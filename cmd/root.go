@@ -1,18 +1,7 @@
-package cmd
+package main
 
-import (
-	"os"
+import "github.com/contracttesting/cli/internal"
 
-	"github.com/spf13/cobra"
-)
-
-var rootCmd = &cobra.Command{
-	Use:   "cli",
-	Short: "contracttests CLI",
-}
-
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
-	}
+func main() {
+	internal.Execute()
 }

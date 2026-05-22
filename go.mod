@@ -1,4 +1,4 @@
-module github.com/contracttests/cli
+module github.com/contracttesting/cli
 
 go 1.25.0
 
