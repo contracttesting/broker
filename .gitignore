@@ -1,0 +1,5 @@
+/cli
+*.test
+*.out
+vendor/
+.DS_Store
