@@ -1,0 +1,63 @@
+name: app
+owner: app-team
+
+consumes:
+  pets-service:
+    rest:
+      "/pets":
+        get:
+          responses:
+            "200": Pets
+      "/pets/{uuid}":
+        get:
+          responses:
+            "200": Pet
+            "404": NotFound
+  users-service:
+    rest:
+      "/users":
+        get:
+          responses:
+            "200": Users
+      "/users/{uuid}":
+        get:
+          responses:
+            "200": User
+            "404": NotFound
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      uuid:
+        type: string
+      name:
+        type: string
+
+  Pets:
+    type: array
+    items:
+      "$ref": Pet
+
+  User:
+    type: object
+    properties:
+      uuid:
+        type: string
+      name:
+        type: string
+      email:
+        type: string
+      aaa:
+        type: string
+
+  Users:
+    type: array
+    items:
+      "$ref": User
+
+  NotFound:
+    type: object
+    properties:
+      message:
+        type: string

@@ -4,15 +4,23 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
 )
 
-const (
-	defaultBrokerURL = "http://localhost:3000"
-	requestTimeout   = 30 * time.Second
-)
+const requestTimeout = 30 * time.Second
+
+func defaultBrokerURL() string {
+	if u := os.Getenv("CONTRACTTESTING_BROKER_URL"); u != "" {
+		return u
+	}
+
+	return "http://localhost:9000"
+}
 
 func newUploadCmd() *cobra.Command {
 	var brokerURL string
@@ -24,9 +32,14 @@ func newUploadCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 
-			contractJSON, err := os.ReadFile(args[0])
+			raw, err := os.ReadFile(args[0])
 			if err != nil {
 				return fmt.Errorf("read contract file: %w", err)
+			}
+
+			contractJSON, err := toJSON(args[0], raw)
+			if err != nil {
+				return fmt.Errorf("encode contract as JSON: %w", err)
 			}
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), requestTimeout)
@@ -60,6 +73,17 @@ func newUploadCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&brokerURL, "broker-url", defaultBrokerURL, "Broker base URL")
+	cmd.Flags().StringVar(&brokerURL, "broker-url", defaultBrokerURL(), "Broker base URL")
 	return cmd
+}
+
+func toJSON(path string, raw []byte) ([]byte, error) {
+	switch ext := strings.ToLower(filepath.Ext(path)); ext {
+	case ".json":
+		return raw, nil
+	case ".yaml", ".yml":
+		return yaml.YAMLToJSON(raw)
+	default:
+		return nil, fmt.Errorf("unsupported contract file extension %q (want .json, .yaml, or .yml)", ext)
+	}
 }

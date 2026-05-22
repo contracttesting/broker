@@ -1,0 +1,40 @@
+name: pets-service
+owner: pets-team
+
+provides:
+  rest:
+    "/pets":
+      get:
+        responses:
+          "200": Pets
+    "/pets/{uuid}":
+      get:
+        responses:
+          "200": Pet
+          "404": NotFound
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      uuid:
+        type: string
+      name:
+        type: string
+      age:
+        type: integer
+      breed:
+        type: string
+      unespected:
+        type: string
+
+  Pets:
+    type: array
+    items:
+      "$ref": Pet
+
+  NotFound:
+    type: object
+    properties:
+      message:
+        type: string

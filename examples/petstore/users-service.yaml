@@ -1,0 +1,36 @@
+name: users-service
+owner: users-team
+
+provides:
+  rest:
+    "/users":
+      get:
+        responses:
+          "200": Users
+    "/users/{uuid}":
+      get:
+        responses:
+          "200": User
+          "404": NotFound
+
+schemas:
+  User:
+    type: object
+    properties:
+      uuid:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+
+  Users:
+    type: array
+    items:
+      "$ref": User
+
+  NotFound:
+    type: object
+    properties:
+      message:
+        type: string

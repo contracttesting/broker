@@ -1,0 +1,23 @@
+name: pets-service
+owner: pets-team
+
+provides:
+  rest:
+    "/pets":
+      get:
+        responses:
+          '200': Pets
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      uuid:
+        type: string
+      name:
+        type: string
+
+  Pets:
+    type: array
+    items:
+      "$ref": Pet

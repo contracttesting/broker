@@ -1,0 +1,28 @@
+name: broken-app
+owner: app-team
+
+consumes:
+  pets-service:
+    rest:
+      "/pets":
+        get:
+          responses:
+            '200': Pets
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      uuid:
+        type: string
+      name:
+        type: string
+      deletedAt:
+        type: string
+      soldAt:
+        type: string
+
+  Pets:
+    type: array
+    items:
+      "$ref": Pet
