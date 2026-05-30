@@ -1,6 +1,3 @@
-name: broken-app
-owner: app-team
-
 consumes:
   pets-service:
     rest:

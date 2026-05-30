@@ -1,6 +1,3 @@
-name: users-service
-owner: users-team
-
 provides:
   rest:
     "/users":

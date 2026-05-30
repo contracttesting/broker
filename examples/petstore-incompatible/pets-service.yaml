@@ -1,6 +1,3 @@
-name: pets-service
-owner: pets-team
-
 provides:
   rest:
     "/pets":
