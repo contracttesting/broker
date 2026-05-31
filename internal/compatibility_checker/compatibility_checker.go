@@ -10,20 +10,20 @@ import (
 )
 
 type BrokenResource struct {
-	Kind       model.ResourceKind
-	Provider   string
-	Endpoint   string
-	Method     string
-	StatusCode string
+	Kind               model.ResourceKind
+	ConsumedProvider   string
+	Endpoint           string
+	Method             string
+	ResponseStatusCode string
 }
 
 func NewBrokenResource(resource model.Resource) BrokenResource {
 	return BrokenResource{
-		Kind:       resource.Kind,
-		Provider:   resource.Provider,
-		Endpoint:   resource.Endpoint,
-		Method:     resource.Method,
-		StatusCode: resource.StatusCode,
+		Kind:               resource.Kind,
+		ConsumedProvider:   resource.ConsumedProvider,
+		Endpoint:           resource.Endpoint,
+		Method:             resource.Method,
+		ResponseStatusCode: resource.ResponseStatusCode,
 	}
 }
 
@@ -101,22 +101,24 @@ func (b *BreakingChange) humanReadable() {
 
 	case ReasonProviderResourceNotFound:
 		b.HumanReadable = fmt.Sprintf(
-			"Provider resource %s not found",
-			b.LeftResource.HumanReadable(),
+			"No %s was found",
+			b.LeftResource.Operation(),
 		)
 
 	case ReasonMissingInProvider:
 		b.HumanReadable = fmt.Sprintf(
-			"Property %s is missing in provider %s",
+			"Property %s is missing in provider %s on %s",
 			b.Property,
 			b.RightResource.ParticipantName(),
+			b.LeftResource.Operation(),
 		)
 
 	case ReasonMissingInConsumer:
 		b.HumanReadable = fmt.Sprintf(
-			"Property %s is missing in consumer %s",
+			"Property %s is missing in consumer %s on %s",
 			b.Property,
-			b.LeftResource.HumanReadable(),
+			b.LeftResource.ParticipantName(),
+			b.LeftResource.Operation(),
 		)
 
 	case ReasonTypeMismatch:
@@ -124,8 +126,9 @@ func (b *BreakingChange) humanReadable() {
 		providerType := b.RightResource.Properties[b.Property].Type
 
 		b.HumanReadable = fmt.Sprintf(
-			"Property %s type mismatch, provider %s expects %s but consumer %s expects %s",
+			"Property %s type mismatch on %s, provider %s expects %s but consumer %s expects %s",
 			b.Property,
+			b.LeftResource.Operation(),
 			b.RightResource.ParticipantName(),
 			providerType,
 			b.LeftResource.ParticipantName(),
@@ -134,18 +137,20 @@ func (b *BreakingChange) humanReadable() {
 
 	case ReasonOptionalInProviderRequiredInConsumer:
 		b.HumanReadable = fmt.Sprintf(
-			"Property %s is optional in provider %s but required in consumer %s",
+			"Property %s is optional in provider %s but required in consumer %s on %s",
 			b.Property,
 			b.RightResource.ParticipantName(),
 			b.LeftResource.ParticipantName(),
+			b.LeftResource.Operation(),
 		)
 
 	case ReasonOptionalInConsumerRequiredInProvider:
 		b.HumanReadable = fmt.Sprintf(
-			"Property %s is optional in consumer %s but required in provider %s",
+			"Property %s is optional in consumer %s but required in provider %s on %s",
 			b.Property,
 			b.LeftResource.ParticipantName(),
 			b.RightResource.ParticipantName(),
+			b.LeftResource.Operation(),
 		)
 
 	default:
@@ -191,11 +196,12 @@ func (c *CompatibilityChecker) checkConsumer(
 	provider, err := c.repository.LoadProviderResourceOfConsumerAndEnvironment(ctx, consumer, environment)
 
 	if errors.Is(err, repository.ErrProviderResourceNotFound) {
-		report.Append(BreakingChange{
-			LeftResource:  &consumer,
-			RightResource: nil,
-			Reason:        ReasonProviderResourceNotFound,
-		})
+		report.Append(NewBreakingChange(
+			&consumer,
+			nil,
+			ReasonProviderResourceNotFound,
+			"",
+		))
 
 		report.Results = append(report.Results, CompatibilityResult{
 			Deployable: false,

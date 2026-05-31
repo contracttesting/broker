@@ -17,23 +17,24 @@ type tableRow struct {
 	ContractRawContract string
 	ContractCreatedAt   time.Time
 
-	ResourceID           int64
-	ResourceDirection    string
-	ResourceKind         string
-	ResourceProvider     sql.NullString
-	ResourceEndpoint     string
-	ResourceMethod       string
-	ResourceStatusCode   sql.NullString
-	ResourceProviderHash string
-	ResourceConsumerHash sql.NullString
-	ResourceCreatedAt    time.Time
+	ResourceID                 int64
+	ResourceDirection          string
+	ResourceKind               string
+	ResourceConsumedProvider   sql.NullString
+	ResourceEndpoint           string
+	ResourceMethod             string
+	ResourceResponseStatusCode sql.NullString
+	ResourceProviderHash       string
+	ResourceConsumerHash       sql.NullString
+	ResourceCreatedAt          time.Time
+	ResourceVersion            string
 
 	PropertyID   int64
 	PropertyPath string
 
-	PropertyVersionType     sql.NullString
-	PropertyVersionOptional sql.NullBool
-	PropertyVersionChange   string
+	PropertyVersionType       sql.NullString
+	PropertyVersionOptional   sql.NullBool
+	PropertyVersionChangeType string
 }
 
 func (c *tableRow) toContractModel() *model.Contract {
@@ -51,14 +52,15 @@ func (c *tableRow) toContractModel() *model.Contract {
 
 func (c *tableRow) toResourceModel() model.Resource {
 	return model.Resource{
-		ID:         c.ResourceID,
-		Direction:  model.Direction(c.ResourceDirection),
-		Kind:       model.ResourceKind(c.ResourceKind),
-		Provider:   c.ResourceProvider.String,
-		Endpoint:   c.ResourceEndpoint,
-		Method:     c.ResourceMethod,
-		StatusCode: c.ResourceStatusCode.String,
-		Properties: make(map[string]model.Property),
+		ID:                 c.ResourceID,
+		Direction:          model.Direction(c.ResourceDirection),
+		Kind:               model.ResourceKind(c.ResourceKind),
+		ConsumedProvider:   c.ResourceConsumedProvider.String,
+		Endpoint:           c.ResourceEndpoint,
+		Method:             c.ResourceMethod,
+		ResponseStatusCode: c.ResourceResponseStatusCode.String,
+		Version:            c.ResourceVersion,
+		Properties:         make(map[string]model.Property),
 		Participant: &model.Participant{
 			ID:   c.ParticipantID,
 			Name: c.ParticipantName,
@@ -84,7 +86,7 @@ type insertPropertyVersionRow struct {
 	ContractID int64
 	Type       sql.NullString
 	Optional   sql.NullBool
-	Change     string
+	ChangeType string
 }
 
 func newInsertPropertyVersionRowAdded(c *model.Contract, p model.Property) *insertPropertyVersionRow {
@@ -105,21 +107,21 @@ func newInsertPropertyVersionRow(c *model.Contract, p model.Property, change con
 		ContractID: c.ID,
 		Type:       nullString(p.Type),
 		Optional:   sql.NullBool{Bool: p.Optional, Valid: true},
-		Change:     string(change),
+		ChangeType: string(change),
 	}
 }
 
 type insertResourceVersionRow struct {
 	ResourceID int64
 	ContractID int64
-	Change     string
+	ChangeType string
 }
 
 func newInsertResourceVersionRowAdded(c *model.Contract, r model.Resource) *insertResourceVersionRow {
 	return &insertResourceVersionRow{
 		ResourceID: r.ID,
 		ContractID: c.ID,
-		Change:     string(contract_differ.ChangeAdded),
+		ChangeType: string(contract_differ.ChangeAdded),
 	}
 }
 
@@ -127,6 +129,6 @@ func newInsertResourceVersionRowRemoved(c *model.Contract, r model.Resource) *in
 	return &insertResourceVersionRow{
 		ResourceID: r.ID,
 		ContractID: c.ID,
-		Change:     string(contract_differ.ChangeRemoved),
+		ChangeType: string(contract_differ.ChangeRemoved),
 	}
 }

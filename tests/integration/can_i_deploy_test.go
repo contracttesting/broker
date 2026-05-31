@@ -131,10 +131,10 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	type brokenResource struct {
 		Direction  string `json:"direction"`
 		Kind       string `json:"kind"`
-		Provider   string `json:"provider"`
+		Provider   string `json:"consumed_provider"`
 		Endpoint   string `json:"endpoint"`
 		Method     string `json:"method"`
-		StatusCode string `json:"status_code"`
+		StatusCode string `json:"response_status_code"`
 	}
 
 	type breakItem struct {
@@ -180,14 +180,14 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 			RightResource: provider,
 			Reason:        "type_mismatch",
 			Property:      "root.id",
-			HumanReadable: "Property root.id type mismatch, provider api expects string but consumer front expects integer",
+			HumanReadable: "Property root.id type mismatch on GET /things (response 200), provider api expects string but consumer front expects integer",
 		},
 		{
 			LeftResource:  consumer,
 			RightResource: provider,
 			Reason:        "missing_in_provider",
 			Property:      "root.name",
-			HumanReadable: "Property root.name is missing in provider api",
+			HumanReadable: "Property root.name is missing in provider api on GET /things (response 200)",
 		},
 	}, got.Breaks["front"])
 
@@ -239,7 +239,7 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 		Deployable bool `json:"deployable"`
 		Breaks     map[string][]struct {
 			LeftResource struct {
-				Provider string `json:"provider"`
+				Provider string `json:"consumed_provider"`
 			} `json:"left_resource"`
 			Reason string `json:"reason"`
 		} `json:"breaks"`
@@ -330,7 +330,7 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		Deployable bool `json:"deployable"`
 		Breaks     map[string][]struct {
 			LeftResource struct {
-				Provider string `json:"provider"`
+				Provider string `json:"consumed_provider"`
 			} `json:"left_resource"`
 			Reason   string `json:"reason"`
 			Property string `json:"property"`
@@ -349,7 +349,7 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	s.Equal(3, s.countRows("compatibility_matrix"))
 
 	rows, err := s.Pool.Query(context.Background(),
-		`SELECT p.name, cm.deployable
+		`SELECT p.name, cm.deployable, cm.counterpart_version
 		   FROM compatibility_matrix cm
 		   JOIN participants p ON p.id = cm.counterpart_participant_id
 		  WHERE cm.version = 'v1'`)
@@ -357,13 +357,19 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	defer rows.Close()
 
 	deployableByProvider := map[string]bool{}
+	versionByProvider := map[string]string{}
 	for rows.Next() {
 		var name string
 		var deployable bool
-		s.Require().NoError(rows.Scan(&name, &deployable))
+		var counterpartVersion string
+		s.Require().NoError(rows.Scan(&name, &deployable, &counterpartVersion))
 		deployableByProvider[name] = deployable
+		versionByProvider[name] = counterpartVersion
 	}
 	s.Require().NoError(rows.Err())
 
 	s.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, deployableByProvider)
+	// counterpart_version records each provider's deployed version (regression:
+	// it was previously always NULL because the resolved resource had no Version).
+	s.Equal(map[string]string{"users": "v1", "auth": "v1", "catalog": "v1"}, versionByProvider)
 }

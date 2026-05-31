@@ -14,13 +14,13 @@ func (s *IntegrationSuite) TestHappyPath_CreateParticipant() {
 	s.Equal(1, s.countRows("participants"))
 }
 
-func (s *IntegrationSuite) TestUnhappyPath_DuplicateParticipantName() {
+func (s *IntegrationSuite) TestIdempotent_DuplicateParticipantName() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/participants", petsParticipantBody)
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"participant already exists"}`, body)
+	s.Equal(http.StatusOK, status)
+	s.JSONEq(`{"success":true,"message":"participant already exists"}`, body)
 
 	s.Equal(1, s.countRows("participants"))
 }
