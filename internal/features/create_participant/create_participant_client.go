@@ -29,7 +29,7 @@ func (c *CreateParticipantClient) Create(ctx context.Context, input *CreateParti
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return "", fmt.Errorf("cannot post participant to broker: %s", resp.String())
+		return "", fmt.Errorf("cannot post participant to broker: %s", components.BrokerMessage(resp.Bytes()))
 	}
 
 	var result CreateParticipantResponse

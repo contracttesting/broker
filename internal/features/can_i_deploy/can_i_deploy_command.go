@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -38,19 +39,31 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 		resp, err := client.Check(ctx, input)
 		if err != nil {
-			fmt.Fprintln(command.ErrOrStderr(), err)
-			return err
+			ui.Failure(command.ErrOrStderr(), err.Error())
+			return ui.ErrSilent
 		}
 
 		if !resp.Deployable {
-			fmt.Fprintln(command.OutOrStdout(), "not deployable")
-			for _, message := range resp.BreakingChangeMessages() {
-				fmt.Fprintf(command.OutOrStdout(), "  - %s\n", message)
+			out := command.OutOrStdout()
+			ui.Failure(out, "not deployable")
+
+			sections := resp.GroupBreaks(participant)
+			if len(sections.DependsOn) > 0 {
+				ui.GroupedTable(out,
+					fmt.Sprintf("%s depends on these providers:", participant),
+					[2]string{"PROVIDER", "BREAKING CHANGE"},
+					tableGroups(sections.DependsOn))
 			}
-			return errNotDeployable
+			if len(sections.DependedOnBy) > 0 {
+				ui.GroupedTable(out,
+					fmt.Sprintf("consumers that depend on %s:", participant),
+					[2]string{"CONSUMER", "BREAKING CHANGE"},
+					tableGroups(sections.DependedOnBy))
+			}
+			return ui.ErrSilent
 		}
 
-		fmt.Fprintln(command.OutOrStdout(), "deployable")
+		ui.Success(command.OutOrStdout(), "🚀", "deployable")
 		return nil
 	}
 
@@ -67,4 +80,12 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 	_ = command.MarkFlagRequired("environment")
 
 	return command
+}
+
+func tableGroups(groups []BreakGroup) []ui.TableGroup {
+	rows := make([]ui.TableGroup, len(groups))
+	for i, group := range groups {
+		rows[i] = ui.TableGroup{Label: group.Counterpart, Rows: group.Messages}
+	}
+	return rows
 }

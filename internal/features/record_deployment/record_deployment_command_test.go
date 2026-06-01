@@ -51,7 +51,7 @@ func TestRecordDeploymentCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, `{"name":"api","version":"v1","environment":"production"}`, string(capturedBody))
-		assert.Equal(t, "deployment recorded\n", out.String())
+		assert.Contains(t, out.String(), "deployment recorded")
 		assert.Empty(t, errOut.String())
 	})
 

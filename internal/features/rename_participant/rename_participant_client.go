@@ -32,7 +32,7 @@ func (c *RenameParticipantClient) Rename(ctx context.Context, input *RenameParti
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return "", fmt.Errorf("cannot post participant rename to broker: %s", resp.String())
+		return "", fmt.Errorf("cannot post participant rename to broker: %s", components.BrokerMessage(resp.Bytes()))
 	}
 
 	var result RenameParticipantResponse

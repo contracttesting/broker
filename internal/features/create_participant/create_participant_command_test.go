@@ -49,7 +49,7 @@ func TestCreateParticipantCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, `{"name":"pets-service"}`, string(capturedBody))
-		assert.Equal(t, "participant created\n", out.String())
+		assert.Contains(t, out.String(), "participant created")
 		assert.Empty(t, errOut.String())
 	})
 
@@ -59,7 +59,7 @@ func TestCreateParticipantCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"success":false,"message":"participant already exists"}`))
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"success":false,"message":"participant invalid input"}`))
 
 		command := create_participant.NewCreateParticipantCommand(
 			create_participant.NewCreateParticipantClient(httpClient),
@@ -72,6 +72,6 @@ func TestCreateParticipantCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "participant already exists")
+		assert.Contains(t, err.Error(), "participant invalid input")
 	})
 }

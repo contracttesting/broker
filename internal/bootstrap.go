@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"os"
 
 	"github.com/contracttesting/cli/internal/components"
@@ -10,12 +11,14 @@ import (
 	"github.com/contracttesting/cli/internal/features/publish_contract"
 	"github.com/contracttesting/cli/internal/features/record_deployment"
 	"github.com/contracttesting/cli/internal/features/rename_participant"
+	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 var rootCommand = &cobra.Command{
-	Use:   "ctio",
-	Short: "CLI for ContractTesting",
+	Use:           "ctio",
+	Short:         "CLI for ContractTesting",
+	SilenceErrors: true,
 }
 
 func Run() {
@@ -48,6 +51,9 @@ func Run() {
 	rename_participant.Register(rootCommand, components)
 
 	if err := rootCommand.Execute(); err != nil {
+		if !errors.Is(err, ui.ErrSilent) {
+			ui.Failure(rootCommand.ErrOrStderr(), err.Error())
+		}
 		os.Exit(1)
 	}
 }

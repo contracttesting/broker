@@ -35,7 +35,7 @@ func (c *PublishContractClient) PublishContract(ctx context.Context, input *Publ
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return "", fmt.Errorf("cannot post contract to broker: %s", resp.String())
+		return "", fmt.Errorf("cannot post contract to broker: %s", components.BrokerMessage(resp.Bytes()))
 	}
 
 	var result PublishContractResponse

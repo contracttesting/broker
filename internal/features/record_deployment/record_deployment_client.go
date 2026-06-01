@@ -33,7 +33,7 @@ func (c *RecordDeploymentClient) Record(ctx context.Context, input *RecordDeploy
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return "", fmt.Errorf("cannot post deployment to broker: %s", resp.String())
+		return "", fmt.Errorf("cannot post deployment to broker: %s", components.BrokerMessage(resp.Bytes()))
 	}
 
 	var result RecordDeploymentResponse

@@ -33,7 +33,7 @@ func (c *CanIDeployClient) Check(ctx context.Context, input *CanIDeployInput) (C
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return CanIDeployResponse{}, fmt.Errorf("cannot query can-i-deploy from broker: %s", resp.String())
+		return CanIDeployResponse{}, fmt.Errorf("cannot query can-i-deploy from broker: %s", components.BrokerMessage(resp.Bytes()))
 	}
 
 	var result CanIDeployResponse

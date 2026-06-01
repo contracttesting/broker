@@ -29,7 +29,7 @@ func (c *CreateEnvironmentClient) Create(ctx context.Context, input *CreateEnvir
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return "", fmt.Errorf("cannot post environment to broker: %s", resp.String())
+		return "", fmt.Errorf("cannot post environment to broker: %s", components.BrokerMessage(resp.Bytes()))
 	}
 
 	var result CreateEnvironmentResponse

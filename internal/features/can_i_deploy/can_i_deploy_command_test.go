@@ -51,7 +51,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, `{"name":"front","version":"v1","environment":"production"}`, string(capturedBody))
-		assert.Equal(t, "deployable\n", out.String())
+		assert.Contains(t, out.String(), "deployable")
 		assert.Empty(t, errOut.String())
 	})
 
@@ -60,9 +60,13 @@ func TestCanIDeployCommand(t *testing.T) {
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
-		responseBody := `{"success":true,"deployable":false,"breaks":{"front":[` +
-			`{"reason":"type_mismatch","property":"root.id","human_readable":"Property root.id type mismatch, provider api expects string but consumer front expects integer"},` +
-			`{"reason":"missing_in_provider","property":"root.name","human_readable":"Property root.name is missing in provider api"}` +
+		responseBody := `{"success":true,"deployable":false,"breaks":{` +
+			`"front":[` +
+			`{"reason":"provider_resource_not_found","property":"","human_readable":"No POST /accounts (request) was found","left_resource":{"consumed_provider":"accounts"}},` +
+			`{"reason":"type_mismatch","property":"root.id","human_readable":"Property root.id type mismatch, provider api expects string but consumer front expects integer","left_resource":{"consumed_provider":"api"}}` +
+			`],` +
+			`"web":[` +
+			`{"reason":"missing_in_provider","property":"root.name","human_readable":"Property root.name is missing in provider front","left_resource":{"consumed_provider":"front"}}` +
 			`]}}`
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
 			httpmock.NewStringResponder(http.StatusOK, responseBody))
@@ -79,13 +83,23 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		require.Error(t, err)
 		output := out.String()
-		assert.Contains(t, output, "not deployable\n")
+		assert.Contains(t, output, "not deployable")
+
+		// providers the checked participant depends on
+		assert.Contains(t, output, "front depends on these providers:")
+		assert.Contains(t, output, "accounts")
+		assert.Contains(t, output, "No POST /accounts (request) was found")
 		assert.Contains(t, output, "Property root.id type mismatch, provider api expects string but consumer front expects integer")
-		assert.Contains(t, output, "Property root.name is missing in provider api")
+
+		// consumers that depend on the checked participant
+		assert.Contains(t, output, "consumers that depend on front:")
+		assert.Contains(t, output, "web")
+		assert.Contains(t, output, "Property root.name is missing in provider front")
+
 		assert.NotContains(t, errOut.String(), "Error:")
 	})
 
-	t.Run("non-2xx response writes the broker body to stderr and exits non-zero", func(t *testing.T) {
+	t.Run("non-2xx response renders the broker message to stderr and exits non-zero", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -105,6 +119,8 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, errOut.String(), "participant not found")
+		assert.NotContains(t, errOut.String(), "{")
+		assert.NotContains(t, errOut.String(), "\"success\"")
 	})
 
 	t.Run("missing --version fails before any request", func(t *testing.T) {
