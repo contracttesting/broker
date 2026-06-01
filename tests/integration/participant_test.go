@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-const petsParticipantBody = `{"name":"pets-service"}`
+const petsParticipantBody = `{"participant":"pets-service"}`
 
 func (s *IntegrationSuite) TestHappyPath_CreateParticipant() {
 	status, body := s.post("/api/participants", petsParticipantBody)

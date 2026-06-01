@@ -43,6 +43,10 @@ func (h *RecordDeploymentHandler) Handle(ctx fiber.Ctx) error {
 		return h.respondParticipantNotFound(ctx)
 	}
 
+	if !h.contractRepository.HasContractForVersion(ctx.Context(), participant.ID, requestBody.Version) {
+		return h.respondVersionNotFound(ctx)
+	}
+
 	environment, exists := h.environmentRepository.FindByName(ctx.Context(), requestBody.Environment)
 	if !exists {
 		return h.respondEnvironmentNotFound(ctx)
@@ -81,6 +85,15 @@ func (h *RecordDeploymentHandler) respondParticipantNotFound(ctx fiber.Ctx) erro
 		BrokerResponseBody: shared.BrokerResponseBody{
 			Success: false,
 			Message: ParticipantNotFound,
+		},
+	})
+}
+
+func (h *RecordDeploymentHandler) respondVersionNotFound(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: false,
+			Message: VersionNotFound,
 		},
 	})
 }

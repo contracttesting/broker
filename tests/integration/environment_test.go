@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-const productionEnvironmentBody = `{"name":"production"}`
+const productionEnvironmentBody = `{"participant":"production"}`
 
 func (s *IntegrationSuite) TestHappyPath_CreateEnvironment() {
 	status, body := s.post("/api/environments", productionEnvironmentBody)

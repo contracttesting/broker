@@ -24,8 +24,13 @@ func (h *RenameParticipantHandler) Handle(ctx fiber.Ctx) error {
 		return h.respondInvalidInput(ctx)
 	}
 
-	if _, conflict := h.participantRepository.Rename(ctx.Context(), requestBody.OldName, requestBody.NewName); conflict {
+	found, conflict := h.participantRepository.Rename(ctx.Context(), requestBody.OldName, requestBody.NewName)
+	if conflict {
 		return h.respondAlreadyExists(ctx)
+	}
+
+	if !found {
+		return h.respondNotFound(ctx)
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(RenameParticipantResponseBody{
@@ -50,6 +55,15 @@ func (h *RenameParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 		BrokerResponseBody: shared.BrokerResponseBody{
 			Success: false,
 			Message: ParticipantAlreadyExists,
+		},
+	})
+}
+
+func (h *RenameParticipantHandler) respondNotFound(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusNotFound).JSON(RenameParticipantResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: false,
+			Message: ParticipantNotFound,
 		},
 	})
 }

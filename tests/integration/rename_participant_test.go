@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	renamePetsBody          = `{"name":"pets-service"}`
-	renameOrdersBody        = `{"name":"orders-service"}`
-	renameProductionEnvBody = `{"name":"production"}`
-	renameV1DeploymentBody  = `{"name":"pets-service","version":"v1","environment":"production"}`
+	renamePetsBody          = `{"participant":"pets-service"}`
+	renameOrdersBody        = `{"participant":"orders-service"}`
+	renameProductionEnvBody = `{"participant":"production"}`
+	renameV1DeploymentBody  = `{"participant":"pets-service","version":"v1","environment":"production"}`
 )
 
 const renameV1ContractBody = `
@@ -40,7 +40,7 @@ func (s *IntegrationSuite) TestRenameParticipant_SuccessPreservesIdentityAndRefe
 	status, _ := s.post("/api/participants", renamePetsBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", `{"name":"pets-service","version":"v1","contract":`+renameV1ContractBody+`}`)
+	status, _ = s.post("/api/contracts", `{"participant":"pets-service","version":"v1","contract":`+renameV1ContractBody+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/environments", renameProductionEnvBody)
@@ -55,7 +55,7 @@ func (s *IntegrationSuite) TestRenameParticipant_SuccessPreservesIdentityAndRefe
 	deploymentsBefore := s.countRows("deployments")
 	s.Require().Positive(resourcesBefore)
 
-	status, body := s.post("/api/participants/rename", `{"name":"pets-service","newName":"orders-service"}`)
+	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service","newName":"orders-service"}`)
 	s.Equal(http.StatusOK, status)
 	s.JSONEq(`{"success":true,"message":"participant renamed"}`, body)
 
@@ -88,7 +88,7 @@ func (s *IntegrationSuite) TestRenameParticipant_OntoExistingNameIsRejectedNever
 	petsID := s.renameParticipantID("pets-service")
 	ordersID := s.renameParticipantID("orders-service")
 
-	status, body := s.post("/api/participants/rename", `{"name":"pets-service","newName":"orders-service"}`)
+	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service","newName":"orders-service"}`)
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"success":false,"message":"participant already exists"}`, body)
 
@@ -97,9 +97,9 @@ func (s *IntegrationSuite) TestRenameParticipant_OntoExistingNameIsRejectedNever
 	s.Equal(ordersID, s.renameParticipantID("orders-service"))
 }
 
-func (s *IntegrationSuite) TestRenameParticipant_UnknownParticipantReturns400() {
-	status, body := s.post("/api/participants/rename", `{"name":"unknown-service","newName":"orders-service"}`)
-	s.Equal(http.StatusBadRequest, status)
+func (s *IntegrationSuite) TestRenameParticipant_UnknownParticipantReturns404() {
+	status, body := s.post("/api/participants/rename", `{"oldName":"unknown-service","newName":"orders-service"}`)
+	s.Equal(http.StatusNotFound, status)
 	s.JSONEq(`{"success":false,"message":"participant not found"}`, body)
 
 	s.Equal(0, s.countRows("participants"))
@@ -109,7 +109,7 @@ func (s *IntegrationSuite) TestRenameParticipant_MissingNewNameReturns400() {
 	status, _ := s.post("/api/participants", renamePetsBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/participants/rename", `{"name":"pets-service"}`)
+	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service"}`)
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"success":false,"message":"participant invalid input"}`, body)
 
@@ -121,7 +121,7 @@ func (s *IntegrationSuite) TestRenameParticipant_EmptyNewNameReturns400() {
 	status, _ := s.post("/api/participants", renamePetsBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/participants/rename", `{"name":"pets-service","newName":""}`)
+	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service","newName":""}`)
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"success":false,"message":"participant invalid input"}`, body)
 
@@ -134,7 +134,7 @@ func (s *IntegrationSuite) TestRenameParticipant_SameNameIsNoOpSuccess() {
 	s.Require().Equal(http.StatusOK, status)
 	originalID := s.renameParticipantID("pets-service")
 
-	status, body := s.post("/api/participants/rename", `{"name":"pets-service","newName":"pets-service"}`)
+	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service","newName":"pets-service"}`)
 	s.Equal(http.StatusOK, status)
 	s.JSONEq(`{"success":true,"message":"participant renamed"}`, body)
 

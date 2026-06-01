@@ -6,10 +6,10 @@ import (
 )
 
 const (
-	apiParticipantBody         = `{"name":"api"}`
-	apiV1DeploymentBody        = `{"name":"api","version":"v1","environment":"production"}`
-	apiV2DeploymentBody        = `{"name":"api","version":"v2","environment":"production"}`
-	productionEnvBodyForDeploy = `{"name":"production"}`
+	apiParticipantBody         = `{"participant":"api"}`
+	apiV1DeploymentBody        = `{"participant":"api","version":"v1","environment":"production"}`
+	apiV2DeploymentBody        = `{"participant":"api","version":"v2","environment":"production"}`
+	productionEnvBodyForDeploy = `{"participant":"production"}`
 )
 
 const apiV1ContractBody = `
@@ -63,7 +63,7 @@ func (s *IntegrationSuite) seedApiParticipantContractAndProductionEnv() {
 	status, _ := s.post("/api/participants", apiParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", `{"name":"api","version":"v1","contract":`+apiV1ContractBody+`}`)
+	status, _ = s.post("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ContractBody+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/environments", productionEnvBodyForDeploy)
@@ -127,10 +127,10 @@ func (s *IntegrationSuite) TestRecordDeployment_RollbackWritesNewRow() {
 	status, _ := s.post("/api/participants", apiParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", `{"name":"api","version":"v1","contract":`+apiV1ContractBody+`}`)
+	status, _ = s.post("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ContractBody+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", `{"name":"api","version":"v2","contract":`+apiV2ContractBody+`}`)
+	status, _ = s.post("/api/contracts", `{"participant":"api","version":"v2","contract":`+apiV2ContractBody+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/environments", productionEnvBodyForDeploy)
@@ -174,7 +174,7 @@ func (s *IntegrationSuite) TestRecordDeployment_MalformedJSONReturns400() {
 
 	status, body := s.post("/api/deployments", `{`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"participant is required"}`, body)
+	s.JSONEq(`{"success":false,"message":"deployment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -182,9 +182,9 @@ func (s *IntegrationSuite) TestRecordDeployment_MalformedJSONReturns400() {
 func (s *IntegrationSuite) TestRecordDeployment_MissingVersionReturns400() {
 	s.seedApiParticipantContractAndProductionEnv()
 
-	status, body := s.post("/api/deployments", `{"name":"api","environment":"production"}`)
+	status, body := s.post("/api/deployments", `{"participant":"api","environment":"production"}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"version is required"}`, body)
+	s.JSONEq(`{"success":false,"message":"deployment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -192,9 +192,9 @@ func (s *IntegrationSuite) TestRecordDeployment_MissingVersionReturns400() {
 func (s *IntegrationSuite) TestRecordDeployment_MissingEnvironmentReturns400() {
 	s.seedApiParticipantContractAndProductionEnv()
 
-	status, body := s.post("/api/deployments", `{"name":"api","version":"v1"}`)
+	status, body := s.post("/api/deployments", `{"participant":"api","version":"v1"}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"environment is required"}`, body)
+	s.JSONEq(`{"success":false,"message":"deployment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -202,22 +202,22 @@ func (s *IntegrationSuite) TestRecordDeployment_MissingEnvironmentReturns400() {
 func (s *IntegrationSuite) TestRecordDeployment_EmptyVersionReturns400() {
 	s.seedApiParticipantContractAndProductionEnv()
 
-	status, body := s.post("/api/deployments", `{"name":"api","version":"","environment":"production"}`)
+	status, body := s.post("/api/deployments", `{"participant":"api","version":"","environment":"production"}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"version is required"}`, body)
+	s.JSONEq(`{"success":false,"message":"deployment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
 
-func (s *IntegrationSuite) TestRecordDeployment_UnknownParticipantReturns400() {
-	status, body := s.post("/api/deployments", `{"name":"unknown","version":"v1","environment":"production"}`)
-	s.Equal(http.StatusBadRequest, status)
+func (s *IntegrationSuite) TestRecordDeployment_UnknownParticipantReturns404() {
+	status, body := s.post("/api/deployments", `{"participant":"unknown","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusNotFound, status)
 	s.JSONEq(`{"success":false,"message":"participant not found"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
 
-func (s *IntegrationSuite) TestRecordDeployment_UnpublishedVersionReturns400() {
+func (s *IntegrationSuite) TestRecordDeployment_UnpublishedVersionReturns404() {
 	status, _ := s.post("/api/participants", apiParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
@@ -225,21 +225,21 @@ func (s *IntegrationSuite) TestRecordDeployment_UnpublishedVersionReturns400() {
 	s.Require().Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/deployments", apiV1DeploymentBody)
-	s.Equal(http.StatusBadRequest, status)
+	s.Equal(http.StatusNotFound, status)
 	s.JSONEq(`{"success":false,"message":"version not found"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
 
-func (s *IntegrationSuite) TestRecordDeployment_UnknownEnvironmentReturns400() {
+func (s *IntegrationSuite) TestRecordDeployment_UnknownEnvironmentReturns404() {
 	status, _ := s.post("/api/participants", apiParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", `{"name":"api","version":"v1","contract":`+apiV1ContractBody+`}`)
+	status, _ = s.post("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ContractBody+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/deployments", apiV1DeploymentBody)
-	s.Equal(http.StatusBadRequest, status)
+	s.Equal(http.StatusNotFound, status)
 	s.JSONEq(`{"success":false,"message":"environment not found"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
@@ -249,7 +249,7 @@ func (s *IntegrationSuite) TestRecordDeployment_ExtraFieldsIgnored() {
 	s.seedApiParticipantContractAndProductionEnv()
 
 	status, body := s.post("/api/deployments",
-		`{"name":"api","version":"v1","environment":"production","deployer":"alice"}`)
+		`{"participant":"api","version":"v1","environment":"production","deployer":"alice"}`)
 	s.Equal(http.StatusOK, status)
 	s.JSONEq(`{"success":true,"message":"deployment recorded"}`, body)
 
