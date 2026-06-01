@@ -1,4 +1,4 @@
-package publish_contract_test
+package integration_test
 
 import (
 	"bytes"
@@ -16,15 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	brokerURL   = "http://localhost:8080"
-	participant = "pets-service"
-	version     = "v1"
-	endpoint    = brokerURL + "/api/contracts"
-)
-
 func TestPublishContractCommand(t *testing.T) {
-	t.Run("publishes a JSON file as name+version+contract object, prints the message, exits 0", func(t *testing.T) {
+	const (
+		brokerURL   = "http://localhost:8080"
+		participant = "pets-service"
+		version     = "v1"
+		endpoint    = brokerURL + "/api/contracts"
+	)
+
+	t.Run("publishes a JSON file as participant+version+contract object, prints the message, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -55,7 +55,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"name":"pets-service","version":"v1","contract":{"provides":{"rest":{}}}}`, string(capturedBody))
+		assert.JSONEq(t, `{"participant":"pets-service","version":"v1","contract":{"provides":{"rest":{}}}}`, string(capturedBody))
 		assert.Contains(t, out.String(), "contract publish successful")
 		assert.Empty(t, errOut.String())
 	})

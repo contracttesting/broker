@@ -1,4 +1,4 @@
-package rename_participant_test
+package integration_test
 
 import (
 	"bytes"
@@ -13,14 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	brokerURL = "http://localhost:8080"
-	oldName   = "pets-service"
-	newName   = "orders-service"
-	endpoint  = brokerURL + "/api/participants/rename"
-)
-
 func TestRenameParticipantCommand(t *testing.T) {
+	const (
+		brokerURL = "http://localhost:8080"
+		oldName   = "pets-service"
+		newName   = "orders-service"
+		endpoint  = brokerURL + "/api/participants/rename"
+	)
+
 	t.Run("renames a participant, posts name+newName, prints the message, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())

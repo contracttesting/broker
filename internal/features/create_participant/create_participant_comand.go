@@ -13,8 +13,6 @@ const requestTimeout = 30 * time.Second
 
 func NewCreateParticipantCommand(client *CreateParticipantClient) *cobra.Command {
 	commandHandler := func(command *cobra.Command, args []string) error {
-		command.SilenceUsage = true
-
 		name := args[0]
 		if name == "" {
 			return fmt.Errorf("participant name must not be empty")
@@ -23,14 +21,17 @@ func NewCreateParticipantCommand(client *CreateParticipantClient) *cobra.Command
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &CreateParticipantInput{Name: name}
+		requestBody := &CreateParticipantRequestBody{
+			Name: name,
+		}
 
-		message, err := client.Create(ctx, input)
+		message, err := client.Create(ctx, requestBody)
 		if err != nil {
 			return err
 		}
 
 		ui.Success(command.OutOrStdout(), "🎭", message)
+
 		return nil
 	}
 

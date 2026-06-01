@@ -1,4 +1,4 @@
-package can_i_deploy_test
+package integration_test
 
 import (
 	"bytes"
@@ -13,16 +13,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	brokerURL   = "http://localhost:8080"
-	participant = "front"
-	version     = "v1"
-	environment = "production"
-	endpoint    = brokerURL + "/api/can-i-deploy"
-)
-
 func TestCanIDeployCommand(t *testing.T) {
-	t.Run("deployable verdict posts name+version+environment, prints deployable, exits 0", func(t *testing.T) {
+	const (
+		brokerURL   = "http://localhost:8080"
+		participant = "front"
+		version     = "v1"
+		environment = "production"
+		endpoint    = brokerURL + "/api/can-i-deploy"
+	)
+
+	t.Run("deployable verdict posts participant+version+environment, prints deployable, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -50,7 +50,7 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"name":"front","version":"v1","environment":"production"}`, string(capturedBody))
+		assert.JSONEq(t, `{"participant":"front","version":"v1","environment":"production"}`, string(capturedBody))
 		assert.Contains(t, out.String(), "deployable")
 		assert.Empty(t, errOut.String())
 	})

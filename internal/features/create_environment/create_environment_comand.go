@@ -23,14 +23,17 @@ func NewCreateEnvironmentCommand(client *CreateEnvironmentClient) *cobra.Command
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &CreateEnvironmentInput{Name: name}
+		requestBody := &CreateEnvironmentRequestBody{
+			Name: name,
+		}
 
-		message, err := client.Create(ctx, input)
+		message, err := client.Create(ctx, requestBody)
 		if err != nil {
 			return err
 		}
 
 		ui.Success(command.OutOrStdout(), "🌍", message)
+
 		return nil
 	}
 

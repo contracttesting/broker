@@ -19,6 +19,7 @@ var rootCommand = &cobra.Command{
 	Use:           "ctio",
 	Short:         "CLI for ContractTesting",
 	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func Run() {
@@ -32,14 +33,13 @@ func Run() {
 			"Broker base URL",
 		)
 
-	// The HTTP client is built before flags are parsed, so apply --broker-url
-	// (which defaults to the env/default URL) once Cobra has resolved it.
 	rootCommand.PersistentPreRunE = func(command *cobra.Command, _ []string) error {
 		brokerURL, err := command.Flags().GetString("broker-url")
 		if err != nil {
 			return err
 		}
 		components.HTTPClient.SetBaseURL(brokerURL)
+
 		return nil
 	}
 
@@ -54,6 +54,7 @@ func Run() {
 		if !errors.Is(err, ui.ErrSilent) {
 			ui.Failure(rootCommand.ErrOrStderr(), err.Error())
 		}
+
 		os.Exit(1)
 	}
 }

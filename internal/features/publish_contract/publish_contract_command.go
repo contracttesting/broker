@@ -24,12 +24,12 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 			return fmt.Errorf("no file path provided")
 		}
 
-		fileContent, err := os.ReadFile(filePath)
+		contractFileContent, err := os.ReadFile(filePath)
 		if err != nil {
 			return fmt.Errorf("read contract file: %w", err)
 		}
 
-		fileContentJSON, err := multiparser.AnyToJSON(args[0], fileContent)
+		contractJSON, err := multiparser.AnyToJSON(args[0], contractFileContent)
 		if err != nil {
 			return err
 		}
@@ -47,18 +47,19 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := PublishContractInput{
-			Participant:  participant,
-			Version:      version,
-			ContractJSON: fileContentJSON,
+		requestBody := &PublishContractRequestBody{
+			Participant: participant,
+			Version:     version,
+			Contract:    contractJSON,
 		}
 
-		message, err := publishContractClient.PublishContract(ctx, &input)
+		message, err := publishContractClient.PublishContract(ctx, requestBody)
 		if err != nil {
 			return err
 		}
 
 		ui.Success(command.OutOrStdout(), "📜", message)
+
 		return nil
 	}
 

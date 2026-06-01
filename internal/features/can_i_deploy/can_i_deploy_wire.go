@@ -1,15 +1,13 @@
 package can_i_deploy
 
-import "sort"
+import (
+	"sort"
 
-type CanIDeployInput struct {
-	Participant string
-	Version     string
-	Environment string
-}
+	"github.com/contracttesting/cli/internal/shared"
+)
 
-type canIDeployBody struct {
-	Name        string `json:"name"`
+type CanIDeployRequestBody struct {
+	Participant string `json:"participant"`
 	Version     string `json:"version"`
 	Environment string `json:"environment"`
 }
@@ -23,33 +21,23 @@ type BreakingChange struct {
 	} `json:"left_resource"`
 }
 
-type CanIDeployResponse struct {
-	Success    bool                        `json:"success"`
+type CanIDeployResponseBody struct {
+	shared.BrokerResponseBody
 	Deployable bool                        `json:"deployable"`
 	Breaks     map[string][]BreakingChange `json:"breaks"`
 }
 
-// BreakGroup holds the breaking-change messages for one counterpart participant:
-// a provider the checked participant depends on, or a consumer that depends on it.
 type BreakGroup struct {
 	Counterpart string
 	Messages    []string
 }
 
-// BreakSections splits a not-deployable verdict by direction relative to the
-// checked participant. A participant both provides and consumes, so a single
-// check can yield breaks in both directions.
 type BreakSections struct {
-	DependsOn    []BreakGroup // providers the checked participant depends on
-	DependedOnBy []BreakGroup // consumers that depend on the checked participant
+	DependsOn    []BreakGroup
+	DependedOnBy []BreakGroup
 }
 
-// GroupBreaks groups the breaks for display. The broker keys breaks by the
-// consumer participant, so breaks under the checked participant are the providers
-// it depends on (grouped by each break's consumed provider); breaks under any
-// other key are consumers that depend on it (grouped by that key). Groups and
-// messages are sorted because the broker's map order is not stable.
-func (r CanIDeployResponse) GroupBreaks(participant string) BreakSections {
+func (r CanIDeployResponseBody) GroupBreaks(participant string) BreakSections {
 	dependsOn := map[string][]string{}
 	dependedOnBy := map[string][]string{}
 

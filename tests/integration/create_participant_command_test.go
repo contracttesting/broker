@@ -1,4 +1,4 @@
-package create_participant_test
+package integration_test
 
 import (
 	"bytes"
@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	brokerURL = "http://localhost:8080"
-	name      = "pets-service"
-	endpoint  = brokerURL + "/api/participants"
-)
-
 func TestCreateParticipantCommand(t *testing.T) {
+	const (
+		brokerURL = "http://localhost:8080"
+		name      = "pets-service"
+		endpoint  = brokerURL + "/api/participants"
+	)
+
 	t.Run("creates a participant, posts name, prints the message, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())

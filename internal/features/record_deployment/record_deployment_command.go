@@ -30,13 +30,13 @@ func NewRecordDeploymentCommand(client *RecordDeploymentClient) *cobra.Command {
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &RecordDeploymentInput{
+		requestBody := &RecordDeploymentRequestBody{
 			Participant: participant,
 			Version:     version,
 			Environment: environment,
 		}
 
-		message, err := client.Record(ctx, input)
+		message, err := client.Record(ctx, requestBody)
 		if err != nil {
 			return err
 		}

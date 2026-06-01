@@ -17,28 +17,24 @@ func NewCanIDeployClient(httpClient *components.HTTPClient) *CanIDeployClient {
 	return &CanIDeployClient{httpClient: httpClient}
 }
 
-func (c *CanIDeployClient) Check(ctx context.Context, input *CanIDeployInput) (CanIDeployResponse, error) {
-	body, err := json.Marshal(canIDeployBody{
-		Name:        input.Participant,
-		Version:     input.Version,
-		Environment: input.Environment,
-	})
+func (c *CanIDeployClient) Check(ctx context.Context, requestBody *CanIDeployRequestBody) (CanIDeployResponseBody, error) {
+	body, err := json.Marshal(requestBody)
 	if err != nil {
-		return CanIDeployResponse{}, fmt.Errorf("cannot serialize can-i-deploy request to JSON: %w", err)
+		return CanIDeployResponseBody{}, fmt.Errorf("cannot serialize can-i-deploy request to JSON: %w", err)
 	}
 
 	resp, err := c.httpClient.Post(ctx, "/api/can-i-deploy", body)
 	if err != nil {
-		return CanIDeployResponse{}, fmt.Errorf("cannot query can-i-deploy from broker: %w", err)
+		return CanIDeployResponseBody{}, fmt.Errorf("cannot query can-i-deploy from broker: %w", err)
+	}
+
+	var result CanIDeployResponseBody
+	if err := json.Unmarshal(resp.Bytes(), &result); err != nil {
+		return CanIDeployResponseBody{}, fmt.Errorf("cannot parse can-i-deploy response: %w", err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return CanIDeployResponse{}, fmt.Errorf("cannot query can-i-deploy from broker: %s", components.BrokerMessage(resp.Bytes()))
-	}
-
-	var result CanIDeployResponse
-	if err := json.Unmarshal(resp.Bytes(), &result); err != nil {
-		return CanIDeployResponse{}, fmt.Errorf("cannot parse can-i-deploy response: %w", err)
+		return CanIDeployResponseBody{}, fmt.Errorf("cannot query can-i-deploy from broker: %s", result.Message)
 	}
 
 	return result, nil

@@ -30,15 +30,10 @@ func NewHTTPClient(config *Config) *HTTPClient {
 	return httpClient
 }
 
-// StdClient returns resty's underlying *http.Client so tests can attach
-// httpmock.ActivateNonDefault to intercept requests (resty does not use
-// http.DefaultTransport).
 func (c *HTTPClient) StdClient() *http.Client {
 	return c.restClient.Client()
 }
 
-// SetBaseURL overrides the broker base URL after construction, so the
-// --broker-url flag (parsed after the client is built) can take effect.
 func (c *HTTPClient) SetBaseURL(url string) {
 	c.restClient.SetBaseURL(url)
 }

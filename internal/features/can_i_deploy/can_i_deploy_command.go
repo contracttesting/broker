@@ -31,13 +31,13 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &CanIDeployInput{
+		requestBody := &CanIDeployRequestBody{
 			Participant: participant,
 			Version:     version,
 			Environment: environment,
 		}
 
-		resp, err := client.Check(ctx, input)
+		resp, err := client.Check(ctx, requestBody)
 		if err != nil {
 			ui.Failure(command.ErrOrStderr(), err.Error())
 			return ui.ErrSilent
