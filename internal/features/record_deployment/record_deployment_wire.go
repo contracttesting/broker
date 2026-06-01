@@ -1,23 +1,19 @@
 package record_deployment
 
-import (
-	"github.com/contracttesting/broker/internal/components"
-	"github.com/contracttesting/broker/internal/middleware"
-	"github.com/contracttesting/broker/internal/repository"
-)
+import "github.com/contracttesting/broker/internal/shared"
 
-func Register(components *components.Components) {
-	participantRepository := repository.NewParticipantRepository(components.Pool)
-	contractRepository := repository.NewContractRepository(components.Pool)
-	environmentRepository := repository.NewEnvironmentRepository(components.Pool)
-	deploymentRepository := repository.NewDeploymentRepository(components.Pool)
+const DeploymentRecorded string = "deployment recorded"
+const DeploymentInvalidInput string = "deployment invalid input"
+const ParticipantNotFound string = "participant not found"
+const VersionNotFound string = "version not found"
+const EnvironmentNotFound string = "environment not found"
 
-	handler := NewRecordDeploymentHandler(deploymentRepository)
+type RecordDeploymentRequestBody struct {
+	Participant string `json:"participant"`
+	Version     string `json:"version"`
+	Environment string `json:"environment"`
+}
 
-	components.Server.Post("/api/deployments",
-		middleware.RequireParticipant(participantRepository, middleware.FromBody("name")),
-		middleware.RequireVersion(contractRepository, middleware.FromBody("version")),
-		middleware.RequireEnvironment(environmentRepository, middleware.FromBody("environment")),
-		handler.Handle,
-	)
+type RecordDeploymentResponseBody struct {
+	shared.BrokerResponseBody
 }

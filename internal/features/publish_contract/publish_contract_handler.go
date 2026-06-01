@@ -5,48 +5,49 @@ import (
 	"strings"
 
 	"github.com/contracttesting/broker/internal/dsl"
-	"github.com/contracttesting/broker/internal/middleware"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
+	"github.com/contracttesting/broker/internal/shared"
 	"github.com/gofiber/fiber/v3"
 )
 
-type PublishContractController struct {
-	contractRepository *repository.ContractRepository
+type PublishContractHandler struct {
+	contractRepository    *repository.ContractRepository
+	participantRepository *repository.ParticipantRepository
 }
 
-func NewPublishContractController(
+func NewPublishContractHandler(
 	contractRepository *repository.ContractRepository,
-) *PublishContractController {
-	return &PublishContractController{
-		contractRepository: contractRepository,
+	participantRepository *repository.ParticipantRepository,
+) *PublishContractHandler {
+	return &PublishContractHandler{
+		contractRepository:    contractRepository,
+		participantRepository: participantRepository,
 	}
 }
 
-type publishContractRequest struct {
-	Version  string          `json:"version"`
-	Contract json.RawMessage `json:"contract"`
-}
-
-func (ctr *PublishContractController) Handle(ctx fiber.Ctx) error {
-	request := &publishContractRequest{}
-	if err := json.Unmarshal(ctx.Body(), request); err != nil {
+func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
+	requestBody := &PublishContractRequestBody{}
+	if err := json.Unmarshal(ctx.Body(), requestBody); err != nil {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	version := strings.TrimSpace(request.Version)
-	if version == "" || len(request.Contract) == 0 {
+	version := strings.TrimSpace(requestBody.Version)
+	if version == "" || len(requestBody.Contract) == 0 {
 		return ctr.respondInvalidInput(ctx)
 	}
 
 	dslContract := &dsl.Contract{}
-	if err := json.Unmarshal(request.Contract, dslContract); err != nil {
+	if err := json.Unmarshal(requestBody.Contract, dslContract); err != nil {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	participant := middleware.ParticipantFrom(ctx)
+	participant, exists := ctr.participantRepository.FindByName(ctx.Context(), requestBody.Participant)
+	if !exists {
+		return ctr.respondParticipantNotFound(ctx)
+	}
 
-	contract := model.NewContract(participant, version, string(request.Contract))
+	contract := model.NewContract(participant, version, string(requestBody.Contract))
 	dslContract.HydrateContract(contract)
 
 	if existing, found := ctr.contractRepository.LoadChecksumForVersion(ctx.Context(), contract.ParticipantID(), version); found {
@@ -61,7 +62,16 @@ func (ctr *PublishContractController) Handle(ctx fiber.Ctx) error {
 	return ctr.respondSuccess(ctx)
 }
 
-func (ctr *PublishContractController) upsert(ctx fiber.Ctx, contract *model.Contract) {
+func (ctr *PublishContractHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusNotFound).JSON(PublishContractResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: false,
+			Message: ContractParticipantNotFound,
+		},
+	})
+}
+
+func (ctr *PublishContractHandler) upsert(ctx fiber.Ctx, contract *model.Contract) {
 	if ctr.contractRepository.HasContractsForParticipant(ctx.Context(), contract.ParticipantID()) {
 		ctr.contractRepository.Update(ctx.Context(), contract)
 
@@ -71,23 +81,29 @@ func (ctr *PublishContractController) upsert(ctx fiber.Ctx, contract *model.Cont
 	ctr.contractRepository.Create(ctx.Context(), contract)
 }
 
-func (ctr *PublishContractController) respondInvalidInput(ctx fiber.Ctx) error {
-	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractOutput{
-		Success: false,
-		Message: ContractInvalidInput,
+func (ctr *PublishContractHandler) respondInvalidInput(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: false,
+			Message: ContractInvalidInput,
+		},
 	})
 }
 
-func (ctr *PublishContractController) respondVersionConflict(ctx fiber.Ctx) error {
-	return ctx.Status(fiber.StatusConflict).JSON(PublishContractOutput{
-		Success: false,
-		Message: ContractVersionConflict,
+func (ctr *PublishContractHandler) respondVersionConflict(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusConflict).JSON(PublishContractResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: false,
+			Message: ContractVersionConflict,
+		},
 	})
 }
 
-func (ctr *PublishContractController) respondSuccess(ctx fiber.Ctx) error {
-	return ctx.Status(fiber.StatusOK).JSON(PublishContractOutput{
-		Success: true,
-		Message: ContractPublishSuccessful,
+func (ctr *PublishContractHandler) respondSuccess(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusOK).JSON(PublishContractResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: true,
+			Message: ContractPublishSuccessful,
+		},
 	})
 }

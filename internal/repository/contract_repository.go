@@ -43,10 +43,10 @@ const (
 				participant_id,
 				direction,
 				kind,
-				provider,
+				consumed_provider,
 				endpoint,
 				method,
-				status_code,
+				response_status_code,
 				provider_hash,
 				consumer_hash
 			)
@@ -77,14 +77,14 @@ const (
 
 	insertPropertyVersionQuery = `
 		INSERT INTO property_versions
-			(property_id, contract_id, type, optional, change)
+			(property_id, contract_id, type, optional, change_type)
 		VALUES
 			($1, $2, $3, $4, $5)
 	`
 
 	insertResourceVersionQuery = `
 		INSERT INTO resource_versions
-			(resource_id, contract_id, change)
+			(resource_id, contract_id, change_type)
 		VALUES
 			($1, $2, $3)
 	`
@@ -100,10 +100,10 @@ const (
 			r.id,
 			r.direction,
 			r.kind,
-			r.provider,
+			r.consumed_provider,
 			r.endpoint,
 			r.method,
-			r.status_code,
+			r.response_status_code,
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
@@ -111,12 +111,12 @@ const (
 			p.path,
 			pv.type,
 			pv.optional,
-			pv.change
+			pv.change_type
 		FROM contracts c
 		JOIN participants pa ON pa.id = c.participant_id
 		JOIN resources r ON r.participant_id = c.participant_id
 		JOIN LATERAL (
-			SELECT change
+			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id AND contract_id <= c.id
 			ORDER BY contract_id DESC
@@ -124,7 +124,7 @@ const (
 		) rv ON true
 		JOIN properties p ON p.resource_id = r.id
 		JOIN LATERAL (
-			SELECT type, optional, change
+			SELECT type, optional, change_type
 			FROM property_versions
 			WHERE property_id = p.id AND contract_id <= c.id
 			ORDER BY contract_id DESC
@@ -132,7 +132,7 @@ const (
 		) pv ON true
 		WHERE pa.name = $1
 		  AND c.id = (SELECT MAX(id) FROM contracts WHERE participant_id = pa.id)
-		  AND rv.change = 'added'
+		  AND rv.change_type = 'added'
 		ORDER BY r.id
 	`
 
@@ -147,10 +147,10 @@ const (
 			r.id,
 			r.direction,
 			r.kind,
-			r.provider,
+			r.consumed_provider,
 			r.endpoint,
 			r.method,
-			r.status_code,
+			r.response_status_code,
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
@@ -158,12 +158,12 @@ const (
 			p.path,
 			pv.type,
 			pv.optional,
-			pv.change
+			pv.change_type
 		FROM contracts c
 		JOIN participants pa ON pa.id = c.participant_id
 		JOIN resources r ON r.participant_id = c.participant_id
 		JOIN LATERAL (
-			SELECT change
+			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id AND contract_id <= c.id
 			ORDER BY contract_id DESC
@@ -171,7 +171,7 @@ const (
 		) rv ON true
 		JOIN properties p ON p.resource_id = r.id
 		JOIN LATERAL (
-			SELECT type, optional, change
+			SELECT type, optional, change_type
 			FROM property_versions
 			WHERE property_id = p.id AND contract_id <= c.id
 			ORDER BY contract_id DESC
@@ -179,7 +179,7 @@ const (
 		) pv ON true
 		WHERE pa.name = $1
 		  AND c.version = $2
-		  AND rv.change = 'added'
+		  AND rv.change_type = 'added'
 		ORDER BY r.id
 	`
 
@@ -197,7 +197,7 @@ const (
 		JOIN resources r ON r.participant_id = cd.participant_id
 		JOIN participants pa ON pa.id = cd.participant_id
 		JOIN LATERAL (
-			SELECT change
+			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id AND contract_id <= cd.contract_id
 			ORDER BY contract_id DESC
@@ -205,7 +205,7 @@ const (
 		) rv ON true
 		WHERE r.direction = 'consumes'
 		  AND r.provider_hash = $1
-		  AND rv.change = 'added'
+		  AND rv.change_type = 'added'
 	`
 
 	findResourcesByDirectionAndProviderHashQuery = `
@@ -215,27 +215,32 @@ const (
 			pa.name,
 			r.direction,
 			r.kind,
-			r.provider,
+			r.consumed_provider,
 			r.endpoint,
 			r.method,
-			r.status_code,
+			r.response_status_code,
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
 			p.path,
 			pv.type,
 			pv.optional,
-			pv.change
+			pv.change_type,
+			dep.version
 		FROM
 			resources r
 		JOIN
 			participants pa ON pa.id = r.participant_id
-		LEFT JOIN
-			deployments d ON d.participant_id = r.participant_id
-		LEFT JOIN
-			environments e ON e.id = d.environment_id
 		JOIN LATERAL (
-			SELECT change
+			SELECT version
+			FROM deployments
+			WHERE participant_id = r.participant_id
+			  AND environment_id = $3
+			ORDER BY deployed_at DESC
+			LIMIT 1
+		) dep ON true
+		JOIN LATERAL (
+			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id
 			  AND contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
@@ -246,7 +251,7 @@ const (
 			properties p ON p.resource_id = r.id
 		LEFT JOIN LATERAL (
 			SELECT
-				type, optional, change
+				type, optional, change_type
 			FROM
 				property_versions
 			WHERE
@@ -259,9 +264,7 @@ const (
 		AND
 			r.provider_hash = $2
 		AND
-			rv.change = 'added'
-		AND
-			e.id = $3
+			rv.change_type = 'added'
 	`
 )
 
@@ -437,13 +440,13 @@ func (r *ContractRepository) insertResource(
 	}
 
 	statusCode := sql.NullString{
-		String: resource.StatusCode,
-		Valid:  resource.StatusCode != "",
+		String: resource.ResponseStatusCode,
+		Valid:  resource.ResponseStatusCode != "",
 	}
 
 	provider := sql.NullString{
-		String: resource.Provider,
-		Valid:  resource.Provider != "",
+		String: resource.ConsumedProvider,
+		Valid:  resource.ConsumedProvider != "",
 	}
 
 	providerHash := sql.NullString{
@@ -536,7 +539,7 @@ func (r *ContractRepository) insertPropertyVersion(
 		row.ContractID,
 		row.Type,
 		row.Optional,
-		row.Change,
+		row.ChangeType,
 	); err != nil {
 		panic(fmt.Errorf("error inserting property version: %w", err))
 	}
@@ -552,7 +555,7 @@ func (r *ContractRepository) insertResourceVersion(
 		insertResourceVersionQuery,
 		row.ResourceID,
 		row.ContractID,
-		row.Change,
+		row.ChangeType,
 	); err != nil {
 		panic(fmt.Errorf("error inserting resource version: %w", err))
 	}
@@ -576,10 +579,10 @@ func (r *ContractRepository) LoadLatestContractByName(
 
 func (r *ContractRepository) LoadContractByNameAndVersion(
 	ctx context.Context,
-	name string,
+	participantName string,
 	version string,
 ) (*model.Contract, bool) {
-	rows, err := r.pool.Query(ctx, findContractTreeByNameAndVersionQuery, name, version)
+	rows, err := r.pool.Query(ctx, findContractTreeByNameAndVersionQuery, participantName, version)
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
@@ -605,10 +608,10 @@ func scanContractTree(rows pgx.Rows) (*model.Contract, bool) {
 			&row.ResourceID,
 			&row.ResourceDirection,
 			&row.ResourceKind,
-			&row.ResourceProvider,
+			&row.ResourceConsumedProvider,
 			&row.ResourceEndpoint,
 			&row.ResourceMethod,
-			&row.ResourceStatusCode,
+			&row.ResourceResponseStatusCode,
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
 			&row.ResourceCreatedAt,
@@ -616,12 +619,12 @@ func scanContractTree(rows pgx.Rows) (*model.Contract, bool) {
 			&row.PropertyPath,
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
-			&row.PropertyVersionChange,
+			&row.PropertyVersionChangeType,
 		); err != nil {
 			panic(fmt.Errorf("error scanning contract tree row: %w", err))
 		}
 
-		if row.PropertyVersionChange == string(contract_differ.ChangeRemoved) {
+		if row.PropertyVersionChangeType == string(contract_differ.ChangeRemoved) {
 			continue
 		}
 
@@ -704,17 +707,18 @@ func (r *ContractRepository) LoadProviderResourceOfConsumerAndEnvironment(
 			&row.ParticipantName,
 			&row.ResourceDirection,
 			&row.ResourceKind,
-			&row.ResourceProvider,
+			&row.ResourceConsumedProvider,
 			&row.ResourceEndpoint,
 			&row.ResourceMethod,
-			&row.ResourceStatusCode,
+			&row.ResourceResponseStatusCode,
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
 			&row.ResourceCreatedAt,
 			&row.PropertyPath,
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
-			&row.PropertyVersionChange,
+			&row.PropertyVersionChangeType,
+			&row.ResourceVersion,
 		); err != nil {
 			panic(fmt.Errorf("error scanning provider resource: %w", err))
 		}
@@ -764,17 +768,18 @@ func (r *ContractRepository) FindConsumersOfProviderAndEnvironment(
 			&row.ParticipantName,
 			&row.ResourceDirection,
 			&row.ResourceKind,
-			&row.ResourceProvider,
+			&row.ResourceConsumedProvider,
 			&row.ResourceEndpoint,
 			&row.ResourceMethod,
-			&row.ResourceStatusCode,
+			&row.ResourceResponseStatusCode,
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
 			&row.ResourceCreatedAt,
 			&row.PropertyPath,
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
-			&row.PropertyVersionChange,
+			&row.PropertyVersionChangeType,
+			&row.ResourceVersion,
 		); err != nil {
 			panic(fmt.Errorf("error scanning consumer: %w", err))
 		}

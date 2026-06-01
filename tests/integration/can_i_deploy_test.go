@@ -87,28 +87,28 @@ const frontV2ConsumerContract = `
 func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	// api@v1 provides Thing{id}; publish it and deploy it to production so the
 	// compatibility check can resolve it as the provider in that environment.
-	status, _ := s.post("/api/participants", `{"name":"api"}`)
+	status, _ := s.post("/api/participants", `{"participant":"api"}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", `{"name":"api","version":"v1","contract":`+apiV1ProviderContract+`}`)
+	status, _ = s.post("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ProviderContract+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/environments", `{"name":"production"}`)
+	status, _ = s.post("/api/environments", `{"participant":"production"}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/deployments", `{"name":"api","version":"v1","environment":"production"}`)
+	status, _ = s.post("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/participants", `{"name":"front"}`)
+	status, _ = s.post("/api/participants", `{"participant":"front"}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	// front@v1 consumes only "id", which api@v1 provides: it is deployable.
-	status, _ = s.post("/api/contracts", `{"name":"front","version":"v1","contract":`+frontV1ConsumerContract+`}`)
+	status, _ = s.post("/api/contracts", `{"participant":"front","version":"v1","contract":`+frontV1ConsumerContract+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/can-i-deploy", `{"name":"front","version":"v1","environment":"production"}`)
+	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"deployable":true}`, body)
+	s.JSONEq(`{"success":true,"message":"Contract checked successfully","deployable":true}`, body)
 
 	// A compatible decision is persisted as a deployable row.
 	s.Equal(1, s.countRows("compatibility_matrix"))
@@ -117,24 +117,24 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 		`SELECT deployable FROM compatibility_matrix WHERE version = 'v1'`).Scan(&v1Deployable))
 	s.True(v1Deployable)
 
-	status, _ = s.post("/api/deployments", `{"name":"front","version":"v1","environment":"production"}`)
+	status, _ = s.post("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	// front@v2 is incompatible with api@v1 on two counts, so it is not deployable
 	// and the response carries the breaking changes.
-	status, _ = s.post("/api/contracts", `{"name":"front","version":"v2","contract":`+frontV2ConsumerContract+`}`)
+	status, _ = s.post("/api/contracts", `{"participant":"front","version":"v2","contract":`+frontV2ConsumerContract+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body = s.post("/api/can-i-deploy", `{"name":"front","version":"v2","environment":"production"}`)
+	status, body = s.post("/api/can-i-deploy", `{"participant":"front","version":"v2","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
 
 	type brokenResource struct {
 		Direction  string `json:"direction"`
 		Kind       string `json:"kind"`
-		Provider   string `json:"provider"`
+		Provider   string `json:"consumed_provider"`
 		Endpoint   string `json:"endpoint"`
 		Method     string `json:"method"`
-		StatusCode string `json:"status_code"`
+		StatusCode string `json:"response_status_code"`
 	}
 
 	type breakItem struct {
@@ -180,14 +180,14 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 			RightResource: provider,
 			Reason:        "type_mismatch",
 			Property:      "root.id",
-			HumanReadable: "Property root.id type mismatch, provider api expects string but consumer front expects integer",
+			HumanReadable: "Property root.id type mismatch on GET /things (response 200), provider api expects string but consumer front expects integer",
 		},
 		{
 			LeftResource:  consumer,
 			RightResource: provider,
 			Reason:        "missing_in_provider",
 			Property:      "root.name",
-			HumanReadable: "Property root.name is missing in provider api",
+			HumanReadable: "Property root.name is missing in provider api on GET /things (response 200)",
 		},
 	}, got.Breaks["front"])
 
@@ -217,19 +217,19 @@ const appV1ThreeDependenciesContract = `
 }`
 
 func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
-	status, _ := s.post("/api/participants", `{"name":"app"}`)
+	status, _ := s.post("/api/participants", `{"participant":"app"}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/environments", `{"name":"production"}`)
+	status, _ = s.post("/api/environments", `{"participant":"production"}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	// Only this contract is uploaded — none of its three providers exist.
 	status, _ = s.post("/api/contracts",
-		`{"name":"app","version":"v1","contract":`+appV1ThreeDependenciesContract+`}`)
+		`{"participant":"app","version":"v1","contract":`+appV1ThreeDependenciesContract+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/can-i-deploy",
-		`{"name":"app","version":"v1","environment":"production"}`)
+		`{"participant":"app","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
 
 	// Not deployable (no provider is present), but the check still fans out to
@@ -239,7 +239,7 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 		Deployable bool `json:"deployable"`
 		Breaks     map[string][]struct {
 			LeftResource struct {
-				Provider string `json:"provider"`
+				Provider string `json:"consumed_provider"`
 			} `json:"left_resource"`
 			Reason string `json:"reason"`
 		} `json:"breaks"`
@@ -306,21 +306,21 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	}
 
 	for _, name := range []string{"users", "auth", "catalog", "app"} {
-		mustPost("/api/participants", `{"name":"`+name+`"}`)
+		mustPost("/api/participants", `{"participant":"`+name+`"}`)
 	}
-	mustPost("/api/environments", `{"name":"production"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
 
 	// Publish and deploy each provider to production so the check can resolve them.
-	mustPost("/api/contracts", `{"name":"users","version":"v1","contract":`+usersV1ProviderContract+`}`)
-	mustPost("/api/deployments", `{"name":"users","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", `{"name":"auth","version":"v1","contract":`+authV1ProviderContract+`}`)
-	mustPost("/api/deployments", `{"name":"auth","version":"v1","environment":"production"}`)
-	mustPost("/api/contracts", `{"name":"catalog","version":"v1","contract":`+catalogV1ProviderContract+`}`)
-	mustPost("/api/deployments", `{"name":"catalog","version":"v1","environment":"production"}`)
+	mustPost("/api/contracts", `{"participant":"users","version":"v1","contract":`+usersV1ProviderContract+`}`)
+	mustPost("/api/deployments", `{"participant":"users","version":"v1","environment":"production"}`)
+	mustPost("/api/contracts", `{"participant":"auth","version":"v1","contract":`+authV1ProviderContract+`}`)
+	mustPost("/api/deployments", `{"participant":"auth","version":"v1","environment":"production"}`)
+	mustPost("/api/contracts", `{"participant":"catalog","version":"v1","contract":`+catalogV1ProviderContract+`}`)
+	mustPost("/api/deployments", `{"participant":"catalog","version":"v1","environment":"production"}`)
 
-	mustPost("/api/contracts", `{"name":"app","version":"v1","contract":`+appV1MixedDependenciesContract+`}`)
+	mustPost("/api/contracts", `{"participant":"app","version":"v1","contract":`+appV1MixedDependenciesContract+`}`)
 
-	status, body := s.post("/api/can-i-deploy", `{"name":"app","version":"v1","environment":"production"}`)
+	status, body := s.post("/api/can-i-deploy", `{"participant":"app","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
 
 	// Two dependencies match; catalog breaks on a type mismatch, so app as a
@@ -330,7 +330,7 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		Deployable bool `json:"deployable"`
 		Breaks     map[string][]struct {
 			LeftResource struct {
-				Provider string `json:"provider"`
+				Provider string `json:"consumed_provider"`
 			} `json:"left_resource"`
 			Reason   string `json:"reason"`
 			Property string `json:"property"`
@@ -349,7 +349,7 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	s.Equal(3, s.countRows("compatibility_matrix"))
 
 	rows, err := s.Pool.Query(context.Background(),
-		`SELECT p.name, cm.deployable
+		`SELECT p.name, cm.deployable, cm.counterpart_version
 		   FROM compatibility_matrix cm
 		   JOIN participants p ON p.id = cm.counterpart_participant_id
 		  WHERE cm.version = 'v1'`)
@@ -357,13 +357,19 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	defer rows.Close()
 
 	deployableByProvider := map[string]bool{}
+	versionByProvider := map[string]string{}
 	for rows.Next() {
 		var name string
 		var deployable bool
-		s.Require().NoError(rows.Scan(&name, &deployable))
+		var counterpartVersion string
+		s.Require().NoError(rows.Scan(&name, &deployable, &counterpartVersion))
 		deployableByProvider[name] = deployable
+		versionByProvider[name] = counterpartVersion
 	}
 	s.Require().NoError(rows.Err())
 
 	s.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, deployableByProvider)
+	// counterpart_version records each provider's deployed version (regression:
+	// it was previously always NULL because the resolved resource had no Version).
+	s.Equal(map[string]string{"users": "v1", "auth": "v1", "catalog": "v1"}, versionByProvider)
 }

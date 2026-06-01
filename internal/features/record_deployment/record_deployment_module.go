@@ -1,8 +1,15 @@
 package record_deployment
 
-const DeploymentRecorded string = "deployment recorded"
+import (
+	"github.com/contracttesting/broker/internal/components"
+	"github.com/contracttesting/broker/internal/repository"
+)
 
-type RecordDeploymentResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+func Register(components *components.Components) {
+	participantRepository := repository.NewParticipantRepository(components.Pool)
+	contractRepository := repository.NewContractRepository(components.Pool)
+	environmentRepository := repository.NewEnvironmentRepository(components.Pool)
+	deploymentRepository := repository.NewDeploymentRepository(components.Pool)
+	handler := NewRecordDeploymentHandler(deploymentRepository, participantRepository, contractRepository, environmentRepository)
+	components.Server.Post("/api/deployments", handler.Handle)
 }

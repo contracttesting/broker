@@ -1,14 +1,24 @@
 package publish_contract
 
-type ContractMessage string
+import (
+	"encoding/json"
 
-const (
-	ContractPublishSuccessful ContractMessage = "contract publish successful"
-	ContractInvalidInput      ContractMessage = "contract invalid input"
-	ContractVersionConflict   ContractMessage = "contract version already exists with different content"
+	"github.com/contracttesting/broker/internal/shared"
 )
 
-type PublishContractOutput struct {
-	Success bool            `json:"success"`
-	Message ContractMessage `json:"message"`
+const (
+	ContractPublishSuccessful   string = "contract publish successful"
+	ContractInvalidInput        string = "contract invalid input"
+	ContractVersionConflict     string = "contract version already exists with different content"
+	ContractParticipantNotFound string = "contract participant not found"
+)
+
+type PublishContractRequestBody struct {
+	Participant string          `json:"participant"`
+	Version     string          `json:"version"`
+	Contract    json.RawMessage `json:"contract"`
+}
+
+type PublishContractResponseBody struct {
+	shared.BrokerResponseBody
 }

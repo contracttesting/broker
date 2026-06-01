@@ -7,7 +7,7 @@ import (
 	"github.com/contracttesting/broker/internal/repository"
 )
 
-const stagingEnvBody = `{"name":"staging"}`
+const stagingEnvBody = `{"participant":"staging"}`
 
 func (s *IntegrationSuite) insertDeploymentAt(participantID int64, version string, environmentID int64, deployedAt string) {
 	_, err := s.Pool.Exec(context.Background(),
