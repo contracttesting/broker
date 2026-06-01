@@ -3,54 +3,60 @@ package create_participant
 import (
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
+	"github.com/contracttesting/broker/internal/shared"
 	"github.com/gofiber/fiber/v3"
 )
-
-type createParticipantRequest struct {
-	Name string `json:"name"`
-}
 
 type CreateParticipantHandler struct {
 	participantRepository *repository.ParticipantRepository
 }
 
-func NewCreateParticipantHandler(repo *repository.ParticipantRepository) *CreateParticipantHandler {
-	return &CreateParticipantHandler{participantRepository: repo}
+func NewCreateParticipantHandler(
+	participantRepository *repository.ParticipantRepository,
+) *CreateParticipantHandler {
+	return &CreateParticipantHandler{
+		participantRepository: participantRepository,
+	}
 }
 
 func (ctr *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
-	request := &createParticipantRequest{}
-
-	if err := ctx.Bind().JSON(request); err != nil {
+	requestBody := &CreateParticipantRequestBody{}
+	if err := ctx.Bind().JSON(requestBody); err != nil {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	if request.Name == "" {
+	if requestBody.Participant == "" {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	if ctr.participantRepository.ExistsByName(ctx.Context(), request.Name) {
+	if ctr.participantRepository.ExistsByName(ctx.Context(), requestBody.Participant) {
 		return ctr.respondAlreadyExists(ctx)
 	}
 
-	ctr.participantRepository.Create(ctx.Context(), model.NewParticipant(request.Name))
+	ctr.participantRepository.Create(ctx.Context(), model.NewParticipant(requestBody.Participant))
 
-	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponse{
-		Success: true,
-		Message: string(ParticipantCreated),
+	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: true,
+			Message: ParticipantCreated,
+		},
 	})
 }
 
 func (ctr *CreateParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
-	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponse{
-		Success: false,
-		Message: ParticipantInvalidInput,
+	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: false,
+			Message: ParticipantInvalidInput,
+		},
 	})
 }
 
 func (ctr *CreateParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error {
-	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponse{
-		Success: true,
-		Message: ParticipantAlreadyExists,
+	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
+		BrokerResponseBody: shared.BrokerResponseBody{
+			Success: true,
+			Message: ParticipantAlreadyExists,
+		},
 	})
 }

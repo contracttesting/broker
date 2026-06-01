@@ -579,10 +579,10 @@ func (r *ContractRepository) LoadLatestContractByName(
 
 func (r *ContractRepository) LoadContractByNameAndVersion(
 	ctx context.Context,
-	name string,
+	participantName string,
 	version string,
 ) (*model.Contract, bool) {
-	rows, err := r.pool.Query(ctx, findContractTreeByNameAndVersionQuery, name, version)
+	rows, err := r.pool.Query(ctx, findContractTreeByNameAndVersionQuery, participantName, version)
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
