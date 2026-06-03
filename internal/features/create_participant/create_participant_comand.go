@@ -22,7 +22,7 @@ func NewCreateParticipantCommand(client *CreateParticipantClient) *cobra.Command
 		defer cancel()
 
 		requestBody := &CreateParticipantRequestBody{
-			Name: name,
+			Participant: name,
 		}
 
 		message, err := client.Create(ctx, requestBody)

@@ -48,7 +48,7 @@ func TestCreateParticipantCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"name":"pets-service"}`, string(capturedBody))
+		assert.JSONEq(t, `{"participant":"pets-service"}`, string(capturedBody))
 		assert.Contains(t, out.String(), "participant created")
 		assert.Empty(t, errOut.String())
 	})

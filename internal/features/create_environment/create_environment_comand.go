@@ -24,7 +24,7 @@ func NewCreateEnvironmentCommand(client *CreateEnvironmentClient) *cobra.Command
 		defer cancel()
 
 		requestBody := &CreateEnvironmentRequestBody{
-			Name: name,
+			Participant: name,
 		}
 
 		message, err := client.Create(ctx, requestBody)

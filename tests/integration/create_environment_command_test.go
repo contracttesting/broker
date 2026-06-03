@@ -48,7 +48,7 @@ func TestCreateEnvironmentCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"name":"production"}`, string(capturedBody))
+		assert.JSONEq(t, `{"participant":"production"}`, string(capturedBody))
 		assert.Contains(t, out.String(), "environment created")
 		assert.Empty(t, errOut.String())
 	})
