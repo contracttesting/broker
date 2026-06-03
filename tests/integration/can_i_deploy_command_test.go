@@ -62,11 +62,11 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		responseBody := `{"success":true,"deployable":false,"breaks":{` +
 			`"front":[` +
-			`{"reason":"provider_resource_not_found","property":"","human_readable":"No POST /accounts (request) was found","left_resource":{"consumed_provider":"accounts"}},` +
-			`{"reason":"type_mismatch","property":"root.id","human_readable":"Property root.id type mismatch, provider api expects string but consumer front expects integer","left_resource":{"consumed_provider":"api"}}` +
+			`{"reason":"provider_resource_not_found","property":"","human_readable":"No POST /accounts (request) was found","left_resource":{"consumed_provider":"accounts","method":"post","endpoint":"/accounts"}},` +
+			`{"reason":"type_mismatch","property":"root.id","human_readable":"Property root.id type mismatch, provider api expects string but consumer front expects integer","left_resource":{"consumed_provider":"api","method":"get","endpoint":"/api/users"}}` +
 			`],` +
 			`"web":[` +
-			`{"reason":"missing_in_provider","property":"root.name","human_readable":"Property root.name is missing in provider front","left_resource":{"consumed_provider":"front"}}` +
+			`{"reason":"missing_in_provider","property":"root.name","human_readable":"Property root.name is missing in provider front","left_resource":{"consumed_provider":"front","method":"put","endpoint":"/profile"}}` +
 			`]}}`
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
 			httpmock.NewStringResponder(http.StatusOK, responseBody))
@@ -88,12 +88,15 @@ func TestCanIDeployCommand(t *testing.T) {
 		// providers the checked participant depends on
 		assert.Contains(t, output, "front depends on these providers:")
 		assert.Contains(t, output, "accounts")
+		assert.Contains(t, output, "POST /accounts")
 		assert.Contains(t, output, "No POST /accounts (request) was found")
+		assert.Contains(t, output, "GET /api/users")
 		assert.Contains(t, output, "Property root.id type mismatch, provider api expects string but consumer front expects integer")
 
 		// consumers that depend on the checked participant
 		assert.Contains(t, output, "consumers that depend on front:")
 		assert.Contains(t, output, "web")
+		assert.Contains(t, output, "PUT /profile")
 		assert.Contains(t, output, "Property root.name is missing in provider front")
 
 		assert.NotContains(t, errOut.String(), "Error:")

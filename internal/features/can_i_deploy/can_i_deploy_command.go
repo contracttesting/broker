@@ -51,13 +51,13 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 			if len(sections.DependsOn) > 0 {
 				ui.GroupedTable(out,
 					fmt.Sprintf("%s depends on these providers:", participant),
-					[2]string{"PROVIDER", "BREAKING CHANGE"},
+					[]string{"PROVIDER", "RESOURCE", "BREAKING CHANGE"},
 					tableGroups(sections.DependsOn))
 			}
 			if len(sections.DependedOnBy) > 0 {
 				ui.GroupedTable(out,
 					fmt.Sprintf("consumers that depend on %s:", participant),
-					[2]string{"CONSUMER", "BREAKING CHANGE"},
+					[]string{"CONSUMER", "RESOURCE", "BREAKING CHANGE"},
 					tableGroups(sections.DependedOnBy))
 			}
 			return ui.ErrSilent
@@ -85,7 +85,7 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 func tableGroups(groups []BreakGroup) []ui.TableGroup {
 	rows := make([]ui.TableGroup, len(groups))
 	for i, group := range groups {
-		rows[i] = ui.TableGroup{Label: group.Counterpart, Rows: group.Messages}
+		rows[i] = ui.TableGroup{Labels: []string{group.Counterpart, group.Resource}, Rows: group.Messages}
 	}
 	return rows
 }

@@ -2,6 +2,7 @@ package can_i_deploy
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/contracttesting/cli/internal/shared"
 )
@@ -18,7 +19,13 @@ type BreakingChange struct {
 	HumanReadable string `json:"human_readable"`
 	LeftResource  struct {
 		ConsumedProvider string `json:"consumed_provider"`
+		Method           string `json:"method"`
+		Endpoint         string `json:"endpoint"`
 	} `json:"left_resource"`
+}
+
+func (c BreakingChange) resource() string {
+	return strings.ToUpper(c.LeftResource.Method) + " " + c.LeftResource.Endpoint
 }
 
 type CanIDeployResponseBody struct {
@@ -29,6 +36,7 @@ type CanIDeployResponseBody struct {
 
 type BreakGroup struct {
 	Counterpart string
+	Resource    string
 	Messages    []string
 }
 
@@ -37,17 +45,23 @@ type BreakSections struct {
 	DependedOnBy []BreakGroup
 }
 
+type groupKey struct {
+	counterpart string
+	resource    string
+}
+
 func (r CanIDeployResponseBody) GroupBreaks(participant string) BreakSections {
-	dependsOn := map[string][]string{}
-	dependedOnBy := map[string][]string{}
+	dependsOn := map[groupKey][]string{}
+	dependedOnBy := map[groupKey][]string{}
 
 	for key, changes := range r.Breaks {
 		for _, change := range changes {
 			if key == participant {
-				provider := change.LeftResource.ConsumedProvider
-				dependsOn[provider] = append(dependsOn[provider], change.HumanReadable)
+				k := groupKey{counterpart: change.LeftResource.ConsumedProvider, resource: change.resource()}
+				dependsOn[k] = append(dependsOn[k], change.HumanReadable)
 			} else {
-				dependedOnBy[key] = append(dependedOnBy[key], change.HumanReadable)
+				k := groupKey{counterpart: key, resource: change.resource()}
+				dependedOnBy[k] = append(dependedOnBy[k], change.HumanReadable)
 			}
 		}
 	}
@@ -58,12 +72,17 @@ func (r CanIDeployResponseBody) GroupBreaks(participant string) BreakSections {
 	}
 }
 
-func sortedGroups(grouped map[string][]string) []BreakGroup {
+func sortedGroups(grouped map[groupKey][]string) []BreakGroup {
 	groups := make([]BreakGroup, 0, len(grouped))
-	for counterpart, messages := range grouped {
+	for key, messages := range grouped {
 		sort.Strings(messages)
-		groups = append(groups, BreakGroup{Counterpart: counterpart, Messages: messages})
+		groups = append(groups, BreakGroup{Counterpart: key.counterpart, Resource: key.resource, Messages: messages})
 	}
-	sort.Slice(groups, func(i, j int) bool { return groups[i].Counterpart < groups[j].Counterpart })
+	sort.Slice(groups, func(i, j int) bool {
+		if groups[i].Counterpart != groups[j].Counterpart {
+			return groups[i].Counterpart < groups[j].Counterpart
+		}
+		return groups[i].Resource < groups[j].Resource
+	})
 	return groups
 }
