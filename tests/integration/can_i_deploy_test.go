@@ -108,7 +108,7 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"Contract checked successfully","deployable":true}`, body)
+	s.JSONEq(`{"message":"Contract checked successfully","deployable":true}`, body)
 
 	// A compatible decision is persisted as a deployable row.
 	s.Equal(1, s.countRows("compatibility_matrix"))
@@ -143,16 +143,18 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 		Reason        string         `json:"reason"`
 		Property      string         `json:"property"`
 		HumanReadable string         `json:"human_readable"`
+		ConsumerName  string         `json:"consumer_name"`
+		ProviderName  string         `json:"provider_name"`
+		ConsumerType  string         `json:"consumer_type"`
+		ProviderType  string         `json:"provider_type"`
 	}
 
 	var got struct {
-		Success    bool                   `json:"success"`
 		Deployable bool                   `json:"deployable"`
 		Breaks     map[string][]breakItem `json:"breaks"`
 	}
 
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.True(got.Success)
 	s.False(got.Deployable)
 
 	consumer := brokenResource{
@@ -181,6 +183,10 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 			Reason:        "type_mismatch",
 			Property:      "root.id",
 			HumanReadable: "Property root.id type mismatch on GET /things (response 200), provider api expects string but consumer front expects integer",
+			ConsumerName:  "front",
+			ProviderName:  "api",
+			ConsumerType:  "integer",
+			ProviderType:  "string",
 		},
 		{
 			LeftResource:  consumer,
@@ -188,6 +194,8 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 			Reason:        "missing_in_provider",
 			Property:      "root.name",
 			HumanReadable: "Property root.name is missing in provider api on GET /things (response 200)",
+			ConsumerName:  "front",
+			ProviderName:  "api",
 		},
 	}, got.Breaks["front"])
 
@@ -235,7 +243,6 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 	// Not deployable (no provider is present), but the check still fans out to
 	// one break per consumed service.
 	var got struct {
-		Success    bool `json:"success"`
 		Deployable bool `json:"deployable"`
 		Breaks     map[string][]struct {
 			LeftResource struct {
@@ -245,7 +252,6 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 		} `json:"breaks"`
 	}
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.True(got.Success)
 	s.False(got.Deployable)
 
 	providers := make([]string, 0, len(got.Breaks["app"]))
@@ -326,7 +332,6 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	// Two dependencies match; catalog breaks on a type mismatch, so app as a
 	// whole is not deployable.
 	var got struct {
-		Success    bool `json:"success"`
 		Deployable bool `json:"deployable"`
 		Breaks     map[string][]struct {
 			LeftResource struct {
@@ -337,7 +342,6 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		} `json:"breaks"`
 	}
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.True(got.Success)
 	s.False(got.Deployable)
 
 	s.Require().Len(got.Breaks["app"], 1)
@@ -372,4 +376,102 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	// counterpart_version records each provider's deployed version (regression:
 	// it was previously always NULL because the resolved resource had no Version).
 	s.Equal(map[string]string{"users": "v1", "auth": "v1", "catalog": "v1"}, versionByProvider)
+}
+
+// providerThingContract@v1 provides Thing{id}. consumerThingContract@v1 consumes
+// it compatibly, so the only thing that can block a deploy is the provider not
+// being deployed in the target environment yet.
+const providerThingContract = `
+{
+  "provides": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } },
+  "schemas": { "Thing": { "type": "object", "properties": { "id": { "type": "string" } } } }
+}`
+
+const consumerThingContract = `
+{
+  "consumes": { "api": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } } },
+  "schemas": { "Thing": { "type": "object", "properties": { "id": { "type": "string" } } } }
+}`
+
+// The provider exists and is deployed to staging, but NOT to production. Checking
+// the consumer against production is not deployable, and the break names staging
+// as where the provider currently lives.
+func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEnv() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"participant":"staging"}`)
+
+	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+providerThingContract+`}`)
+	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"staging"}`)
+
+	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+consumerThingContract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got struct {
+		Deployable bool `json:"deployable"`
+		Breaks     map[string][]struct {
+			LeftResource struct {
+				Provider string `json:"consumed_provider"`
+			} `json:"left_resource"`
+			Reason               string   `json:"reason"`
+			HumanReadable        string   `json:"human_readable"`
+			DeployedEnvironments []string `json:"deployed_environments"`
+		} `json:"breaks"`
+	}
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+
+	s.False(got.Deployable)
+	s.Require().Len(got.Breaks["front"], 1)
+
+	breakItem := got.Breaks["front"][0]
+	s.Equal("api", breakItem.LeftResource.Provider)
+	s.Equal("provider_resource_not_deployed_in_environment", breakItem.Reason)
+	s.Equal([]string{"staging"}, breakItem.DeployedEnvironments)
+	s.Contains(breakItem.HumanReadable, "staging")
+	s.Contains(breakItem.HumanReadable, "isn't deployed")
+}
+
+// The provider exists but has never been deployed anywhere. The break still fires
+// (not deployable) and reports an empty deployed-environments list.
+func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
+
+	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+providerThingContract+`}`)
+	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+consumerThingContract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got struct {
+		Deployable bool `json:"deployable"`
+		Breaks     map[string][]struct {
+			Reason               string   `json:"reason"`
+			HumanReadable        string   `json:"human_readable"`
+			DeployedEnvironments []string `json:"deployed_environments"`
+		} `json:"breaks"`
+	}
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+
+	s.False(got.Deployable)
+	s.Require().Len(got.Breaks["front"], 1)
+
+	breakItem := got.Breaks["front"][0]
+	s.Equal("provider_resource_not_deployed_in_environment", breakItem.Reason)
+	s.Empty(breakItem.DeployedEnvironments)
+	s.Contains(breakItem.HumanReadable, "any environment yet")
 }

@@ -57,7 +57,7 @@ func (s *IntegrationSuite) TestRenameParticipant_SuccessPreservesIdentityAndRefe
 
 	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service","newName":"orders-service"}`)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"participant renamed"}`, body)
+	s.JSONEq(`{"message":"participant renamed"}`, body)
 
 	var (
 		idAfter   int64
@@ -90,7 +90,7 @@ func (s *IntegrationSuite) TestRenameParticipant_OntoExistingNameIsRejectedNever
 
 	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service","newName":"orders-service"}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"participant already exists"}`, body)
+	s.JSONEq(`{"message":"participant already exists"}`, body)
 
 	s.Equal(2, s.countRows("participants"))
 	s.Equal(petsID, s.renameParticipantID("pets-service"))
@@ -100,7 +100,7 @@ func (s *IntegrationSuite) TestRenameParticipant_OntoExistingNameIsRejectedNever
 func (s *IntegrationSuite) TestRenameParticipant_UnknownParticipantReturns404() {
 	status, body := s.post("/api/participants/rename", `{"oldName":"unknown-service","newName":"orders-service"}`)
 	s.Equal(http.StatusNotFound, status)
-	s.JSONEq(`{"success":false,"message":"participant not found"}`, body)
+	s.JSONEq(`{"message":"participant not found"}`, body)
 
 	s.Equal(0, s.countRows("participants"))
 }
@@ -111,7 +111,7 @@ func (s *IntegrationSuite) TestRenameParticipant_MissingNewNameReturns400() {
 
 	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service"}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"participant invalid input"}`, body)
+	s.JSONEq(`{"message":"participant invalid input"}`, body)
 
 	s.Equal(1, s.countRows("participants"))
 	s.NotZero(s.renameParticipantID("pets-service"))
@@ -123,7 +123,7 @@ func (s *IntegrationSuite) TestRenameParticipant_EmptyNewNameReturns400() {
 
 	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service","newName":""}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"participant invalid input"}`, body)
+	s.JSONEq(`{"message":"participant invalid input"}`, body)
 
 	s.Equal(1, s.countRows("participants"))
 	s.NotZero(s.renameParticipantID("pets-service"))
@@ -136,7 +136,7 @@ func (s *IntegrationSuite) TestRenameParticipant_SameNameIsNoOpSuccess() {
 
 	status, body := s.post("/api/participants/rename", `{"oldName":"pets-service","newName":"pets-service"}`)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"participant renamed"}`, body)
+	s.JSONEq(`{"message":"participant renamed"}`, body)
 
 	s.Equal(1, s.countRows("participants"))
 	s.Equal(originalID, s.renameParticipantID("pets-service"))

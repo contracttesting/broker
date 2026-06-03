@@ -36,6 +36,7 @@ type Resource struct {
 	Method             string              `json:"method"`
 	ResponseStatusCode string              `json:"response_status_code"`
 	Properties         map[string]Property `json:"-"`
+	DeployedVersions   map[string]string   `json:"-"`
 	Version            string              `json:"version"`
 	Participant        *Participant        `json:"-"`
 }
@@ -50,6 +51,20 @@ func (resouce *Resource) Operation() string {
 	}
 
 	return operation + " (request)"
+}
+
+func (resouce *Resource) DeployedEnvironments() []string {
+	environments := make([]string, 0, len(resouce.DeployedVersions))
+	for environment := range resouce.DeployedVersions {
+		environments = append(environments, environment)
+	}
+	sort.Strings(environments)
+	return environments
+}
+
+func (resouce *Resource) DeployedVersionIn(environment string) (string, bool) {
+	version, ok := resouce.DeployedVersions[environment]
+	return version, ok
 }
 
 func (resouce *Resource) AddParticipant(participant *Participant) {

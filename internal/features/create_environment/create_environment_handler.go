@@ -3,7 +3,6 @@ package create_environment
 import (
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/shared"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -33,27 +32,18 @@ func (ctr *CreateEnvironmentHandler) Handle(ctx fiber.Ctx) error {
 	ctr.environmentRepository.Create(ctx.Context(), model.NewEnvironment(requestBody.Participant))
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: true,
-			Message: EnvironmentCreated,
-		},
+		Message: EnvironmentCreated,
 	})
 }
 
 func (ctr *CreateEnvironmentHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateEnvironmentResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: EnvironmentInvalidInput,
-		},
+		Message: EnvironmentInvalidInput,
 	})
 }
 
 func (ctr *CreateEnvironmentHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateEnvironmentResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: EnvironmentAlreadyExists,
-		},
+		Message: EnvironmentAlreadyExists,
 	})
 }

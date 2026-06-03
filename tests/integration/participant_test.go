@@ -9,7 +9,7 @@ const petsParticipantBody = `{"participant":"pets-service"}`
 func (s *IntegrationSuite) TestHappyPath_CreateParticipant() {
 	status, body := s.post("/api/participants", petsParticipantBody)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"participant created"}`, body)
+	s.JSONEq(`{"message":"participant created"}`, body)
 
 	s.Equal(1, s.countRows("participants"))
 }
@@ -20,7 +20,7 @@ func (s *IntegrationSuite) TestIdempotent_DuplicateParticipantName() {
 
 	status, body := s.post("/api/participants", petsParticipantBody)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"participant already exists"}`, body)
+	s.JSONEq(`{"message":"participant already exists"}`, body)
 
 	s.Equal(1, s.countRows("participants"))
 }

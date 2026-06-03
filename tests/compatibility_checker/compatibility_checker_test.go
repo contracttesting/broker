@@ -13,7 +13,10 @@ import (
 // NewBreakingChange (and thus humanReadable()), so the CLI rendered empty
 // "  - " bullets for every such break.
 func TestProviderResourceNotFoundHasHumanReadable(t *testing.T) {
-	consumer := &model.Resource{}
+	consumer := &model.Resource{
+		ConsumedProvider: "accounts",
+		Participant:      &model.Participant{Name: "front"},
+	}
 
 	change := compatibility_checker.NewBreakingChange(
 		consumer,
@@ -24,6 +27,10 @@ func TestProviderResourceNotFoundHasHumanReadable(t *testing.T) {
 
 	assert.NotEmpty(t, change.HumanReadable)
 	assert.Contains(t, change.HumanReadable, "was found")
+	assert.Equal(t, "front", change.ConsumerName)
+	assert.Equal(t, "accounts", change.ProviderName)
+	assert.Empty(t, change.ConsumerType)
+	assert.Empty(t, change.ProviderType)
 }
 
 // The message describes the missing HTTP operation, upper-casing the method and,
@@ -35,6 +42,7 @@ func TestProviderResourceNotFoundMessage(t *testing.T) {
 		ConsumedProvider: "accounts",
 		Endpoint:         "/accounts",
 		Method:           "post",
+		Participant:      &model.Participant{Name: "front"},
 	}
 	response := &model.Resource{
 		Kind:               model.RestResponse,
@@ -42,6 +50,7 @@ func TestProviderResourceNotFoundMessage(t *testing.T) {
 		Endpoint:           "/accounts",
 		Method:             "post",
 		ResponseStatusCode: "201",
+		Participant:        &model.Participant{Name: "front"},
 	}
 
 	requestChange := compatibility_checker.NewBreakingChange(
@@ -123,4 +132,18 @@ func TestPropertyBreakMessagesIncludeOperation(t *testing.T) {
 	assert.Equal(t,
 		`Property root.flag is optional in consumer front but required in provider api on POST /things (request)`,
 		optionalInConsumer.HumanReadable)
+
+	// Every break carries the consumer name. Type-mismatch breaks additionally
+	// carry the consumer/provider property types; other reasons leave them empty.
+	assert.Equal(t, "front", typeMismatch.ConsumerName)
+	assert.Equal(t, "integer", typeMismatch.ConsumerType)
+	assert.Equal(t, "string", typeMismatch.ProviderType)
+
+	assert.Equal(t, "front", missingInProvider.ConsumerName)
+	assert.Empty(t, missingInProvider.ConsumerType)
+	assert.Empty(t, missingInProvider.ProviderType)
+
+	assert.Equal(t, "front", missingInConsumer.ConsumerName)
+	assert.Empty(t, missingInConsumer.ConsumerType)
+	assert.Empty(t, missingInConsumer.ProviderType)
 }

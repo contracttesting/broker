@@ -3,7 +3,6 @@ package create_participant
 import (
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/shared"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -36,27 +35,18 @@ func (ctr *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
 	ctr.participantRepository.Create(ctx.Context(), model.NewParticipant(requestBody.Participant))
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: true,
-			Message: ParticipantCreated,
-		},
+		Message: ParticipantCreated,
 	})
 }
 
 func (ctr *CreateParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ParticipantInvalidInput,
-		},
+		Message: ParticipantInvalidInput,
 	})
 }
 
 func (ctr *CreateParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(CreateParticipantResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: true,
-			Message: ParticipantAlreadyExists,
-		},
+		Message: ParticipantAlreadyExists,
 	})
 }

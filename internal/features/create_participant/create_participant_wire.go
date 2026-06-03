@@ -1,7 +1,5 @@
 package create_participant
 
-import "github.com/contracttesting/broker/internal/shared"
-
 const (
 	ParticipantCreated       string = "participant created"
 	ParticipantInvalidInput  string = "participant invalid input"
@@ -13,5 +11,5 @@ type CreateParticipantRequestBody struct {
 }
 
 type CreateParticipantResponseBody struct {
-	shared.BrokerResponseBody
+	Message string `json:"message"`
 }

@@ -1,7 +1,5 @@
 package record_deployment
 
-import "github.com/contracttesting/broker/internal/shared"
-
 const DeploymentRecorded string = "deployment recorded"
 const DeploymentInvalidInput string = "deployment invalid input"
 const ParticipantNotFound string = "participant not found"
@@ -15,5 +13,5 @@ type RecordDeploymentRequestBody struct {
 }
 
 type RecordDeploymentResponseBody struct {
-	shared.BrokerResponseBody
+	Message string `json:"message"`
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
@@ -30,21 +31,27 @@ func NewBrokenResource(resource model.Resource) BrokenResource {
 type BreakingReason string
 
 const (
-	ReasonProviderNotFound                     BreakingReason = "provider_not_found"
-	ReasonProviderResourceNotFound             BreakingReason = "provider_resource_not_found"
-	ReasonMissingInProvider                    BreakingReason = "missing_in_provider"
-	ReasonMissingInConsumer                    BreakingReason = "missing_in_consumer"
-	ReasonTypeMismatch                         BreakingReason = "type_mismatch"
-	ReasonOptionalInProviderRequiredInConsumer BreakingReason = "optional_in_provider_required_in_consumer"
-	ReasonOptionalInConsumerRequiredInProvider BreakingReason = "optional_in_consumer_required_in_provider"
+	ReasonProviderNotFound                         BreakingReason = "provider_not_found"
+	ReasonProviderResourceNotFound                 BreakingReason = "provider_resource_not_found"
+	ReasonMissingInProvider                        BreakingReason = "missing_in_provider"
+	ReasonMissingInConsumer                        BreakingReason = "missing_in_consumer"
+	ReasonTypeMismatch                             BreakingReason = "type_mismatch"
+	ReasonOptionalInProviderRequiredInConsumer     BreakingReason = "optional_in_provider_required_in_consumer"
+	ReasonOptionalInConsumerRequiredInProvider     BreakingReason = "optional_in_consumer_required_in_provider"
+	ReasonProviderResourceNotDeployedInEnvironment BreakingReason = "provider_resource_not_deployed_in_environment"
 )
 
 type BreakingChange struct {
-	LeftResource  *model.Resource `json:"left_resource"`
-	RightResource *model.Resource `json:"right_resource"`
-	Reason        BreakingReason  `json:"reason"`
-	Property      string          `json:"property"`
-	HumanReadable string          `json:"human_readable"`
+	LeftResource         *model.Resource `json:"left_resource"`
+	RightResource        *model.Resource `json:"right_resource"`
+	Reason               BreakingReason  `json:"reason"`
+	Property             string          `json:"property"`
+	HumanReadable        string          `json:"human_readable"`
+	DeployedEnvironments []string        `json:"deployed_environments,omitempty"`
+	ConsumerName         string          `json:"consumer_name,omitempty"`
+	ProviderName         string          `json:"provider_name,omitempty"`
+	ConsumerType         string          `json:"consumer_type,omitempty"`
+	ProviderType         string          `json:"provider_type,omitempty"`
 }
 
 type CompatibilityResult struct {
@@ -84,6 +91,27 @@ func NewBreakingChange(
 		RightResource: rightResource,
 		Reason:        reason,
 		Property:      property,
+		ConsumerName:  leftResource.ParticipantName(),
+		ProviderName:  leftResource.ConsumedProvider,
+	}
+
+	if reason == ReasonTypeMismatch {
+		breakingChange.ConsumerType = leftResource.Properties[property].Type
+		breakingChange.ProviderType = rightResource.Properties[property].Type
+	}
+
+	breakingChange.humanReadable()
+
+	return breakingChange
+}
+
+func NewProviderNotDeployedBreakingChange(consumer *model.Resource, deployedEnvironments []string) BreakingChange {
+	breakingChange := BreakingChange{
+		LeftResource:         consumer,
+		Reason:               ReasonProviderResourceNotDeployedInEnvironment,
+		DeployedEnvironments: deployedEnvironments,
+		ConsumerName:         consumer.ParticipantName(),
+		ProviderName:         consumer.ConsumedProvider,
 	}
 
 	breakingChange.humanReadable()
@@ -153,6 +181,20 @@ func (b *BreakingChange) humanReadable() {
 			b.LeftResource.Operation(),
 		)
 
+	case ReasonProviderResourceNotDeployedInEnvironment:
+		if len(b.DeployedEnvironments) > 0 {
+			b.HumanReadable = fmt.Sprintf(
+				"%s exists but isn't deployed in this environment yet (deployed in: %s)",
+				b.LeftResource.Operation(),
+				strings.Join(b.DeployedEnvironments, ", "),
+			)
+		} else {
+			b.HumanReadable = fmt.Sprintf(
+				"%s exists but isn't deployed in any environment yet",
+				b.LeftResource.Operation(),
+			)
+		}
+
 	default:
 		b.HumanReadable = "Unknown reason"
 	}
@@ -193,7 +235,7 @@ func (c *CompatibilityChecker) checkConsumer(
 	environment *model.Environment,
 	report *CompatibilityReport,
 ) {
-	provider, err := c.repository.LoadProviderResourceOfConsumerAndEnvironment(ctx, consumer, environment)
+	provider, err := c.repository.LoadProviderResourceOfConsumer(ctx, consumer)
 
 	if errors.Is(err, repository.ErrProviderResourceNotFound) {
 		report.Append(NewBreakingChange(
@@ -209,6 +251,22 @@ func (c *CompatibilityChecker) checkConsumer(
 
 		return
 	}
+
+	version, deployed := provider.DeployedVersionIn(environment.Name)
+	if !deployed {
+		report.Append(NewProviderNotDeployedBreakingChange(
+			&consumer,
+			provider.DeployedEnvironments(),
+		))
+
+		report.Results = append(report.Results, CompatibilityResult{
+			Deployable: false,
+		})
+
+		return
+	}
+
+	provider.Version = version
 
 	breaks := checkResources(&consumer, &provider)
 	for _, breakingChange := range breaks {

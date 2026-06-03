@@ -266,6 +266,66 @@ const (
 		AND
 			rv.change_type = 'added'
 	`
+
+	loadProviderResourceWithDeploymentsQuery = `
+		SELECT
+			r.id,
+			pa.id,
+			pa.name,
+			r.direction,
+			r.kind,
+			r.consumed_provider,
+			r.endpoint,
+			r.method,
+			r.response_status_code,
+			r.provider_hash,
+			r.consumer_hash,
+			r.created_at,
+			p.path,
+			pv.type,
+			pv.optional,
+			pv.change_type,
+			e.name,
+			dep.version
+		FROM
+			resources r
+		JOIN
+			participants pa ON pa.id = r.participant_id
+		JOIN LATERAL (
+			SELECT change_type
+			FROM resource_versions
+			WHERE resource_id = r.id
+			  AND contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+			ORDER BY contract_id DESC
+			LIMIT 1
+		) rv ON true
+		LEFT JOIN
+			properties p ON p.resource_id = r.id
+		LEFT JOIN LATERAL (
+			SELECT
+				type, optional, change_type
+			FROM
+				property_versions
+			WHERE
+				property_id = p.id
+			ORDER BY contract_id DESC
+			LIMIT 1
+		) pv ON true
+		LEFT JOIN LATERAL (
+			SELECT DISTINCT ON (environment_id) environment_id, version
+			FROM deployments
+			WHERE participant_id = r.participant_id
+			ORDER BY environment_id, deployed_at DESC
+		) dep ON true
+		LEFT JOIN
+			environments e ON e.id = dep.environment_id
+		WHERE
+			r.direction = $1
+		AND
+			r.provider_hash = $2
+		AND
+			rv.change_type = 'added'
+	`
 )
 
 type ContractRepository struct {
@@ -676,21 +736,19 @@ func (r *ContractRepository) FindCurrentConsumersOfProviderInEnv(
 	return consumers
 }
 
-func (r *ContractRepository) LoadProviderResourceOfConsumerAndEnvironment(
+func (r *ContractRepository) LoadProviderResourceOfConsumer(
 	ctx context.Context,
 	consumer model.Resource,
-	environment *model.Environment,
 ) (model.Resource, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		findResourcesByDirectionAndProviderHashQuery,
+		loadProviderResourceWithDeploymentsQuery,
 		string(model.Provides),
 		consumer.ProviderHash(),
-		environment.ID,
 	)
 
 	if err != nil {
-		return model.Resource{}, ErrProviderResourceNotFound
+		panic(fmt.Errorf("error loading provider resource of consumer: %w", err))
 	}
 
 	defer rows.Close()
@@ -718,9 +776,10 @@ func (r *ContractRepository) LoadProviderResourceOfConsumerAndEnvironment(
 			&row.PropertyVersionType,
 			&row.PropertyVersionOptional,
 			&row.PropertyVersionChangeType,
-			&row.ResourceVersion,
+			&row.DeploymentEnvironment,
+			&row.DeploymentVersion,
 		); err != nil {
-			panic(fmt.Errorf("error scanning provider resource: %w", err))
+			panic(fmt.Errorf("error scanning provider resource of consumer: %w", err))
 		}
 
 		if !found {
@@ -729,6 +788,10 @@ func (r *ContractRepository) LoadProviderResourceOfConsumerAndEnvironment(
 		}
 
 		provider.Properties[row.PropertyPath] = row.toPropertyModel()
+
+		if row.DeploymentEnvironment.Valid {
+			provider.DeployedVersions[row.DeploymentEnvironment.String] = row.DeploymentVersion.String
+		}
 	}
 
 	if !found {

@@ -9,7 +9,7 @@ const productionEnvironmentBody = `{"participant":"production"}`
 func (s *IntegrationSuite) TestHappyPath_CreateEnvironment() {
 	status, body := s.post("/api/environments", productionEnvironmentBody)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"environment created"}`, body)
+	s.JSONEq(`{"message":"environment created"}`, body)
 
 	s.Equal(1, s.countRows("environments"))
 }
@@ -20,7 +20,7 @@ func (s *IntegrationSuite) TestUnhappyPath_DuplicateEnvironmentName() {
 
 	status, body := s.post("/api/environments", productionEnvironmentBody)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"environment already exists"}`, body)
+	s.JSONEq(`{"message":"environment already exists"}`, body)
 
 	s.Equal(1, s.countRows("environments"))
 }
@@ -28,7 +28,7 @@ func (s *IntegrationSuite) TestUnhappyPath_DuplicateEnvironmentName() {
 func (s *IntegrationSuite) TestUnhappyPath_MissingEnvironmentName() {
 	status, body := s.post("/api/environments", `{}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"environment invalid input"}`, body)
+	s.JSONEq(`{"message":"environment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("environments"))
 }

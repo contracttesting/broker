@@ -1,10 +1,6 @@
 package publish_contract
 
-import (
-	"encoding/json"
-
-	"github.com/contracttesting/broker/internal/shared"
-)
+import "encoding/json"
 
 const (
 	ContractPublishSuccessful   string = "contract publish successful"
@@ -20,5 +16,5 @@ type PublishContractRequestBody struct {
 }
 
 type PublishContractResponseBody struct {
-	shared.BrokerResponseBody
+	Message string `json:"message"`
 }
