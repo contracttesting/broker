@@ -14,18 +14,73 @@ type CanIDeployRequestBody struct {
 }
 
 type BreakingChange struct {
-	Reason        string `json:"reason"`
-	Property      string `json:"property"`
-	HumanReadable string `json:"human_readable"`
-	LeftResource  struct {
-		ConsumedProvider string `json:"consumed_provider"`
-		Method           string `json:"method"`
-		Endpoint         string `json:"endpoint"`
-	} `json:"left_resource"`
+	Reason          string            `json:"reason"`
+	Details         map[string]string `json:"details"`
+	CheckedResource struct {
+		Direction          string `json:"direction"`
+		Kind               string `json:"kind"`
+		ConsumedProvider   string `json:"consumed_provider"`
+		Endpoint           string `json:"endpoint"`
+		Method             string `json:"method"`
+		ResponseStatusCode string `json:"response_status_code"`
+	} `json:"checked_resource"`
 }
 
 func (c BreakingChange) resource() string {
-	return strings.ToUpper(c.LeftResource.Method) + " " + c.LeftResource.Endpoint
+	return strings.ToUpper(c.CheckedResource.Method) + " " + c.CheckedResource.Endpoint
+}
+
+func (c BreakingChange) operation() string {
+	if c.CheckedResource.Kind == "rest_request" {
+		return c.resource() + " (request)"
+	}
+	return c.resource() + " (response " + c.CheckedResource.ResponseStatusCode + ")"
+}
+
+func (c BreakingChange) Message(consumerName, providerName string) string {
+	X, Y := consumerName, providerName
+	P := c.Details["property"]
+	T1 := c.Details["consumer_type"]
+	T2 := c.Details["provider_type"]
+	OP := c.operation()
+	providerChecked := c.CheckedResource.Direction == "provides"
+
+	switch c.Reason {
+	case "missing_in_provider":
+		if providerChecked {
+			return "Provider " + Y + " no longer provides property " + P + " required by consumer " + X + " on " + OP
+		}
+		return "Consumer " + X + " requires property " + P + " but provider " + Y + " does not provide it on " + OP
+	case "missing_in_consumer":
+		if providerChecked {
+			return "Provider " + Y + " now requires property " + P + ", not sent by consumer " + X + " on " + OP
+		}
+		return "Consumer " + X + " does not send required property " + P + " on " + OP
+	case "type_mismatch":
+		if providerChecked {
+			return "Provider " + Y + " changed property " + P + " to " + T2 + "; consumer " + X + " expects " + T1 + " on " + OP
+		}
+		return "Consumer " + X + " expects " + P + " as " + T1 + " but provider " + Y + " provides " + T2 + " on " + OP
+	case "optional_in_provider_required_in_consumer":
+		if providerChecked {
+			return "Provider " + Y + " made property " + P + " optional but consumer " + X + " requires it on " + OP
+		}
+		return "Consumer " + X + " requires property " + P + " but provider " + Y + " provides it as optional on " + OP
+	case "optional_in_consumer_required_in_provider":
+		if providerChecked {
+			return "Provider " + Y + " now requires property " + P + ", sent as optional by consumer " + X + " on " + OP
+		}
+		return "Consumer " + X + " sends property " + P + " as optional but provider " + Y + " requires it on " + OP
+	case "provider_resource_not_found":
+		return "No " + OP + " was found"
+	case "provider_resource_not_deployed_in_environment":
+		if env, ok := c.Details["deployed_environments"]; ok {
+			return OP + " exists but isn't deployed in this environment yet (deployed in: " + env + ")"
+		}
+		return OP + " exists but isn't deployed in any environment yet"
+	default:
+		return c.Reason
+	}
 }
 
 type CanIDeployResponseBody struct {
@@ -57,11 +112,12 @@ func (r CanIDeployResponseBody) GroupBreaks(participant string) BreakSections {
 	for key, changes := range r.Breaks {
 		for _, change := range changes {
 			if key == participant {
-				k := groupKey{counterpart: change.LeftResource.ConsumedProvider, resource: change.resource()}
-				dependsOn[k] = append(dependsOn[k], change.HumanReadable)
+				providerName := change.CheckedResource.ConsumedProvider
+				k := groupKey{counterpart: providerName, resource: change.resource()}
+				dependsOn[k] = append(dependsOn[k], change.Message(key, providerName))
 			} else {
 				k := groupKey{counterpart: key, resource: change.resource()}
-				dependedOnBy[k] = append(dependedOnBy[k], change.HumanReadable)
+				dependedOnBy[k] = append(dependedOnBy[k], change.Message(key, participant))
 			}
 		}
 	}

@@ -62,11 +62,21 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		responseBody := `{"success":true,"deployable":false,"breaks":{` +
 			`"front":[` +
-			`{"reason":"provider_resource_not_found","property":"","human_readable":"No POST /accounts (request) was found","left_resource":{"consumed_provider":"accounts","method":"post","endpoint":"/accounts"}},` +
-			`{"reason":"type_mismatch","property":"root.id","human_readable":"Property root.id type mismatch, provider api expects string but consumer front expects integer","left_resource":{"consumed_provider":"api","method":"get","endpoint":"/api/users"}}` +
+			`{"reason":"provider_resource_not_found",` +
+			`"checked_resource":{"direction":"consumes","kind":"rest_request","consumed_provider":"accounts","method":"post","endpoint":"/accounts"}},` +
+			`{"reason":"type_mismatch",` +
+			`"checked_resource":{"direction":"consumes","kind":"rest_request","consumed_provider":"api","method":"get","endpoint":"/api/users"},` +
+			`"counterpart_resource":{"direction":"provides","kind":"rest_request","method":"get","endpoint":"/api/users"},` +
+			`"details":{"property":"root.id","consumer_type":"integer","provider_type":"string"}},` +
+			`{"reason":"provider_resource_not_deployed_in_environment",` +
+			`"checked_resource":{"direction":"consumes","kind":"rest_response","consumed_provider":"billing","method":"get","endpoint":"/invoices","response_status_code":"200"},` +
+			`"details":{"deployed_environments":"staging, prod"}}` +
 			`],` +
 			`"web":[` +
-			`{"reason":"missing_in_provider","property":"root.name","human_readable":"Property root.name is missing in provider front","left_resource":{"consumed_provider":"front","method":"put","endpoint":"/profile"}}` +
+			`{"reason":"missing_in_provider",` +
+			`"checked_resource":{"direction":"provides","kind":"rest_request","consumed_provider":"","method":"put","endpoint":"/profile"},` +
+			`"counterpart_resource":{"direction":"consumes","kind":"rest_request","consumed_provider":"front","method":"put","endpoint":"/profile"},` +
+			`"details":{"property":"root.name"}}` +
 			`]}}`
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
 			httpmock.NewStringResponder(http.StatusOK, responseBody))
@@ -85,19 +95,21 @@ func TestCanIDeployCommand(t *testing.T) {
 		output := out.String()
 		assert.Contains(t, output, "not deployable")
 
-		// providers the checked participant depends on
+		// providers the checked participant depends on (consumer-checked: X=front, Y=consumed_provider)
 		assert.Contains(t, output, "front depends on these providers:")
 		assert.Contains(t, output, "accounts")
 		assert.Contains(t, output, "POST /accounts")
 		assert.Contains(t, output, "No POST /accounts (request) was found")
 		assert.Contains(t, output, "GET /api/users")
-		assert.Contains(t, output, "Property root.id type mismatch, provider api expects string but consumer front expects integer")
+		assert.Contains(t, output, "Consumer front expects root.id as integer but provider api provides string on GET /api/users (request)")
+		assert.Contains(t, output, "GET /invoices")
+		assert.Contains(t, output, "GET /invoices (response 200) exists but isn't deployed in this environment yet (deployed in: staging, prod)")
 
-		// consumers that depend on the checked participant
+		// consumers that depend on the checked participant (provider-checked: X=breaks key, Y=front)
 		assert.Contains(t, output, "consumers that depend on front:")
 		assert.Contains(t, output, "web")
 		assert.Contains(t, output, "PUT /profile")
-		assert.Contains(t, output, "Property root.name is missing in provider front")
+		assert.Contains(t, output, "Provider front no longer provides property root.name required by consumer web on PUT /profile (request)")
 
 		assert.NotContains(t, errOut.String(), "Error:")
 	})
