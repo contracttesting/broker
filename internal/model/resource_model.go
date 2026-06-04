@@ -41,9 +41,6 @@ type Resource struct {
 	Participant        *Participant        `json:"-"`
 }
 
-// Operation renders the HTTP operation the resource describes, with the method
-// upper-cased and the message kind made explicit: "POST /accounts (request)" or
-// "POST /accounts (response 201)".
 func (resouce *Resource) Operation() string {
 	operation := fmt.Sprintf("%s %s", strings.ToUpper(resouce.Method), resouce.Endpoint)
 	if resouce.Kind == RestResponse {
@@ -59,6 +56,7 @@ func (resouce *Resource) DeployedEnvironments() []string {
 		environments = append(environments, environment)
 	}
 	sort.Strings(environments)
+
 	return environments
 }
 
@@ -75,9 +73,17 @@ func (resouce *Resource) ParticipantID() int64 {
 	return resouce.Participant.ID
 }
 
+func (resouce *Resource) IsConsumer() bool {
+	return resouce.Direction == Consumes
+}
+
+func (resouce *Resource) IsProvider() bool {
+	return resouce.Direction == Provides
+}
+
 func (resouce *Resource) ProviderHash() string {
 	providerName := resouce.ConsumedProvider
-	if resouce.Direction == Provides {
+	if resouce.IsProvider() {
 		providerName = resouce.ParticipantName()
 	}
 

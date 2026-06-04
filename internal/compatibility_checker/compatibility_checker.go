@@ -3,35 +3,15 @@ package compatibility_checker
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
 )
 
-type BrokenResource struct {
-	Kind               model.ResourceKind
-	ConsumedProvider   string
-	Endpoint           string
-	Method             string
-	ResponseStatusCode string
-}
-
-func NewBrokenResource(resource model.Resource) BrokenResource {
-	return BrokenResource{
-		Kind:               resource.Kind,
-		ConsumedProvider:   resource.ConsumedProvider,
-		Endpoint:           resource.Endpoint,
-		Method:             resource.Method,
-		ResponseStatusCode: resource.ResponseStatusCode,
-	}
-}
-
 type BreakingReason string
 
 const (
-	ReasonProviderNotFound                         BreakingReason = "provider_not_found"
 	ReasonProviderResourceNotFound                 BreakingReason = "provider_resource_not_found"
 	ReasonMissingInProvider                        BreakingReason = "missing_in_provider"
 	ReasonMissingInConsumer                        BreakingReason = "missing_in_consumer"
@@ -41,17 +21,34 @@ const (
 	ReasonProviderResourceNotDeployedInEnvironment BreakingReason = "provider_resource_not_deployed_in_environment"
 )
 
+const (
+	detailKeyProperty             = "property"
+	detailKeyConsumerType         = "consumer_type"
+	detailKeyProviderType         = "provider_type"
+	detailKeyDeployedEnvironments = "deployed_environments"
+)
+
 type BreakingChange struct {
-	LeftResource         *model.Resource `json:"left_resource"`
-	RightResource        *model.Resource `json:"right_resource"`
-	Reason               BreakingReason  `json:"reason"`
-	Property             string          `json:"property"`
-	HumanReadable        string          `json:"human_readable"`
-	DeployedEnvironments []string        `json:"deployed_environments,omitempty"`
-	ConsumerName         string          `json:"consumer_name,omitempty"`
-	ProviderName         string          `json:"provider_name,omitempty"`
-	ConsumerType         string          `json:"consumer_type,omitempty"`
-	ProviderType         string          `json:"provider_type,omitempty"`
+	CheckedResource     *model.Resource   `json:"checked_resource"`
+	CounterpartResource *model.Resource   `json:"counterpart_resource,omitempty"`
+	Reason              BreakingReason    `json:"reason"`
+	Details             map[string]string `json:"details,omitempty"`
+}
+
+func (b *BreakingChange) consumerResource() *model.Resource {
+	if b.CheckedResource.IsConsumer() {
+		return b.CheckedResource
+	}
+
+	return b.CounterpartResource
+}
+
+func (b *BreakingChange) ConsumerName() string {
+	return b.consumerResource().ParticipantName()
+}
+
+func (b *BreakingChange) ProviderName() string {
+	return b.consumerResource().ConsumedProvider
 }
 
 type CompatibilityResult struct {
@@ -77,126 +74,50 @@ func (r *CompatibilityReport) Append(b BreakingChange) {
 		r.Breaks = make(map[string][]BreakingChange)
 	}
 
-	r.Breaks[b.LeftResource.ParticipantName()] = append(r.Breaks[b.LeftResource.ParticipantName()], b)
+	r.Breaks[b.ConsumerName()] = append(r.Breaks[b.ConsumerName()], b)
 }
 
 func NewBreakingChange(
-	leftResource *model.Resource,
-	rightResource *model.Resource,
+	checked *model.Resource,
+	counterpart *model.Resource,
 	reason BreakingReason,
 	property string,
 ) BreakingChange {
-	breakingChange := BreakingChange{
-		LeftResource:  leftResource,
-		RightResource: rightResource,
-		Reason:        reason,
-		Property:      property,
-		ConsumerName:  leftResource.ParticipantName(),
-		ProviderName:  leftResource.ConsumedProvider,
+	consumer, provider := checked, counterpart
+	if !checked.IsConsumer() {
+		consumer, provider = counterpart, checked
 	}
 
-	if reason == ReasonTypeMismatch {
-		breakingChange.ConsumerType = leftResource.Properties[property].Type
-		breakingChange.ProviderType = rightResource.Properties[property].Type
+	var details map[string]string
+	if property != "" {
+		details = map[string]string{detailKeyProperty: property}
+
+		if reason == ReasonTypeMismatch {
+			details[detailKeyConsumerType] = consumer.Properties[property].Type
+			details[detailKeyProviderType] = provider.Properties[property].Type
+		}
 	}
 
-	breakingChange.humanReadable()
-
-	return breakingChange
+	return BreakingChange{
+		CheckedResource:     checked,
+		CounterpartResource: counterpart,
+		Reason:              reason,
+		Details:             details,
+	}
 }
 
 func NewProviderNotDeployedBreakingChange(consumer *model.Resource, deployedEnvironments []string) BreakingChange {
-	breakingChange := BreakingChange{
-		LeftResource:         consumer,
-		Reason:               ReasonProviderResourceNotDeployedInEnvironment,
-		DeployedEnvironments: deployedEnvironments,
-		ConsumerName:         consumer.ParticipantName(),
-		ProviderName:         consumer.ConsumedProvider,
+	var details map[string]string
+	if len(deployedEnvironments) > 0 {
+		details = map[string]string{
+			detailKeyDeployedEnvironments: strings.Join(deployedEnvironments, ", "),
+		}
 	}
 
-	breakingChange.humanReadable()
-
-	return breakingChange
-}
-
-func (b *BreakingChange) humanReadable() {
-	switch b.Reason {
-	case ReasonProviderNotFound:
-		b.HumanReadable = fmt.Sprintf(
-			"Provider %s not found",
-			b.LeftResource.ParticipantName(),
-		)
-
-	case ReasonProviderResourceNotFound:
-		b.HumanReadable = fmt.Sprintf(
-			"No %s was found",
-			b.LeftResource.Operation(),
-		)
-
-	case ReasonMissingInProvider:
-		b.HumanReadable = fmt.Sprintf(
-			"Property %s is missing in provider %s on %s",
-			b.Property,
-			b.RightResource.ParticipantName(),
-			b.LeftResource.Operation(),
-		)
-
-	case ReasonMissingInConsumer:
-		b.HumanReadable = fmt.Sprintf(
-			"Property %s is missing in consumer %s on %s",
-			b.Property,
-			b.LeftResource.ParticipantName(),
-			b.LeftResource.Operation(),
-		)
-
-	case ReasonTypeMismatch:
-		consumerType := b.LeftResource.Properties[b.Property].Type
-		providerType := b.RightResource.Properties[b.Property].Type
-
-		b.HumanReadable = fmt.Sprintf(
-			"Property %s type mismatch on %s, provider %s expects %s but consumer %s expects %s",
-			b.Property,
-			b.LeftResource.Operation(),
-			b.RightResource.ParticipantName(),
-			providerType,
-			b.LeftResource.ParticipantName(),
-			consumerType,
-		)
-
-	case ReasonOptionalInProviderRequiredInConsumer:
-		b.HumanReadable = fmt.Sprintf(
-			"Property %s is optional in provider %s but required in consumer %s on %s",
-			b.Property,
-			b.RightResource.ParticipantName(),
-			b.LeftResource.ParticipantName(),
-			b.LeftResource.Operation(),
-		)
-
-	case ReasonOptionalInConsumerRequiredInProvider:
-		b.HumanReadable = fmt.Sprintf(
-			"Property %s is optional in consumer %s but required in provider %s on %s",
-			b.Property,
-			b.LeftResource.ParticipantName(),
-			b.RightResource.ParticipantName(),
-			b.LeftResource.Operation(),
-		)
-
-	case ReasonProviderResourceNotDeployedInEnvironment:
-		if len(b.DeployedEnvironments) > 0 {
-			b.HumanReadable = fmt.Sprintf(
-				"%s exists but isn't deployed in this environment yet (deployed in: %s)",
-				b.LeftResource.Operation(),
-				strings.Join(b.DeployedEnvironments, ", "),
-			)
-		} else {
-			b.HumanReadable = fmt.Sprintf(
-				"%s exists but isn't deployed in any environment yet",
-				b.LeftResource.Operation(),
-			)
-		}
-
-	default:
-		b.HumanReadable = "Unknown reason"
+	return BreakingChange{
+		CheckedResource: consumer,
+		Reason:          ReasonProviderResourceNotDeployedInEnvironment,
+		Details:         details,
 	}
 }
 
@@ -289,7 +210,7 @@ func (c *CompatibilityChecker) checkProvider(
 	consumers := c.repository.FindConsumersOfProviderAndEnvironment(ctx, provider, environment)
 
 	for _, consumer := range consumers {
-		consumerBreaks := checkResources(&consumer, &provider)
+		consumerBreaks := checkResources(&provider, &consumer)
 		for _, breakingChange := range consumerBreaks {
 			report.Append(breakingChange)
 		}
@@ -302,26 +223,36 @@ func (c *CompatibilityChecker) checkProvider(
 	}
 }
 
-func checkResources(leftResource *model.Resource, rightResource *model.Resource) []BreakingChange {
-	switch leftResource.Kind {
+func checkResources(checked *model.Resource, counterpart *model.Resource) []BreakingChange {
+	consumer, provider := checked, counterpart
+	if !checked.IsConsumer() {
+		consumer, provider = counterpart, checked
+	}
+
+	switch consumer.Kind {
 	case model.RestRequest:
-		return checkRequestResource(leftResource, rightResource)
+		return checkRequestResource(checked, counterpart, consumer, provider)
 	default:
-		return checkResponseResource(leftResource, rightResource)
+		return checkResponseResource(checked, counterpart, consumer, provider)
 	}
 }
 
-func checkResponseResource(leftResource *model.Resource, rightResource *model.Resource) []BreakingChange {
+func checkResponseResource(
+	checked *model.Resource,
+	counterpart *model.Resource,
+	consumer *model.Resource,
+	provider *model.Resource,
+) []BreakingChange {
 	var breaks []BreakingChange
 
-	for consumerPropertyPath, consumerProperty := range leftResource.Properties {
-		providerProperty, propertyExists := rightResource.Properties[consumerPropertyPath]
+	for consumerPropertyPath, consumerProperty := range consumer.Properties {
+		providerProperty, propertyExists := provider.Properties[consumerPropertyPath]
 
 		// If the property is not present in the provider and is required in the consumer, it is a breaking change.
 		if !propertyExists && !consumerProperty.Optional {
 			breaks = append(breaks, NewBreakingChange(
-				leftResource,
-				rightResource,
+				checked,
+				counterpart,
 				ReasonMissingInProvider,
 				consumerPropertyPath,
 			))
@@ -332,8 +263,8 @@ func checkResponseResource(leftResource *model.Resource, rightResource *model.Re
 		// If the property is present in the provider and the type is different, it is a breaking change.
 		if consumerProperty.Type != providerProperty.Type {
 			breaks = append(breaks, NewBreakingChange(
-				leftResource,
-				rightResource,
+				checked,
+				counterpart,
 				ReasonTypeMismatch,
 				consumerPropertyPath,
 			))
@@ -344,8 +275,8 @@ func checkResponseResource(leftResource *model.Resource, rightResource *model.Re
 		// If the property is required in the consumer and is optional in the provider, it is a breaking change.
 		if !consumerProperty.Optional && providerProperty.Optional {
 			breaks = append(breaks, NewBreakingChange(
-				leftResource,
-				rightResource,
+				checked,
+				counterpart,
 				ReasonOptionalInProviderRequiredInConsumer,
 				consumerPropertyPath,
 			))
@@ -355,16 +286,21 @@ func checkResponseResource(leftResource *model.Resource, rightResource *model.Re
 	return breaks
 }
 
-func checkRequestResource(leftResource *model.Resource, rightResource *model.Resource) []BreakingChange {
+func checkRequestResource(
+	checked *model.Resource,
+	counterpart *model.Resource,
+	consumer *model.Resource,
+	provider *model.Resource,
+) []BreakingChange {
 	var breaks []BreakingChange
 
-	for providerPropertyPath, providerProperty := range rightResource.Properties {
-		consumerProperty, propertyExists := leftResource.Properties[providerPropertyPath]
+	for providerPropertyPath, providerProperty := range provider.Properties {
+		consumerProperty, propertyExists := consumer.Properties[providerPropertyPath]
 		// If the property is not present in the consumer and is not optional, it is a breaking change.
 		if !propertyExists && !providerProperty.Optional {
 			breaks = append(breaks, NewBreakingChange(
-				leftResource,
-				rightResource,
+				checked,
+				counterpart,
 				ReasonMissingInConsumer,
 				providerPropertyPath,
 			))
@@ -375,8 +311,8 @@ func checkRequestResource(leftResource *model.Resource, rightResource *model.Res
 		// If the property is present in the consumer and the type is different, it is a breaking change.
 		if consumerProperty.Type != providerProperty.Type {
 			breaks = append(breaks, NewBreakingChange(
-				leftResource,
-				rightResource,
+				checked,
+				counterpart,
 				ReasonTypeMismatch,
 				providerPropertyPath,
 			))
@@ -387,8 +323,8 @@ func checkRequestResource(leftResource *model.Resource, rightResource *model.Res
 		// If the property is required in the provider and is optional in the consumer, it is a breaking change.
 		if !providerProperty.Optional && consumerProperty.Optional {
 			breaks = append(breaks, NewBreakingChange(
-				leftResource,
-				rightResource,
+				checked,
+				counterpart,
 				ReasonOptionalInConsumerRequiredInProvider,
 				providerPropertyPath,
 			))
