@@ -23,7 +23,6 @@ func TestProviderResourceNotFound(t *testing.T) {
 		consumer,
 		nil,
 		compatibility_checker.ReasonProviderResourceNotFound,
-		"",
 	)
 
 	assert.Equal(t, compatibility_checker.ReasonProviderResourceNotFound, change.Reason)
@@ -35,9 +34,9 @@ func TestProviderResourceNotFound(t *testing.T) {
 }
 
 // Property-level breaks record the property path in Details. Type mismatches
-// additionally record both sides' property types, always keyed by role
-// (consumer_type / provider_type) and never by argument position. Reasons
-// round-trip unchanged. These are all consumer-checked breaks.
+// additionally record both sides' property types, keyed by position
+// (checked_property_type / counterpart_property_type). Reasons round-trip
+// unchanged. These are all consumer-checked breaks.
 func TestPropertyBreakDetails(t *testing.T) {
 	consumerResponse := &model.Resource{
 		Direction:          model.Consumes,
@@ -78,19 +77,19 @@ func TestPropertyBreakDetails(t *testing.T) {
 		Participant: &model.Participant{Name: "api"},
 	}
 
-	typeMismatch := compatibility_checker.NewBreakingChange(
+	typeMismatch := compatibility_checker.NewPropertyBreakChange(
 		consumerResponse, providerResponse, compatibility_checker.ReasonTypeMismatch, "root.id",
 	)
-	missingInProvider := compatibility_checker.NewBreakingChange(
+	missingInProvider := compatibility_checker.NewPropertyBreakChange(
 		consumerResponse, providerResponse, compatibility_checker.ReasonMissingInProvider, "root.name",
 	)
-	optionalInProvider := compatibility_checker.NewBreakingChange(
+	optionalInProvider := compatibility_checker.NewPropertyBreakChange(
 		consumerResponse, providerResponse, compatibility_checker.ReasonOptionalInProviderRequiredInConsumer, "root.id",
 	)
-	missingInConsumer := compatibility_checker.NewBreakingChange(
+	missingInConsumer := compatibility_checker.NewPropertyBreakChange(
 		consumerRequest, providerRequest, compatibility_checker.ReasonMissingInConsumer, "root.user",
 	)
-	optionalInConsumer := compatibility_checker.NewBreakingChange(
+	optionalInConsumer := compatibility_checker.NewPropertyBreakChange(
 		consumerRequest, providerRequest, compatibility_checker.ReasonOptionalInConsumerRequiredInProvider, "root.flag",
 	)
 
@@ -101,11 +100,11 @@ func TestPropertyBreakDetails(t *testing.T) {
 	assert.Equal(t, compatibility_checker.ReasonMissingInConsumer, missingInConsumer.Reason)
 	assert.Equal(t, compatibility_checker.ReasonOptionalInConsumerRequiredInProvider, optionalInConsumer.Reason)
 
-	// Type mismatch carries property + both role-keyed types.
+	// Type mismatch carries property + both position-keyed types.
 	assert.Equal(t, map[string]string{
-		"property":      "root.id",
-		"consumer_type": "integer",
-		"provider_type": "string",
+		"property":                  "root.id",
+		"checked_property_type":     "integer",
+		"counterpart_property_type": "string",
 	}, typeMismatch.Details)
 
 	// Non-type-mismatch property breaks carry only the property path.
@@ -121,13 +120,14 @@ func TestPropertyBreakDetails(t *testing.T) {
 	assert.Equal(t, "api", missingInConsumer.ProviderName())
 }
 
-// Role resolution is by direction, not argument order. The same logical type
+// Type details are keyed by position, not role. The same logical type
 // mismatch, constructed consumer-checked and provider-checked (swapped
-// arguments), yields identical Details: consumer_type always comes from the
-// consumes-side property type, provider_type from the provides side. The
-// provider-checked construction also exercises a checked side with
-// Direction: Provides and asserts consumer/provider names resolve correctly.
-func TestTypeMismatchRoleResolutionIsDirectionBased(t *testing.T) {
+// arguments), swaps the Details values: checked_property_type always comes
+// from the checked side (the one introducing the change),
+// counterpart_property_type from the stored side. The provider-checked
+// construction also exercises a checked side with Direction: Provides and
+// asserts consumer/provider names still resolve by direction.
+func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 	consumerRes := &model.Resource{
 		Direction:          model.Consumes,
 		Kind:               model.RestResponse,
@@ -152,22 +152,25 @@ func TestTypeMismatchRoleResolutionIsDirectionBased(t *testing.T) {
 		},
 	}
 
-	consumerChecked := compatibility_checker.NewBreakingChange(
+	consumerChecked := compatibility_checker.NewPropertyBreakChange(
 		consumerRes, providerRes, compatibility_checker.ReasonTypeMismatch, "root.id",
 	)
-	providerChecked := compatibility_checker.NewBreakingChange(
+	providerChecked := compatibility_checker.NewPropertyBreakChange(
 		providerRes, consumerRes, compatibility_checker.ReasonTypeMismatch, "root.id",
 	)
 
-	expectedDetails := map[string]string{
-		"property":      "root.id",
-		"consumer_type": "integer",
-		"provider_type": "string",
-	}
-	assert.Equal(t, expectedDetails, consumerChecked.Details,
-		"consumer_type must come from the consumes-side property type")
-	assert.Equal(t, expectedDetails, providerChecked.Details,
-		"role resolution is by direction: swapping arguments must not swap types")
+	assert.Equal(t, map[string]string{
+		"property":                  "root.id",
+		"checked_property_type":     "integer",
+		"counterpart_property_type": "string",
+	}, consumerChecked.Details,
+		"checked_property_type must come from the checked side")
+	assert.Equal(t, map[string]string{
+		"property":                  "root.id",
+		"checked_property_type":     "string",
+		"counterpart_property_type": "integer",
+	}, providerChecked.Details,
+		"types are position-keyed: swapping arguments must swap the values")
 
 	// The provider-checked break stores the provider as the checked resource.
 	assert.Same(t, providerRes, providerChecked.CheckedResource)
@@ -233,10 +236,10 @@ func TestReportAppendKeysByConsumerName(t *testing.T) {
 		},
 	}
 
-	consumerChecked := compatibility_checker.NewBreakingChange(
+	consumerChecked := compatibility_checker.NewPropertyBreakChange(
 		consumerRes, providerRes, compatibility_checker.ReasonTypeMismatch, "root.id",
 	)
-	providerChecked := compatibility_checker.NewBreakingChange(
+	providerChecked := compatibility_checker.NewPropertyBreakChange(
 		providerRes, consumerRes, compatibility_checker.ReasonTypeMismatch, "root.id",
 	)
 

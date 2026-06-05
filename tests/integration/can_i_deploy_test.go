@@ -185,21 +185,21 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 		byReason[b.Reason] = b
 	}
 
-	// type_mismatch on root.id carries both consumer and provider types in details.
+	// type_mismatch on root.id carries both checked and counterpart types in details.
 	typeMismatch, ok := byReason["type_mismatch"]
 	s.Require().True(ok)
 	s.Equal("root.id", typeMismatch.Details["property"])
-	s.Equal("integer", typeMismatch.Details["consumer_type"])
-	s.Equal("string", typeMismatch.Details["provider_type"])
+	s.Equal("integer", typeMismatch.Details["checked_property_type"])
+	s.Equal("string", typeMismatch.Details["counterpart_property_type"])
 
 	// missing_in_provider on root.name carries only the property in details.
 	missing, ok := byReason["missing_in_provider"]
 	s.Require().True(ok)
 	s.Equal("root.name", missing.Details["property"])
-	_, hasConsumerType := missing.Details["consumer_type"]
-	s.False(hasConsumerType)
-	_, hasProviderType := missing.Details["provider_type"]
-	s.False(hasProviderType)
+	_, hasCheckedType := missing.Details["checked_property_type"]
+	s.False(hasCheckedType)
+	_, hasCounterpartType := missing.Details["counterpart_property_type"]
+	s.False(hasCounterpartType)
 
 	// The incompatible decision is persisted too, as a non-deployable row.
 	s.Equal(2, s.countRows("compatibility_matrix"))
@@ -286,8 +286,10 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer
 
 	s.Equal("type_mismatch", breakItem.Reason)
 	s.Equal("root.id", breakItem.Details["property"])
-	s.Equal("integer", breakItem.Details["consumer_type"])
-	s.Equal("string", breakItem.Details["provider_type"])
+	// Types are position-keyed: the checked side is the provider (string),
+	// the stored counterpart is the consumer (integer).
+	s.Equal("string", breakItem.Details["checked_property_type"])
+	s.Equal("integer", breakItem.Details["counterpart_property_type"])
 }
 
 // app@v1 consumes one endpoint from each of three providers. None of them is
