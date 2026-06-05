@@ -8,10 +8,35 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// A provider-resource-not-found break carries the checked consumer, no
-// counterpart, and no Details: there is no property and no counterpart side to
-// describe. Roles still resolve from the checked consumer, so its participant
-// and consumed provider surface as the consumer/provider names.
+func consumerResource() *model.Resource {
+	return &model.Resource{
+		Direction:          model.Consumes,
+		Kind:               model.RestResponse,
+		ConsumedProvider:   "api",
+		Endpoint:           "/things",
+		Method:             "get",
+		ResponseStatusCode: "200",
+		Participant:        &model.Participant{Name: "front"},
+		Properties: map[string]model.Property{
+			"root.id": {Path: "root.id", Type: "integer"},
+		},
+	}
+}
+
+func providerResource() *model.Resource {
+	return &model.Resource{
+		Direction:          model.Provides,
+		Kind:               model.RestResponse,
+		Endpoint:           "/things",
+		Method:             "get",
+		ResponseStatusCode: "200",
+		Participant:        &model.Participant{Name: "api"},
+		Properties: map[string]model.Property{
+			"root.id": {Path: "root.id", Type: "string"},
+		},
+	}
+}
+
 func TestProviderResourceNotFound(t *testing.T) {
 	consumer := &model.Resource{
 		Direction:        model.Consumes,
@@ -33,34 +58,9 @@ func TestProviderResourceNotFound(t *testing.T) {
 	assert.Equal(t, "accounts", change.ProviderName())
 }
 
-// Property-level breaks record the property path in Details. Type mismatches
-// additionally record both sides' property types, keyed by position
-// (checked_property_type / counterpart_property_type). Reasons round-trip
-// unchanged. These are all consumer-checked breaks.
 func TestPropertyBreakDetails(t *testing.T) {
-	consumerResponse := &model.Resource{
-		Direction:          model.Consumes,
-		Kind:               model.RestResponse,
-		ConsumedProvider:   "api",
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: "200",
-		Participant:        &model.Participant{Name: "front"},
-		Properties: map[string]model.Property{
-			"root.id": {Path: "root.id", Type: "integer"},
-		},
-	}
-	providerResponse := &model.Resource{
-		Direction:          model.Provides,
-		Kind:               model.RestResponse,
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: "200",
-		Participant:        &model.Participant{Name: "api"},
-		Properties: map[string]model.Property{
-			"root.id": {Path: "root.id", Type: "string"},
-		},
-	}
+	consumerResponse := consumerResource()
+	providerResponse := providerResource()
 	consumerRequest := &model.Resource{
 		Direction:        model.Consumes,
 		Kind:             model.RestRequest,
@@ -93,64 +93,32 @@ func TestPropertyBreakDetails(t *testing.T) {
 		consumerRequest, providerRequest, compatibility_checker.ReasonOptionalInConsumerRequiredInProvider, "root.flag",
 	)
 
-	// Reasons round-trip.
 	assert.Equal(t, compatibility_checker.ReasonTypeMismatch, typeMismatch.Reason)
 	assert.Equal(t, compatibility_checker.ReasonMissingInProvider, missingInProvider.Reason)
 	assert.Equal(t, compatibility_checker.ReasonOptionalInProviderRequiredInConsumer, optionalInProvider.Reason)
 	assert.Equal(t, compatibility_checker.ReasonMissingInConsumer, missingInConsumer.Reason)
 	assert.Equal(t, compatibility_checker.ReasonOptionalInConsumerRequiredInProvider, optionalInConsumer.Reason)
 
-	// Type mismatch carries property + both position-keyed types.
 	assert.Equal(t, map[string]string{
 		"property":                  "root.id",
 		"checked_property_type":     "integer",
 		"counterpart_property_type": "string",
 	}, typeMismatch.Details)
 
-	// Non-type-mismatch property breaks carry only the property path.
 	assert.Equal(t, map[string]string{"property": "root.name"}, missingInProvider.Details)
 	assert.Equal(t, map[string]string{"property": "root.id"}, optionalInProvider.Details)
 	assert.Equal(t, map[string]string{"property": "root.user"}, missingInConsumer.Details)
 	assert.Equal(t, map[string]string{"property": "root.flag"}, optionalInConsumer.Details)
 
-	// Names resolve from the consumes side for every consumer-checked break.
 	assert.Equal(t, "front", typeMismatch.ConsumerName())
 	assert.Equal(t, "api", typeMismatch.ProviderName())
 	assert.Equal(t, "front", missingInConsumer.ConsumerName())
 	assert.Equal(t, "api", missingInConsumer.ProviderName())
 }
 
-// Type details are keyed by position, not role. The same logical type
-// mismatch, constructed consumer-checked and provider-checked (swapped
-// arguments), swaps the Details values: checked_property_type always comes
-// from the checked side (the one introducing the change),
-// counterpart_property_type from the stored side. The provider-checked
-// construction also exercises a checked side with Direction: Provides and
-// asserts consumer/provider names still resolve by direction.
 func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
-	consumerRes := &model.Resource{
-		Direction:          model.Consumes,
-		Kind:               model.RestResponse,
-		ConsumedProvider:   "api",
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: "200",
-		Participant:        &model.Participant{Name: "front"},
-		Properties: map[string]model.Property{
-			"root.id": {Path: "root.id", Type: "integer"},
-		},
-	}
-	providerRes := &model.Resource{
-		Direction:          model.Provides,
-		Kind:               model.RestResponse,
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: "200",
-		Participant:        &model.Participant{Name: "api"},
-		Properties: map[string]model.Property{
-			"root.id": {Path: "root.id", Type: "string"},
-		},
-	}
+	consumerRes := consumerResource()
+	providerRes := providerResource()
 
 	consumerChecked := compatibility_checker.NewPropertyBreakChange(
 		consumerRes, providerRes, compatibility_checker.ReasonTypeMismatch, "root.id",
@@ -163,28 +131,22 @@ func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 		"property":                  "root.id",
 		"checked_property_type":     "integer",
 		"counterpart_property_type": "string",
-	}, consumerChecked.Details,
-		"checked_property_type must come from the checked side")
+	}, consumerChecked.Details)
 	assert.Equal(t, map[string]string{
 		"property":                  "root.id",
 		"checked_property_type":     "string",
 		"counterpart_property_type": "integer",
-	}, providerChecked.Details,
-		"types are position-keyed: swapping arguments must swap the values")
+	}, providerChecked.Details)
 
-	// The provider-checked break stores the provider as the checked resource.
 	assert.Same(t, providerRes, providerChecked.CheckedResource)
 	assert.Same(t, consumerRes, providerChecked.CounterpartResource)
 
-	// Both directions resolve to the same consumer/provider names.
 	assert.Equal(t, "front", consumerChecked.ConsumerName())
 	assert.Equal(t, "api", consumerChecked.ProviderName())
 	assert.Equal(t, "front", providerChecked.ConsumerName())
 	assert.Equal(t, "api", providerChecked.ProviderName())
 }
 
-// A provider-not-deployed break joins the deployed environments into a single
-// Details entry. With no environments it carries no Details at all.
 func TestProviderNotDeployedDetails(t *testing.T) {
 	consumer := &model.Resource{
 		Direction:        model.Consumes,
@@ -208,33 +170,9 @@ func TestProviderNotDeployedDetails(t *testing.T) {
 	assert.Nil(t, nowhere.Details)
 }
 
-// Append keys breaks by the resolved consumer name regardless of whether the
-// break was consumer-checked or provider-checked, so both land under the same
-// consumer bucket.
 func TestReportAppendKeysByConsumerName(t *testing.T) {
-	consumerRes := &model.Resource{
-		Direction:          model.Consumes,
-		Kind:               model.RestResponse,
-		ConsumedProvider:   "api",
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: "200",
-		Participant:        &model.Participant{Name: "front"},
-		Properties: map[string]model.Property{
-			"root.id": {Path: "root.id", Type: "integer"},
-		},
-	}
-	providerRes := &model.Resource{
-		Direction:          model.Provides,
-		Kind:               model.RestResponse,
-		Endpoint:           "/things",
-		Method:             "get",
-		ResponseStatusCode: "200",
-		Participant:        &model.Participant{Name: "api"},
-		Properties: map[string]model.Property{
-			"root.id": {Path: "root.id", Type: "string"},
-		},
-	}
+	consumerRes := consumerResource()
+	providerRes := providerResource()
 
 	consumerChecked := compatibility_checker.NewPropertyBreakChange(
 		consumerRes, providerRes, compatibility_checker.ReasonTypeMismatch, "root.id",
