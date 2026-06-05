@@ -35,6 +35,9 @@ type tableRow struct {
 	PropertyVersionType       sql.NullString
 	PropertyVersionOptional   sql.NullBool
 	PropertyVersionChangeType string
+
+	DeploymentEnvironment sql.NullString
+	DeploymentVersion     sql.NullString
 }
 
 func (c *tableRow) toContractModel() *model.Contract {
@@ -61,6 +64,7 @@ func (c *tableRow) toResourceModel() model.Resource {
 		ResponseStatusCode: c.ResourceResponseStatusCode.String,
 		Version:            c.ResourceVersion,
 		Properties:         make(map[string]model.Property),
+		DeployedVersions:   make(map[string]string),
 		Participant: &model.Participant{
 			ID:   c.ParticipantID,
 			Name: c.ParticipantName,

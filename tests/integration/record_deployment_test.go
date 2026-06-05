@@ -75,7 +75,7 @@ func (s *IntegrationSuite) TestRecordDeployment_Success() {
 
 	status, body := s.post("/api/deployments", apiV1DeploymentBody)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"deployment recorded"}`, body)
+	s.JSONEq(`{"message":"deployment recorded"}`, body)
 
 	s.Equal(1, s.countRows("deployments"))
 
@@ -100,11 +100,11 @@ func (s *IntegrationSuite) TestRecordDeployment_TwiceSameTupleIsIdempotent() {
 
 	status, body := s.post("/api/deployments", apiV1DeploymentBody)
 	s.Require().Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"deployment recorded"}`, body)
+	s.JSONEq(`{"message":"deployment recorded"}`, body)
 
 	status, body = s.post("/api/deployments", apiV1DeploymentBody)
 	s.Require().Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"deployment recorded"}`, body)
+	s.JSONEq(`{"message":"deployment recorded"}`, body)
 
 	s.Equal(1, s.countRows("deployments"))
 
@@ -174,7 +174,7 @@ func (s *IntegrationSuite) TestRecordDeployment_MalformedJSONReturns400() {
 
 	status, body := s.post("/api/deployments", `{`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"deployment invalid input"}`, body)
+	s.JSONEq(`{"message":"deployment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -184,7 +184,7 @@ func (s *IntegrationSuite) TestRecordDeployment_MissingVersionReturns400() {
 
 	status, body := s.post("/api/deployments", `{"participant":"api","environment":"production"}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"deployment invalid input"}`, body)
+	s.JSONEq(`{"message":"deployment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -194,7 +194,7 @@ func (s *IntegrationSuite) TestRecordDeployment_MissingEnvironmentReturns400() {
 
 	status, body := s.post("/api/deployments", `{"participant":"api","version":"v1"}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"deployment invalid input"}`, body)
+	s.JSONEq(`{"message":"deployment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -204,7 +204,7 @@ func (s *IntegrationSuite) TestRecordDeployment_EmptyVersionReturns400() {
 
 	status, body := s.post("/api/deployments", `{"participant":"api","version":"","environment":"production"}`)
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"success":false,"message":"deployment invalid input"}`, body)
+	s.JSONEq(`{"message":"deployment invalid input"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -212,7 +212,7 @@ func (s *IntegrationSuite) TestRecordDeployment_EmptyVersionReturns400() {
 func (s *IntegrationSuite) TestRecordDeployment_UnknownParticipantReturns404() {
 	status, body := s.post("/api/deployments", `{"participant":"unknown","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusNotFound, status)
-	s.JSONEq(`{"success":false,"message":"participant not found"}`, body)
+	s.JSONEq(`{"message":"participant not found"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -226,7 +226,7 @@ func (s *IntegrationSuite) TestRecordDeployment_UnpublishedVersionReturns404() {
 
 	status, body := s.post("/api/deployments", apiV1DeploymentBody)
 	s.Equal(http.StatusNotFound, status)
-	s.JSONEq(`{"success":false,"message":"version not found"}`, body)
+	s.JSONEq(`{"message":"version not found"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -240,7 +240,7 @@ func (s *IntegrationSuite) TestRecordDeployment_UnknownEnvironmentReturns404() {
 
 	status, body := s.post("/api/deployments", apiV1DeploymentBody)
 	s.Equal(http.StatusNotFound, status)
-	s.JSONEq(`{"success":false,"message":"environment not found"}`, body)
+	s.JSONEq(`{"message":"environment not found"}`, body)
 
 	s.Equal(0, s.countRows("deployments"))
 }
@@ -251,7 +251,7 @@ func (s *IntegrationSuite) TestRecordDeployment_ExtraFieldsIgnored() {
 	status, body := s.post("/api/deployments",
 		`{"participant":"api","version":"v1","environment":"production","deployer":"alice"}`)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"success":true,"message":"deployment recorded"}`, body)
+	s.JSONEq(`{"message":"deployment recorded"}`, body)
 
 	s.Equal(1, s.countRows("deployments"))
 

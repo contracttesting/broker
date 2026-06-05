@@ -3,7 +3,6 @@ package record_deployment
 import (
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/shared"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -55,45 +54,30 @@ func (h *RecordDeploymentHandler) Handle(ctx fiber.Ctx) error {
 	h.deploymentRepository.Insert(ctx.Context(), model.NewDeployment(participant, requestBody.Version, environment))
 
 	return ctx.Status(fiber.StatusOK).JSON(RecordDeploymentResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: true,
-			Message: DeploymentRecorded,
-		},
+		Message: DeploymentRecorded,
 	})
 }
 
 func (h *RecordDeploymentHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RecordDeploymentResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: DeploymentInvalidInput,
-		},
+		Message: DeploymentInvalidInput,
 	})
 }
 
 func (h *RecordDeploymentHandler) respondEnvironmentNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: EnvironmentNotFound,
-		},
+		Message: EnvironmentNotFound,
 	})
 }
 
 func (h *RecordDeploymentHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ParticipantNotFound,
-		},
+		Message: ParticipantNotFound,
 	})
 }
 
 func (h *RecordDeploymentHandler) respondVersionNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RecordDeploymentResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: VersionNotFound,
-		},
+		Message: VersionNotFound,
 	})
 }

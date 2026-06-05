@@ -7,7 +7,6 @@ import (
 	"github.com/contracttesting/broker/internal/dsl"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/shared"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -64,10 +63,7 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 
 func (ctr *PublishContractHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(PublishContractResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ContractParticipantNotFound,
-		},
+		Message: ContractParticipantNotFound,
 	})
 }
 
@@ -83,27 +79,18 @@ func (ctr *PublishContractHandler) upsert(ctx fiber.Ctx, contract *model.Contrac
 
 func (ctr *PublishContractHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ContractInvalidInput,
-		},
+		Message: ContractInvalidInput,
 	})
 }
 
 func (ctr *PublishContractHandler) respondVersionConflict(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusConflict).JSON(PublishContractResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ContractVersionConflict,
-		},
+		Message: ContractVersionConflict,
 	})
 }
 
 func (ctr *PublishContractHandler) respondSuccess(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(PublishContractResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: true,
-			Message: ContractPublishSuccessful,
-		},
+		Message: ContractPublishSuccessful,
 	})
 }

@@ -4,7 +4,6 @@ import (
 	"github.com/contracttesting/broker/internal/compatibility_checker"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/shared"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -79,10 +78,7 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(CanIDeployResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: true,
-			Message: "Contract checked successfully",
-		},
+		Message:    "Contract checked successfully",
 		Deployable: len(report.Breaks) == 0,
 		Breaks:     report.Breaks,
 	})
@@ -90,27 +86,18 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 
 func (h *CanIDeployHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(CanIDeployErrorResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ParticipantNotFound,
-		},
+		Message: ParticipantNotFound,
 	})
 }
 
 func (h *CanIDeployHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CanIDeployErrorResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: "Invalid input",
-		},
+		Message: "Invalid input",
 	})
 }
 
 func (h *CanIDeployHandler) respondContractNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(CanIDeployErrorResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ContractNotFound,
-		},
+		Message: ContractNotFound,
 	})
 }

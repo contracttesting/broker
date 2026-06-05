@@ -2,7 +2,6 @@ package rename_participant
 
 import (
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/shared"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -34,36 +33,24 @@ func (h *RenameParticipantHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(RenameParticipantResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: true,
-			Message: ParticipantRenamed,
-		},
+		Message: ParticipantRenamed,
 	})
 }
 
 func (h *RenameParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RenameParticipantResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ParticipantInvalidInput,
-		},
+		Message: ParticipantInvalidInput,
 	})
 }
 
 func (h *RenameParticipantHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RenameParticipantResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ParticipantAlreadyExists,
-		},
+		Message: ParticipantAlreadyExists,
 	})
 }
 
 func (h *RenameParticipantHandler) respondNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(RenameParticipantResponseBody{
-		BrokerResponseBody: shared.BrokerResponseBody{
-			Success: false,
-			Message: ParticipantNotFound,
-		},
+		Message: ParticipantNotFound,
 	})
 }

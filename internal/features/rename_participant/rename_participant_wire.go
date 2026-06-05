@@ -1,7 +1,5 @@
 package rename_participant
 
-import "github.com/contracttesting/broker/internal/shared"
-
 const (
 	ParticipantRenamed       string = "participant renamed"
 	ParticipantInvalidInput  string = "participant invalid input"
@@ -15,5 +13,5 @@ type RenameParticipantRequestBody struct {
 }
 
 type RenameParticipantResponseBody struct {
-	shared.BrokerResponseBody
+	Message string `json:"message"`
 }
