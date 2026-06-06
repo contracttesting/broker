@@ -60,24 +60,69 @@ func TestCanIDeployCommand(t *testing.T) {
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
-		responseBody := `{"success":true,"deployable":false,"breaks":{` +
-			`"front":[` +
-			`{"reason":"provider_resource_not_found",` +
-			`"checked_resource":{"direction":"consumes","kind":"rest_request","consumed_provider":"accounts","method":"post","endpoint":"/accounts"}},` +
-			`{"reason":"type_mismatch",` +
-			`"checked_resource":{"direction":"consumes","kind":"rest_request","consumed_provider":"api","method":"get","endpoint":"/api/users"},` +
-			`"counterpart_resource":{"direction":"provides","kind":"rest_request","method":"get","endpoint":"/api/users"},` +
-			`"details":{"property":"root.id","consumer_type":"integer","provider_type":"string"}},` +
-			`{"reason":"provider_resource_not_deployed_in_environment",` +
-			`"checked_resource":{"direction":"consumes","kind":"rest_response","consumed_provider":"billing","method":"get","endpoint":"/invoices","response_status_code":"200"},` +
-			`"details":{"deployed_environments":"staging, prod"}}` +
-			`],` +
-			`"web":[` +
-			`{"reason":"missing_in_provider",` +
-			`"checked_resource":{"direction":"provides","kind":"rest_request","consumed_provider":"","method":"put","endpoint":"/profile"},` +
-			`"counterpart_resource":{"direction":"consumes","kind":"rest_request","consumed_provider":"front","method":"put","endpoint":"/profile"},` +
-			`"details":{"property":"root.name"}}` +
-			`]}}`
+		responseBody := `{
+		  "success": true,
+		  "deployable": false,
+		  "breaks": {
+		    "front": [
+		      {
+		        "reason": "provider_resource_not_found",
+		        "checked_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "accounts", "method": "post", "endpoint": "/accounts"}
+		      },
+		      {
+		        "reason": "type_mismatch",
+		        "checked_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "api", "method": "get", "endpoint": "/api/users"},
+		        "counterpart_resource": {"direction": "provides", "kind": "rest_request", "method": "get", "endpoint": "/api/users"},
+		        "details": {"property": "root.id", "checked_property_type": "integer", "counterpart_property_type": "string"}
+		      },
+		      {
+		        "reason": "provider_resource_not_deployed_in_environment",
+		        "checked_resource": {"direction": "consumes", "kind": "rest_response", "consumed_provider": "billing", "method": "get", "endpoint": "/invoices", "response_status_code": "200"},
+		        "details": {"deployed_environments": "staging, prod"}
+		      },
+		      {
+		        "reason": "provider_resource_not_deployed_in_environment",
+		        "checked_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "payments", "method": "get", "endpoint": "/payments"}
+		      },
+		      {
+		        "reason": "missing_in_consumer",
+		        "checked_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "api", "method": "get", "endpoint": "/api/users"},
+		        "counterpart_resource": {"direction": "provides", "kind": "rest_request", "method": "get", "endpoint": "/api/users"},
+		        "details": {"property": "root.tenant"}
+		      },
+		      {
+		        "reason": "exotic_future_reason",
+		        "checked_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "legacy", "method": "delete", "endpoint": "/sessions"}
+		      }
+		    ],
+		    "web": [
+		      {
+		        "reason": "missing_in_provider",
+		        "checked_resource": {"direction": "provides", "kind": "rest_request", "consumed_provider": "", "method": "put", "endpoint": "/profile"},
+		        "counterpart_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "front", "method": "put", "endpoint": "/profile"},
+		        "details": {"property": "root.name"}
+		      },
+		      {
+		        "reason": "type_mismatch",
+		        "checked_resource": {"direction": "provides", "kind": "rest_request", "consumed_provider": "", "method": "put", "endpoint": "/profile"},
+		        "counterpart_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "front", "method": "put", "endpoint": "/profile"},
+		        "details": {"property": "root.age", "checked_property_type": "string", "counterpart_property_type": "integer"}
+		      },
+		      {
+		        "reason": "optional_in_provider_required_in_consumer",
+		        "checked_resource": {"direction": "provides", "kind": "rest_request", "consumed_provider": "", "method": "put", "endpoint": "/profile"},
+		        "counterpart_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "front", "method": "put", "endpoint": "/profile"},
+		        "details": {"property": "root.email"}
+		      },
+		      {
+		        "reason": "optional_in_consumer_required_in_provider",
+		        "checked_resource": {"direction": "provides", "kind": "rest_request", "consumed_provider": "", "method": "put", "endpoint": "/profile"},
+		        "counterpart_resource": {"direction": "consumes", "kind": "rest_request", "consumed_provider": "front", "method": "put", "endpoint": "/profile"},
+		        "details": {"property": "root.phone"}
+		      }
+		    ]
+		  }
+		}`
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
 			httpmock.NewStringResponder(http.StatusOK, responseBody))
 
@@ -95,21 +140,27 @@ func TestCanIDeployCommand(t *testing.T) {
 		output := out.String()
 		assert.Contains(t, output, "not deployable")
 
-		// providers the checked participant depends on (consumer-checked: X=front, Y=consumed_provider)
 		assert.Contains(t, output, "front depends on these providers:")
 		assert.Contains(t, output, "accounts")
-		assert.Contains(t, output, "POST /accounts")
-		assert.Contains(t, output, "No POST /accounts (request) was found")
-		assert.Contains(t, output, "GET /api/users")
-		assert.Contains(t, output, "Consumer front expects root.id as integer but provider api provides string on GET /api/users (request)")
-		assert.Contains(t, output, "GET /invoices")
-		assert.Contains(t, output, "GET /invoices (response 200) exists but isn't deployed in this environment yet (deployed in: staging, prod)")
+		assert.Contains(t, output, "POST /accounts (request)")
+		assert.Contains(t, output, "not found in provider")
+		assert.Contains(t, output, "GET /api/users (request)")
+		assert.Contains(t, output, "root.id: consumer expects integer, provider provides string")
+		assert.Contains(t, output, "root.tenant: required, not sent")
+		assert.Contains(t, output, "GET /invoices (response 200)")
+		assert.Contains(t, output, "not deployed in this environment (deployed in: staging, prod)")
+		assert.Contains(t, output, "GET /payments (request)")
+		assert.Contains(t, output, "not deployed in any environment")
+		assert.Contains(t, output, "DELETE /sessions (request)")
+		assert.Contains(t, output, "exotic_future_reason")
 
-		// consumers that depend on the checked participant (provider-checked: X=breaks key, Y=front)
 		assert.Contains(t, output, "consumers that depend on front:")
 		assert.Contains(t, output, "web")
-		assert.Contains(t, output, "PUT /profile")
-		assert.Contains(t, output, "Provider front no longer provides property root.name required by consumer web on PUT /profile (request)")
+		assert.Contains(t, output, "PUT /profile (request)")
+		assert.Contains(t, output, "root.name: required, not provided")
+		assert.Contains(t, output, "root.age: consumer expects integer, provider provides string")
+		assert.Contains(t, output, "root.email: required, provided as optional")
+		assert.Contains(t, output, "root.phone: required, sent as optional")
 
 		assert.NotContains(t, errOut.String(), "Error:")
 	})

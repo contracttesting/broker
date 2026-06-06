@@ -37,47 +37,31 @@ func (c BreakingChange) operation() string {
 	return c.resource() + " (response " + c.CheckedResource.ResponseStatusCode + ")"
 }
 
-func (c BreakingChange) Message(consumerName, providerName string) string {
-	X, Y := consumerName, providerName
+func (c BreakingChange) Message() string {
 	P := c.Details["property"]
-	T1 := c.Details["consumer_type"]
-	T2 := c.Details["provider_type"]
-	OP := c.operation()
-	providerChecked := c.CheckedResource.Direction == "provides"
 
 	switch c.Reason {
 	case "missing_in_provider":
-		if providerChecked {
-			return "Provider " + Y + " no longer provides property " + P + " required by consumer " + X + " on " + OP
-		}
-		return "Consumer " + X + " requires property " + P + " but provider " + Y + " does not provide it on " + OP
+		return P + ": required, not provided"
 	case "missing_in_consumer":
-		if providerChecked {
-			return "Provider " + Y + " now requires property " + P + ", not sent by consumer " + X + " on " + OP
-		}
-		return "Consumer " + X + " does not send required property " + P + " on " + OP
+		return P + ": required, not sent"
 	case "type_mismatch":
-		if providerChecked {
-			return "Provider " + Y + " changed property " + P + " to " + T2 + "; consumer " + X + " expects " + T1 + " on " + OP
+		consumerType, providerType := c.Details["checked_property_type"], c.Details["counterpart_property_type"]
+		if c.CheckedResource.Direction == "provides" {
+			consumerType, providerType = providerType, consumerType
 		}
-		return "Consumer " + X + " expects " + P + " as " + T1 + " but provider " + Y + " provides " + T2 + " on " + OP
+		return P + ": consumer expects " + consumerType + ", provider provides " + providerType
 	case "optional_in_provider_required_in_consumer":
-		if providerChecked {
-			return "Provider " + Y + " made property " + P + " optional but consumer " + X + " requires it on " + OP
-		}
-		return "Consumer " + X + " requires property " + P + " but provider " + Y + " provides it as optional on " + OP
+		return P + ": required, provided as optional"
 	case "optional_in_consumer_required_in_provider":
-		if providerChecked {
-			return "Provider " + Y + " now requires property " + P + ", sent as optional by consumer " + X + " on " + OP
-		}
-		return "Consumer " + X + " sends property " + P + " as optional but provider " + Y + " requires it on " + OP
+		return P + ": required, sent as optional"
 	case "provider_resource_not_found":
-		return "No " + OP + " was found"
+		return "not found in provider"
 	case "provider_resource_not_deployed_in_environment":
 		if env, ok := c.Details["deployed_environments"]; ok {
-			return OP + " exists but isn't deployed in this environment yet (deployed in: " + env + ")"
+			return "not deployed in this environment (deployed in: " + env + ")"
 		}
-		return OP + " exists but isn't deployed in any environment yet"
+		return "not deployed in any environment"
 	default:
 		return c.Reason
 	}
@@ -112,12 +96,11 @@ func (r CanIDeployResponseBody) GroupBreaks(participant string) BreakSections {
 	for key, changes := range r.Breaks {
 		for _, change := range changes {
 			if key == participant {
-				providerName := change.CheckedResource.ConsumedProvider
-				k := groupKey{counterpart: providerName, resource: change.resource()}
-				dependsOn[k] = append(dependsOn[k], change.Message(key, providerName))
+				k := groupKey{counterpart: change.CheckedResource.ConsumedProvider, resource: change.operation()}
+				dependsOn[k] = append(dependsOn[k], change.Message())
 			} else {
-				k := groupKey{counterpart: key, resource: change.resource()}
-				dependedOnBy[k] = append(dependedOnBy[k], change.Message(key, participant))
+				k := groupKey{counterpart: key, resource: change.operation()}
+				dependedOnBy[k] = append(dependedOnBy[k], change.Message())
 			}
 		}
 	}
