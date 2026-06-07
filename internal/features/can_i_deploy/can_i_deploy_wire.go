@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/contracttesting/cli/internal/shared"
+	"github.com/contracttesting/cli/internal/ui"
 )
 
 type CanIDeployRequestBody struct {
@@ -26,102 +27,95 @@ type BreakingChange struct {
 	} `json:"checked_resource"`
 }
 
-func (c BreakingChange) resource() string {
-	return strings.ToUpper(c.CheckedResource.Method) + " " + c.CheckedResource.Endpoint
-}
-
-func (c BreakingChange) operation() string {
-	if c.CheckedResource.Kind == "rest_request" {
-		return c.resource() + " (request)"
-	}
-	return c.resource() + " (response " + c.CheckedResource.ResponseStatusCode + ")"
-}
-
-func (c BreakingChange) Message() string {
-	P := c.Details["property"]
-
-	switch c.Reason {
-	case "missing_in_provider":
-		return P + ": required, not provided"
-	case "missing_in_consumer":
-		return P + ": required, not sent"
-	case "type_mismatch":
-		consumerType, providerType := c.Details["checked_property_type"], c.Details["counterpart_property_type"]
-		if c.CheckedResource.Direction == "provides" {
-			consumerType, providerType = providerType, consumerType
-		}
-		return P + ": consumer expects " + consumerType + ", provider provides " + providerType
-	case "optional_in_provider_required_in_consumer":
-		return P + ": required, provided as optional"
-	case "optional_in_consumer_required_in_provider":
-		return P + ": required, sent as optional"
-	case "provider_resource_not_found":
-		return "not found in provider"
-	case "provider_resource_not_deployed_in_environment":
-		if env, ok := c.Details["deployed_environments"]; ok {
-			return "not deployed in this environment (deployed in: " + env + ")"
-		}
-		return "not deployed in any environment"
-	default:
-		return c.Reason
-	}
-}
-
 type CanIDeployResponseBody struct {
 	shared.BrokerResponseBody
 	Deployable bool                        `json:"deployable"`
 	Breaks     map[string][]BreakingChange `json:"breaks"`
 }
 
-type BreakGroup struct {
-	Counterpart string
-	Resource    string
-	Messages    []string
-}
-
-type BreakSections struct {
-	DependsOn    []BreakGroup
-	DependedOnBy []BreakGroup
-}
-
-type groupKey struct {
-	counterpart string
-	resource    string
-}
-
-func (r CanIDeployResponseBody) GroupBreaks(participant string) BreakSections {
-	dependsOn := map[groupKey][]string{}
-	dependedOnBy := map[groupKey][]string{}
+// CheckView maps the breaks into the ui failure view. The breaks map is keyed
+// by consumer name: the checked participant's own key holds its consumer-side
+// breaks (counterpart = the consumed provider) and every other key is a
+// consumer broken by the checked participant's provider side (counterpart =
+// that consumer). Properties arrive in the broker's $.-prefixed dialect and
+// are rendered verbatim. Map iteration order is random, so integrations sort
+// by identity and mismatches by property.
+func (r CanIDeployResponseBody) CheckView(participant, environment string) ui.CheckView {
+	type identity struct{ counterpart, method, path, location string }
+	integrations := map[identity]*ui.Integration{}
 
 	for key, changes := range r.Breaks {
 		for _, change := range changes {
+			consumer, provider := key, participant
 			if key == participant {
-				k := groupKey{counterpart: change.CheckedResource.ConsumedProvider, resource: change.operation()}
-				dependsOn[k] = append(dependsOn[k], change.Message())
-			} else {
-				k := groupKey{counterpart: key, resource: change.operation()}
-				dependedOnBy[k] = append(dependedOnBy[k], change.Message())
+				provider = change.CheckedResource.ConsumedProvider
+			}
+			counterpart := consumer
+			if consumer == participant {
+				counterpart = provider
+			}
+
+			request := change.CheckedResource.Kind == "rest_request"
+			location := "request"
+			if !request {
+				location = "response " + change.CheckedResource.ResponseStatusCode
+			}
+
+			id := identity{counterpart, strings.ToUpper(change.CheckedResource.Method), change.CheckedResource.Endpoint, location}
+			integration, ok := integrations[id]
+			if !ok {
+				integration = &ui.Integration{Counterpart: id.counterpart, Method: id.method, Path: id.path, Location: id.location}
+				integrations[id] = integration
+			}
+
+			property := change.Details["property"]
+
+			switch change.Reason {
+			case "missing_in_consumer":
+				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.Missing, Property: property, Omitter: consumer, Requirer: provider})
+			case "missing_in_provider":
+				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.Missing, Property: property, Omitter: provider, Requirer: consumer})
+			case "type_mismatch":
+				consumerType, providerType := change.Details["checked_property_type"], change.Details["counterpart_property_type"]
+				if change.CheckedResource.Direction == "provides" {
+					consumerType, providerType = providerType, consumerType
+				}
+				wanter, wants, sender, sends := consumer, consumerType, provider, providerType
+				if request {
+					wanter, wants, sender, sends = provider, providerType, consumer, consumerType
+				}
+				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.TypeMismatch, Property: property, Wanter: wanter, Wants: wants, Sender: sender, Sends: sends})
+			case "optional_in_consumer_required_in_provider":
+				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.Optional, Property: property, Requirer: provider, Sender: consumer})
+			case "optional_in_provider_required_in_consumer":
+				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.Optional, Property: property, Requirer: consumer, Sender: provider})
+			case "provider_resource_not_found":
+				integration.Issues = append(integration.Issues, ui.Issue{Kind: ui.NotProvided})
+			case "provider_resource_not_deployed_in_environment":
+				integration.Issues = append(integration.Issues, ui.Issue{Kind: ui.NotDeployed, DeployedIn: change.Details["deployed_environments"]})
+			default:
+				integration.Issues = append(integration.Issues, ui.Issue{Kind: ui.UnknownReason, Reason: change.Reason})
 			}
 		}
 	}
 
-	return BreakSections{
-		DependsOn:    sortedGroups(dependsOn),
-		DependedOnBy: sortedGroups(dependedOnBy),
+	view := ui.CheckView{Pacticipant: participant, Target: environment}
+	for _, integration := range integrations {
+		sort.Slice(integration.Mismatches, func(i, j int) bool { return integration.Mismatches[i].Property < integration.Mismatches[j].Property })
+		view.Integrations = append(view.Integrations, *integration)
 	}
-}
-
-func sortedGroups(grouped map[groupKey][]string) []BreakGroup {
-	groups := make([]BreakGroup, 0, len(grouped))
-	for key, messages := range grouped {
-		sort.Strings(messages)
-		groups = append(groups, BreakGroup{Counterpart: key.counterpart, Resource: key.resource, Messages: messages})
-	}
-	sort.Slice(groups, func(i, j int) bool {
-		if groups[i].Counterpart != groups[j].Counterpart {
-			return groups[i].Counterpart < groups[j].Counterpart
+	sort.Slice(view.Integrations, func(i, j int) bool {
+		a, b := view.Integrations[i], view.Integrations[j]
+		if a.Counterpart != b.Counterpart {
+			return a.Counterpart < b.Counterpart
 		}
-		return groups[i].Resource < groups[j].Resource
+		if a.Method != b.Method {
+			return a.Method < b.Method
+		}
+		if a.Path != b.Path {
+			return a.Path < b.Path
+		}
+		return a.Location < b.Location
 	})
-	return groups
+	return view
 }

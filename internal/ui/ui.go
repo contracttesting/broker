@@ -2,9 +2,7 @@ package ui
 
 import (
 	"errors"
-	"fmt"
 	"io"
-	"strings"
 
 	"github.com/pterm/pterm"
 )
@@ -31,30 +29,3 @@ func Success(w io.Writer, prefix, msg string) {
 
 // Failure prints msg to w as a red "❌ <msg>" line.
 func Failure(w io.Writer, msg string) { failure.WithWriter(w).Println(msg) }
-
-// TableGroup is one row of a GroupedTable: one cell per leading label column and
-// one or more lines stacked in the final column as a single multi-line cell.
-type TableGroup struct {
-	Labels []string
-	Rows   []string
-}
-
-// GroupedTable prints caption then a boxed table to w whose columns are described
-// by header. Each group is one row — its Labels fill the leading columns and its
-// Rows stack in the final column — so the labels read as headings spanning the
-// stacked lines.
-func GroupedTable(w io.Writer, caption string, header []string, groups []TableGroup) {
-	data := pterm.TableData{header}
-	for _, group := range groups {
-		data = append(data, append(append([]string{}, group.Labels...), strings.Join(group.Rows, "\n")))
-	}
-
-	fmt.Fprintf(w, "\n%s\n", caption)
-	_ = pterm.DefaultTable.
-		WithHasHeader().
-		WithBoxed().
-		WithRowSeparator("─").
-		WithData(data).
-		WithWriter(w).
-		Render()
-}

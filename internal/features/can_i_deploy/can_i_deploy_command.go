@@ -45,25 +45,13 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 		if !resp.Deployable {
 			out := command.OutOrStdout()
-			ui.Failure(out, "not deployable")
-
-			sections := resp.GroupBreaks(participant)
-			if len(sections.DependsOn) > 0 {
-				ui.GroupedTable(out,
-					fmt.Sprintf("%s depends on these providers:", participant),
-					[]string{"PROVIDER", "RESOURCE", "BREAKING CHANGE"},
-					tableGroups(sections.DependsOn))
-			}
-			if len(sections.DependedOnBy) > 0 {
-				ui.GroupedTable(out,
-					fmt.Sprintf("consumers that depend on %s:", participant),
-					[]string{"CONSUMER", "RESOURCE", "BREAKING CHANGE"},
-					tableGroups(sections.DependedOnBy))
-			}
+			ui.Check(out, resp.CheckView(participant, environment))
+			ui.Rule(out)
+			ui.ChecksSummary(out, 1)
 			return ui.ErrSilent
 		}
 
-		ui.Success(command.OutOrStdout(), "🚀", "deployable")
+		ui.Success(command.OutOrStdout(), "🚀", fmt.Sprintf("%s can be deployed to %s", participant, environment))
 		return nil
 	}
 
@@ -80,12 +68,4 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 	_ = command.MarkFlagRequired("environment")
 
 	return command
-}
-
-func tableGroups(groups []BreakGroup) []ui.TableGroup {
-	rows := make([]ui.TableGroup, len(groups))
-	for i, group := range groups {
-		rows[i] = ui.TableGroup{Labels: []string{group.Counterpart, group.Resource}, Rows: group.Messages}
-	}
-	return rows
 }
