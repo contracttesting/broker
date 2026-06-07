@@ -156,14 +156,14 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	typeMismatch, ok := byReason["type_mismatch"]
 	s.Require().True(ok)
 	s.Equal(map[string]string{
-		"property":                  "root.id",
+		"property":                  "$.id",
 		"checked_property_type":     "integer",
 		"counterpart_property_type": "string",
 	}, typeMismatch.Details)
 
 	missing, ok := byReason["missing_in_provider"]
 	s.Require().True(ok)
-	s.Equal(map[string]string{"property": "root.name"}, missing.Details)
+	s.Equal(map[string]string{"property": "$.name"}, missing.Details)
 
 	s.Equal(2, s.countRows("compatibility_matrix"))
 	var v2Deployable bool
@@ -232,7 +232,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer
 
 	s.Equal("type_mismatch", b.Reason)
 	s.Equal(map[string]string{
-		"property":                  "root.id",
+		"property":                  "$.id",
 		"checked_property_type":     "string",
 		"counterpart_property_type": "integer",
 	}, b.Details)
@@ -352,7 +352,7 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	b := got.Breaks["app"][0]
 	s.Equal("catalog", b.CheckedResource.Provider)
 	s.Equal("type_mismatch", b.Reason)
-	s.Equal("root.id", b.Details["property"])
+	s.Equal("$.id", b.Details["property"])
 
 	s.Equal(3, s.countRows("compatibility_matrix"))
 
@@ -422,6 +422,341 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 	s.Equal("api", b.CheckedResource.Provider)
 	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
 	s.Equal("staging", b.Details["deployed_environments"])
+}
+
+const dualRoleUsersV1Contract = `
+{
+  "provides": {
+    "rest": {
+      "/users": {
+        "post": {
+          "request": "CreateUserRequest",
+          "responses": { "200": "CreateUserResponse" }
+        }
+      },
+      "/users/{userId}": {
+        "get": { "responses": { "200": "User" } }
+      }
+    }
+  },
+  "schemas": {
+    "CreateUserRequest": {
+      "type": "object",
+      "properties": {
+        "email":    { "type": "string" },
+        "password": { "type": "string" }
+      }
+    },
+    "CreateUserResponse": {
+      "type": "object",
+      "properties": {
+        "userId": { "type": "integer" }
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "userId": { "type": "integer" },
+        "status": { "type": "string" }
+      }
+    }
+  }
+}`
+
+const dualRolePetsV1Contract = `
+{
+  "consumes": {
+    "users": {
+      "rest": {
+        "/users/{userId}": {
+          "get": { "responses": { "200": "User" } }
+        }
+      }
+    }
+  },
+  "provides": {
+    "rest": {
+      "/pets": {
+        "post": {
+          "request": "CreatePetRequest",
+          "responses": { "200": "Pet" }
+        }
+      },
+      "/pets/{petId}": {
+        "get": { "responses": { "200": "Pet" } }
+      }
+    }
+  },
+  "schemas": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "userId": { "type": "integer" }
+      }
+    },
+    "CreatePetRequest": {
+      "type": "object",
+      "properties": {
+        "name":   { "type": "string" },
+        "userId": { "type": "integer" }
+      }
+    },
+    "Pet": {
+      "type": "object",
+      "properties": {
+        "petId":  { "type": "integer" },
+        "userId": { "type": "integer" },
+        "name":   { "type": "string" }
+      }
+    }
+  }
+}`
+
+// v2 introduces exactly three breaks: the consumes side now expects userId as
+// string (users provides integer), POST /pets gains a new required request
+// field breed (app v1 does not send it), and the GET /pets/{petId} response
+// drops name (app v1 expects it). PetSummary keeps the POST /pets response
+// intact so the break count stays at three.
+const dualRolePetsV2Contract = `
+{
+  "consumes": {
+    "users": {
+      "rest": {
+        "/users/{userId}": {
+          "get": { "responses": { "200": "User" } }
+        }
+      }
+    }
+  },
+  "provides": {
+    "rest": {
+      "/pets": {
+        "post": {
+          "request": "CreatePetRequest",
+          "responses": { "200": "Pet" }
+        }
+      },
+      "/pets/{petId}": {
+        "get": { "responses": { "200": "PetSummary" } }
+      }
+    }
+  },
+  "schemas": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" }
+      }
+    },
+    "CreatePetRequest": {
+      "type": "object",
+      "properties": {
+        "name":   { "type": "string" },
+        "userId": { "type": "integer" },
+        "breed":  { "type": "string" }
+      }
+    },
+    "Pet": {
+      "type": "object",
+      "properties": {
+        "petId":  { "type": "integer" },
+        "userId": { "type": "integer" },
+        "name":   { "type": "string" }
+      }
+    },
+    "PetSummary": {
+      "type": "object",
+      "properties": {
+        "petId":  { "type": "integer" },
+        "userId": { "type": "integer" }
+      }
+    }
+  }
+}`
+
+const dualRoleAppV1Contract = `
+{
+  "consumes": {
+    "users": {
+      "rest": {
+        "/users": {
+          "post": {
+            "request": "CreateUserRequest",
+            "responses": { "200": "CreateUserResponse" }
+          }
+        },
+        "/users/{userId}": {
+          "get": { "responses": { "200": "User" } }
+        }
+      }
+    },
+    "pets": {
+      "rest": {
+        "/pets": {
+          "post": {
+            "request": "CreatePetRequest",
+            "responses": { "200": "Pet" }
+          }
+        },
+        "/pets/{petId}": {
+          "get": { "responses": { "200": "Pet" } }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "CreateUserRequest": {
+      "type": "object",
+      "properties": {
+        "email":    { "type": "string" },
+        "password": { "type": "string" }
+      }
+    },
+    "CreateUserResponse": {
+      "type": "object",
+      "properties": {
+        "userId": { "type": "integer" }
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "userId": { "type": "integer" },
+        "status": { "type": "string" }
+      }
+    },
+    "CreatePetRequest": {
+      "type": "object",
+      "properties": {
+        "name":   { "type": "string" },
+        "userId": { "type": "integer" }
+      }
+    },
+    "Pet": {
+      "type": "object",
+      "properties": {
+        "petId":  { "type": "integer" },
+        "userId": { "type": "integer" },
+        "name":   { "type": "string" }
+      }
+    }
+  }
+}`
+
+func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	checkDeployableAndDeploy := func(participant, version string) {
+		status, body := s.post("/api/can-i-deploy",
+			`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
+		s.Require().Equalf(http.StatusOK, status, "can-i-deploy %s %s", participant, version)
+		s.Require().JSONEqf(`{"message":"Contract checked successfully","deployable":true}`, body,
+			"can-i-deploy %s %s", participant, version)
+		mustPost("/api/deployments",
+			`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
+	}
+
+	for _, name := range []string{"users", "pets", "app"} {
+		mustPost("/api/participants", `{"participant":"`+name+`"}`)
+	}
+	mustPost("/api/environments", `{"participant":"production"}`)
+
+	mustPost("/api/contracts", `{"participant":"users","version":"v1","contract":`+dualRoleUsersV1Contract+`}`)
+	checkDeployableAndDeploy("users", "v1")
+
+	mustPost("/api/contracts", `{"participant":"pets","version":"v1","contract":`+dualRolePetsV1Contract+`}`)
+	checkDeployableAndDeploy("pets", "v1")
+
+	mustPost("/api/contracts", `{"participant":"app","version":"v1","contract":`+dualRoleAppV1Contract+`}`)
+	checkDeployableAndDeploy("app", "v1")
+
+	mustPost("/api/contracts", `{"participant":"pets","version":"v2","contract":`+dualRolePetsV2Contract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"pets","version":"v2","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got canIDeployResponse
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	s.False(got.Deployable)
+
+	s.Require().Len(got.Breaks, 2, "breaks must surface both sides: consumer (pets) and provider (app)")
+
+	petsBreaks := got.Breaks["pets"]
+	s.Require().Len(petsBreaks, 1)
+
+	consumerSide := petsBreaks[0]
+	s.Equal("consumes", consumerSide.CheckedResource.Direction)
+	s.Equal("rest_response", consumerSide.CheckedResource.Kind)
+	s.Equal("users", consumerSide.CheckedResource.Provider)
+	s.Equal("/users/{userId}", consumerSide.CheckedResource.Endpoint)
+	s.Equal("get", consumerSide.CheckedResource.Method)
+	s.Equal("200", consumerSide.CheckedResource.StatusCode)
+	s.Require().NotNil(consumerSide.CounterpartResource)
+	s.Equal("provides", consumerSide.CounterpartResource.Direction)
+	s.Equal("type_mismatch", consumerSide.Reason)
+	s.Equal(map[string]string{
+		"property":                  "$.userId",
+		"checked_property_type":     "string",
+		"counterpart_property_type": "integer",
+	}, consumerSide.Details)
+
+	appBreaks := got.Breaks["app"]
+	s.Require().Len(appBreaks, 2)
+
+	byReason := map[string]breakItem{}
+	for _, b := range appBreaks {
+		s.Equal("provides", b.CheckedResource.Direction)
+		s.Require().NotNil(b.CounterpartResource)
+		s.Equal("consumes", b.CounterpartResource.Direction)
+		s.Equal("pets", b.CounterpartResource.Provider)
+		byReason[b.Reason] = b
+	}
+
+	missingInConsumer, ok := byReason["missing_in_consumer"]
+	s.Require().True(ok)
+	s.Equal("rest_request", missingInConsumer.CheckedResource.Kind)
+	s.Equal("/pets", missingInConsumer.CheckedResource.Endpoint)
+	s.Equal("post", missingInConsumer.CheckedResource.Method)
+	s.Equal(map[string]string{"property": "$.breed"}, missingInConsumer.Details)
+
+	missingInProvider, ok := byReason["missing_in_provider"]
+	s.Require().True(ok)
+	s.Equal("rest_response", missingInProvider.CheckedResource.Kind)
+	s.Equal("/pets/{petId}", missingInProvider.CheckedResource.Endpoint)
+	s.Equal("get", missingInProvider.CheckedResource.Method)
+	s.Equal("200", missingInProvider.CheckedResource.StatusCode)
+	s.Equal(map[string]string{"property": "$.name"}, missingInProvider.Details)
+
+	type matrixRow struct {
+		Counterpart string
+		Version     string
+		Deployable  bool
+	}
+
+	rows, err := s.Pool.Query(context.Background(),
+		`SELECT counterpart.name, cm.counterpart_version, cm.deployable
+		   FROM compatibility_matrix cm
+		   JOIN participants checked ON checked.id = cm.participant_id
+		   JOIN participants counterpart ON counterpart.id = cm.counterpart_participant_id
+		  WHERE checked.name = 'pets' AND cm.version = 'v2'`)
+	s.Require().NoError(err)
+	defer rows.Close()
+
+	var matrixRows []matrixRow
+	for rows.Next() {
+		var row matrixRow
+		s.Require().NoError(rows.Scan(&row.Counterpart, &row.Version, &row.Deployable))
+		matrixRows = append(matrixRows, row)
+	}
+	s.Require().NoError(rows.Err())
+
+	s.ElementsMatch([]matrixRow{
+		{Counterpart: "users", Version: "v1", Deployable: false},
+		{Counterpart: "app", Version: "v1", Deployable: false},
+	}, matrixRows)
 }
 
 func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {

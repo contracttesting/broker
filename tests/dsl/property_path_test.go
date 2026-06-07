@@ -10,15 +10,15 @@ import (
 func TestPropertyPath_Append_OnEmptyReceiver_ReturnsChunkOnly(t *testing.T) {
 	pp := dsl.NewPropertyPath("")
 
-	result := pp.Append("root")
+	result := pp.Append("$")
 
-	assert.Equal(t, "root", result.String())
+	assert.Equal(t, "$", result.String())
 }
 
 func TestPropertyPath_AppendArray_SuffixesBrackets(t *testing.T) {
-	pp := dsl.NewPropertyPath("root")
+	pp := dsl.NewPropertyPath("$")
 
 	result := pp.AppendArray()
 
-	assert.Equal(t, "root[]", result.String())
+	assert.Equal(t, "$[]", result.String())
 }

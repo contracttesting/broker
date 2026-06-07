@@ -20,7 +20,7 @@ func (c *CompatibilityChecker) checkProvider(
 			report.Append(breakingChange)
 		}
 
-		report.Results = append(report.Results, CompatibilityResult{
+		report.AppendResult(consumer.ParticipantName(), CompatibilityResult{
 			CounterpartParticipantID: consumer.ParticipantID(),
 			CounterpartVersion:       consumer.Version,
 			Deployable:               len(consumerBreaks) == 0,
