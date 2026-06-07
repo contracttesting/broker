@@ -7,15 +7,37 @@ type CompatibilityResult struct {
 }
 
 type CompatibilityReport struct {
-	Results []CompatibilityResult       `json:"results"`
-	Breaks  map[string][]BreakingChange `json:"breaks"`
+	Results map[string]CompatibilityResult `json:"results"`
+	Breaks  map[string][]BreakingChange    `json:"breaks"`
 }
 
 func NewCompatibilityReport() *CompatibilityReport {
 	return &CompatibilityReport{
-		Results: make([]CompatibilityResult, 0),
+		Results: make(map[string]CompatibilityResult),
 		Breaks:  make(map[string][]BreakingChange),
 	}
+}
+
+// AppendResult records the outcome of one resource check against the named
+// dependency, keeping a single aggregated result per dependency: the
+// dependency is deployable only if every one of its resource checks is.
+func (r *CompatibilityReport) AppendResult(dependency string, result CompatibilityResult) {
+	if r.Results == nil {
+		r.Results = make(map[string]CompatibilityResult)
+	}
+
+	existing, seen := r.Results[dependency]
+	if !seen {
+		r.Results[dependency] = result
+		return
+	}
+
+	existing.Deployable = existing.Deployable && result.Deployable
+	if existing.CounterpartParticipantID == 0 {
+		existing.CounterpartParticipantID = result.CounterpartParticipantID
+		existing.CounterpartVersion = result.CounterpartVersion
+	}
+	r.Results[dependency] = existing
 }
 
 func (r *CompatibilityReport) Append(b BreakingChange) {

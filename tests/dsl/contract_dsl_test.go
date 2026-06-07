@@ -78,10 +78,10 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 	assert.Equal(t, "get", resource.Method)
 	assert.Equal(t, "200", resource.ResponseStatusCode)
 
-	assert.Contains(t, resource.Properties, "root")
-	assert.Contains(t, resource.Properties, "root.id")
-	assert.Contains(t, resource.Properties, "root.name")
-	assert.Equal(t, "string", resource.Properties["root.id"].Type)
+	assert.Contains(t, resource.Properties, "$")
+	assert.Contains(t, resource.Properties, "$.id")
+	assert.Contains(t, resource.Properties, "$.name")
+	assert.Equal(t, "string", resource.Properties["$.id"].Type)
 }
 
 const postWithRequestBodyJSON = `{
@@ -214,12 +214,12 @@ func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing
 	assert.Equal(t, "/pets", request.Endpoint)
 	assert.Equal(t, "post", request.Method)
 	assert.Empty(t, request.ResponseStatusCode)
-	assert.Contains(t, request.Properties, "root.id")
+	assert.Contains(t, request.Properties, "$.id")
 
 	assert.Equal(t, model.Consumes, response.Direction)
 	assert.Equal(t, model.RestResponse, response.Kind)
 	assert.Equal(t, "201", response.ResponseStatusCode)
-	assert.Contains(t, response.Properties, "root.name")
+	assert.Contains(t, response.Properties, "$.name")
 }
 
 func TestHydrateContract_ProvidesSide_EmitsProvidedResource(t *testing.T) {
@@ -238,7 +238,7 @@ func TestHydrateContract_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
 	assert.Equal(t, "200", resource.ResponseStatusCode)
-	assert.Contains(t, resource.Properties, "root.id")
+	assert.Contains(t, resource.Properties, "$.id")
 }
 
 func TestHydrateContract_PrimitiveTopLevel_EmitsRootPrimitive(t *testing.T) {
@@ -251,8 +251,8 @@ func TestHydrateContract_PrimitiveTopLevel_EmitsRootPrimitive(t *testing.T) {
 		resource = r
 	}
 
-	require.Contains(t, resource.Properties, "root")
-	assert.Equal(t, "string", resource.Properties["root"].Type)
+	require.Contains(t, resource.Properties, "$")
+	assert.Equal(t, "string", resource.Properties["$"].Type)
 	assert.Len(t, resource.Properties, 1)
 }
 
@@ -266,12 +266,12 @@ func TestHydrateContract_ArrayOfObjects_WalksItemsViaSchemaPointer(t *testing.T)
 		resource = r
 	}
 
-	require.Contains(t, resource.Properties, "root")
-	require.Contains(t, resource.Properties, "root[]")
-	require.Contains(t, resource.Properties, "root[].id")
-	assert.Equal(t, "array", resource.Properties["root"].Type)
-	assert.Equal(t, "object", resource.Properties["root[]"].Type)
-	assert.Equal(t, "string", resource.Properties["root[].id"].Type)
+	require.Contains(t, resource.Properties, "$")
+	require.Contains(t, resource.Properties, "$[]")
+	require.Contains(t, resource.Properties, "$[].id")
+	assert.Equal(t, "array", resource.Properties["$"].Type)
+	assert.Equal(t, "object", resource.Properties["$[]"].Type)
+	assert.Equal(t, "string", resource.Properties["$[].id"].Type)
 }
 
 func TestHydrateContract_RefResolves_SubstitutesReferencedSchema(t *testing.T) {
@@ -284,10 +284,10 @@ func TestHydrateContract_RefResolves_SubstitutesReferencedSchema(t *testing.T) {
 		resource = r
 	}
 
-	require.Contains(t, resource.Properties, "root")
-	require.Contains(t, resource.Properties, "root.id")
-	assert.Equal(t, "object", resource.Properties["root"].Type)
-	assert.Equal(t, "string", resource.Properties["root.id"].Type)
+	require.Contains(t, resource.Properties, "$")
+	require.Contains(t, resource.Properties, "$.id")
+	assert.Equal(t, "object", resource.Properties["$"].Type)
+	assert.Equal(t, "string", resource.Properties["$.id"].Type)
 }
 
 func TestHydrateContract_Unhappy_PanicsOnSchemaTooDeep(t *testing.T) {

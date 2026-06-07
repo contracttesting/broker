@@ -8,15 +8,15 @@ import (
 )
 
 func TestProperty_IsSame_Identical(t *testing.T) {
-	a := model.NewProperty("root.id", "string", false)
-	b := model.NewProperty("root.id", "string", false)
+	a := model.NewProperty("$.id", "string", false)
+	b := model.NewProperty("$.id", "string", false)
 
 	assert.True(t, a.IsSame(&b))
 }
 
 func TestProperty_IsSame_FalseOnTypeMismatch(t *testing.T) {
-	a := model.NewProperty("root.id", "string", false)
-	b := model.NewProperty("root.id", "int", false)
+	a := model.NewProperty("$.id", "string", false)
+	b := model.NewProperty("$.id", "int", false)
 
 	assert.False(t, a.IsSame(&b))
 }

@@ -10,8 +10,8 @@ import (
 func newContractWithOnePetsResource(participantName string) *model.Contract {
 	contract := model.NewContract(model.NewParticipant(participantName), "1", "raw")
 	contract.AddResource(model.NewProvidedRestResponse("/pets", "get", "200", map[string]model.Property{
-		"root":    model.NewProperty("root", "object", false),
-		"root.id": model.NewProperty("root.id", "string", false),
+		"$":    model.NewProperty("$", "object", false),
+		"$.id": model.NewProperty("$.id", "string", false),
 	}))
 	return contract
 }
@@ -28,7 +28,7 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 
 	b := newContractWithOnePetsResource("pets-service")
 	b.AddResource(model.NewProvidedRestResponse("/pets/{id}", "get", "200", map[string]model.Property{
-		"root": model.NewProperty("root", "object", false),
+		"$": model.NewProperty("$", "object", false),
 	}))
 
 	assert.NotEqual(t, a.Checksum(), b.Checksum())

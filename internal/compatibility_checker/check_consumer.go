@@ -23,7 +23,7 @@ func (c *CompatibilityChecker) checkConsumer(
 			ReasonProviderResourceNotFound,
 		))
 
-		report.Results = append(report.Results, CompatibilityResult{
+		report.AppendResult(consumer.ConsumedProvider, CompatibilityResult{
 			Deployable: false,
 		})
 
@@ -37,7 +37,7 @@ func (c *CompatibilityChecker) checkConsumer(
 			provider.DeployedEnvironments(),
 		))
 
-		report.Results = append(report.Results, CompatibilityResult{
+		report.AppendResult(consumer.ConsumedProvider, CompatibilityResult{
 			Deployable: false,
 		})
 
@@ -51,7 +51,7 @@ func (c *CompatibilityChecker) checkConsumer(
 		report.Append(breakingChange)
 	}
 
-	report.Results = append(report.Results, CompatibilityResult{
+	report.AppendResult(consumer.ConsumedProvider, CompatibilityResult{
 		CounterpartParticipantID: provider.ParticipantID(),
 		CounterpartVersion:       provider.Version,
 		Deployable:               len(breaks) == 0,

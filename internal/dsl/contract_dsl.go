@@ -115,7 +115,7 @@ func (c *Contract) hydrateResources(
 				NewDepthCounter(postMethod.RequestBody),
 				c.Schemas,
 				make(map[string]model.Property),
-				NewPropertyPath("root"),
+				NewPropertyPath("$"),
 				c.Schemas[postMethod.RequestBody],
 			)
 
@@ -137,7 +137,7 @@ func (c *Contract) hydrateResources(
 				NewDepthCounter(putMethod.RequestBody),
 				c.Schemas,
 				make(map[string]model.Property),
-				NewPropertyPath("root"),
+				NewPropertyPath("$"),
 				c.Schemas[putMethod.RequestBody],
 			)
 
@@ -167,7 +167,7 @@ func (c *Contract) hydrateResources(
 				NewDepthCounter(schemaName),
 				c.Schemas,
 				make(map[string]model.Property),
-				NewPropertyPath("root"),
+				NewPropertyPath("$"),
 				c.Schemas[schemaName],
 			)
 
