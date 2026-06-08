@@ -1,4 +1,4 @@
-package ui_test
+package can_i_deploy
 
 import (
 	"bytes"
@@ -6,33 +6,31 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/contracttesting/cli/internal/ui"
 )
 
 // renderCheck renders v and returns its lines.
-func renderCheck(v ui.CheckView) []string {
+func renderCheck(v CheckView) []string {
 	var buf bytes.Buffer
-	ui.Check(&buf, v)
+	printBreakdown(&buf, v)
 	return strings.Split(buf.String(), "\n")
 }
 
 func TestCheckHeadline(t *testing.T) {
-	lines := renderCheck(ui.CheckView{Participant: "app", Environment: "production"})
+	lines := renderCheck(CheckView{Participant: "app", Environment: "production"})
 	require.Equal(t, `"app" cannot be deployed in "production" environment`, lines[0])
 }
 
 func TestCheckGroupedLayout(t *testing.T) {
-	lines := renderCheck(ui.CheckView{
+	lines := renderCheck(CheckView{
 		Participant: "app",
 		Environment: "production",
-		Counterparts: []ui.Counterpart{
+		Counterparts: []Counterpart{
 			{
 				Name: "users",
-				Resources: []ui.Resource{
+				Resources: []Resource{
 					{
 						Method: "GET", Path: "/users/{id}", Location: "200 response",
-						Groups: []ui.BreakGroup{
+						Groups: []BreakGroup{
 							{Label: "absent fields", Breaks: []string{
 								"$.firstName: absent in users - required in app",
 								"$.lastName: absent in users - required in app",
@@ -62,14 +60,14 @@ func TestCheckGroupedLayout(t *testing.T) {
 }
 
 func TestCheckUngroupedRawReason(t *testing.T) {
-	lines := renderCheck(ui.CheckView{
+	lines := renderCheck(CheckView{
 		Participant: "front",
 		Environment: "production",
-		Counterparts: []ui.Counterpart{
-			{Name: "accounts", Resources: []ui.Resource{
+		Counterparts: []Counterpart{
+			{Name: "accounts", Resources: []Resource{
 				{
 					Method: "POST", Path: "/accounts", Location: "request",
-					Groups: []ui.BreakGroup{
+					Groups: []BreakGroup{
 						{Label: "", Breaks: []string{"provider_resource_not_found"}},
 					},
 				},

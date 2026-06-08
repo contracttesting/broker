@@ -44,7 +44,7 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 		}
 
 		if !resp.Deployable {
-			ui.Check(command.OutOrStdout(), resp.CheckView(participant, environment))
+			printBreakdown(command.OutOrStdout(), resp.CheckView(participant, environment))
 			return ui.ErrSilent
 		}
 
