@@ -10,7 +10,6 @@ import (
 	"github.com/contracttesting/cli/internal/components"
 	"github.com/contracttesting/cli/internal/features/can_i_deploy"
 	"github.com/jarcoal/httpmock"
-	"github.com/pterm/pterm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,54 +139,50 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		require.Error(t, err)
 
-		// Integrations sort by (counterpart, method, path, location) and
-		// mismatches by property, so the whole view asserts byte-for-byte.
+		// Counterparts sort by name, resources by (method, path, location); within
+		// a resource, breaks bucket into alphabetical error-type groups (ungrouped
+		// raw reasons first) and sort by field name — so the whole view asserts
+		// byte-for-byte.
 		want := strings.Join([]string{
-			"✗  cannot deploy  front  → production",
-			"   6 integrations · 6 mismatches  (2 missing · 2 type · 2 optional)",
+			`"front" cannot be deployed in "production" environment`,
 			"",
-			"  accounts POST /accounts  request",
-			"    ✗  accounts does not provide this resource · front consumes it",
+			"front is not compatible with accounts",
+			"  POST /accounts (request)",
+			"    - provider_resource_not_found",
 			"",
-			"  api      GET /api/users  request",
-			"    ≠  type     $.id",
-			"       api wants string · front sends integer",
-			"       send $.id as a string",
-			"    ✗  missing  $.tenant",
-			"       front omits it · api requires it",
-			"       send $.tenant in the request body",
+			"front is not compatible with api",
+			"  GET /api/users (request)",
+			"    * absent fields",
+			"      - $.tenant: required in api - absent in front",
+			"    * type mismatches",
+			"      - $.id: string in api - integer in front",
 			"",
-			"  billing  GET /invoices  response 200",
-			"    ✗  billing is not deployed in production · deployed in staging, prod",
+			"front is not compatible with billing",
+			"  GET /invoices (200 response)",
+			"    - provider_resource_not_deployed_in_environment",
 			"",
-			"  legacy   DELETE /sessions  request",
-			"    ✗  exotic_future_reason",
+			"front is not compatible with legacy",
+			"  DELETE /sessions (request)",
+			"    - exotic_future_reason",
 			"",
-			"  payments GET /payments  request",
-			"    ✗  payments is not deployed in any environment",
+			"front is not compatible with payments",
+			"  GET /payments (request)",
+			"    - provider_resource_not_deployed_in_environment",
 			"",
-			"  web      PUT /profile  request",
-			"    ?  optional $.phone",
-			"       front requires it · web sends it as optional",
-			"       make $.phone required in the request body",
-			"",
-			"  web      PUT /profile  response 200",
-			"    ≠  type     $.age",
-			"       web wants integer · front sends string",
-			"       return $.age as a integer",
-			"    ?  optional $.email",
-			"       web requires it · front sends it as optional",
-			"       make $.email required in the response",
-			"    ✗  missing  $.name",
-			"       front omits it · web requires it",
-			"       return $.name in the response",
-			"",
-			strings.Repeat("─", 64),
-			"",
-			"✗ 1 check failed — fix the mismatches, publish new pacts, re-run.",
+			"front is not compatible with web",
+			"  PUT /profile (200 response)",
+			"    * absent fields",
+			"      - $.name: required in web - absent in front",
+			"    * optional fields",
+			"      - $.email: required in web - optional in front",
+			"    * type mismatches",
+			"      - $.age: integer in web - string in front",
+			"  PUT /profile (request)",
+			"    * optional fields",
+			"      - $.phone: optional in web - required in front",
 			"",
 		}, "\n")
-		assert.Equal(t, want, pterm.RemoveColorFromString(out.String()))
+		assert.Equal(t, want, out.String())
 		assert.NotContains(t, errOut.String(), "Error:")
 	})
 

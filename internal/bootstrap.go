@@ -52,7 +52,7 @@ func Run() {
 
 	if err := rootCommand.Execute(); err != nil {
 		if !errors.Is(err, ui.ErrSilent) {
-			ui.Failure(rootCommand.ErrOrStderr(), err.Error())
+			ui.Failure(rootCommand.ErrOrStderr(), "❌", err.Error())
 		}
 
 		os.Exit(1)

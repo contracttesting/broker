@@ -1,10 +1,10 @@
 package can_i_deploy
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
-	"github.com/contracttesting/cli/internal/shared"
 	"github.com/contracttesting/cli/internal/ui"
 )
 
@@ -28,21 +28,15 @@ type BreakingChange struct {
 }
 
 type CanIDeployResponseBody struct {
-	shared.BrokerResponseBody
+	Message    string                      `json:"message"`
 	Deployable bool                        `json:"deployable"`
 	Breaks     map[string][]BreakingChange `json:"breaks"`
 }
 
-// CheckView maps the breaks into the ui failure view. The breaks map is keyed
-// by consumer name: the checked participant's own key holds its consumer-side
-// breaks (counterpart = the consumed provider) and every other key is a
-// consumer broken by the checked participant's provider side (counterpart =
-// that consumer). Properties arrive in the broker's $.-prefixed dialect and
-// are rendered verbatim. Map iteration order is random, so integrations sort
-// by identity and mismatches by property.
 func (r CanIDeployResponseBody) CheckView(participant, environment string) ui.CheckView {
-	type identity struct{ counterpart, method, path, location string }
-	integrations := map[identity]*ui.Integration{}
+	type resourceKey struct{ method, path, location string }
+	type breakItem struct{ property, line string }
+	byCounterpart := map[string]map[resourceKey]map[string][]breakItem{}
 
 	for key, changes := range r.Breaks {
 		for _, change := range changes {
@@ -55,67 +49,113 @@ func (r CanIDeployResponseBody) CheckView(participant, environment string) ui.Ch
 				counterpart = provider
 			}
 
-			request := change.CheckedResource.Kind == "rest_request"
 			location := "request"
-			if !request {
-				location = "response " + change.CheckedResource.ResponseStatusCode
+			if change.CheckedResource.Kind != "rest_request" {
+				location = change.CheckedResource.ResponseStatusCode + " response"
 			}
 
-			id := identity{counterpart, strings.ToUpper(change.CheckedResource.Method), change.CheckedResource.Endpoint, location}
-			integration, ok := integrations[id]
+			resources, ok := byCounterpart[counterpart]
 			if !ok {
-				integration = &ui.Integration{Counterpart: id.counterpart, Method: id.method, Path: id.path, Location: id.location}
-				integrations[id] = integration
+				resources = map[resourceKey]map[string][]breakItem{}
+				byCounterpart[counterpart] = resources
+			}
+			rk := resourceKey{strings.ToUpper(change.CheckedResource.Method), change.CheckedResource.Endpoint, location}
+			groups, ok := resources[rk]
+			if !ok {
+				groups = map[string][]breakItem{}
+				resources[rk] = groups
 			}
 
-			property := change.Details["property"]
-
-			switch change.Reason {
-			case "missing_in_consumer":
-				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.Missing, Property: property, Omitter: consumer, Requirer: provider})
-			case "missing_in_provider":
-				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.Missing, Property: property, Omitter: provider, Requirer: consumer})
-			case "type_mismatch":
-				consumerType, providerType := change.Details["checked_property_type"], change.Details["counterpart_property_type"]
-				if change.CheckedResource.Direction == "provides" {
-					consumerType, providerType = providerType, consumerType
-				}
-				wanter, wants, sender, sends := consumer, consumerType, provider, providerType
-				if request {
-					wanter, wants, sender, sends = provider, providerType, consumer, consumerType
-				}
-				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.TypeMismatch, Property: property, Wanter: wanter, Wants: wants, Sender: sender, Sends: sends})
-			case "optional_in_consumer_required_in_provider":
-				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.Optional, Property: property, Requirer: provider, Sender: consumer})
-			case "optional_in_provider_required_in_consumer":
-				integration.Mismatches = append(integration.Mismatches, ui.Mismatch{Kind: ui.Optional, Property: property, Requirer: consumer, Sender: provider})
-			case "provider_resource_not_found":
-				integration.Issues = append(integration.Issues, ui.Issue{Kind: ui.NotProvided})
-			case "provider_resource_not_deployed_in_environment":
-				integration.Issues = append(integration.Issues, ui.Issue{Kind: ui.NotDeployed, DeployedIn: change.Details["deployed_environments"]})
-			default:
-				integration.Issues = append(integration.Issues, ui.Issue{Kind: ui.UnknownReason, Reason: change.Reason})
-			}
+			label := groupLabel(change.Reason)
+			groups[label] = append(groups[label], breakItem{change.Details["property"], breakLine(change, participant, counterpart, provider)})
 		}
 	}
 
-	view := ui.CheckView{Pacticipant: participant, Target: environment}
-	for _, integration := range integrations {
-		sort.Slice(integration.Mismatches, func(i, j int) bool { return integration.Mismatches[i].Property < integration.Mismatches[j].Property })
-		view.Integrations = append(view.Integrations, *integration)
+	view := ui.CheckView{Participant: participant, Environment: environment}
+	for name, resources := range byCounterpart {
+		cp := ui.Counterpart{Name: name}
+		for rk, groups := range resources {
+			resource := ui.Resource{Method: rk.method, Path: rk.path, Location: rk.location}
+			for label, items := range groups {
+				sort.Slice(items, func(i, j int) bool {
+					if items[i].property != items[j].property {
+						return items[i].property < items[j].property
+					}
+					return items[i].line < items[j].line
+				})
+				lines := make([]string, len(items))
+				for i, item := range items {
+					lines[i] = item.line
+				}
+				resource.Groups = append(resource.Groups, ui.BreakGroup{Label: label, Breaks: lines})
+			}
+			sort.Slice(resource.Groups, func(i, j int) bool {
+				return resource.Groups[i].Label < resource.Groups[j].Label
+			})
+			cp.Resources = append(cp.Resources, resource)
+		}
+		sort.Slice(cp.Resources, func(i, j int) bool {
+			a, b := cp.Resources[i], cp.Resources[j]
+			if a.Method != b.Method {
+				return a.Method < b.Method
+			}
+			if a.Path != b.Path {
+				return a.Path < b.Path
+			}
+			return a.Location < b.Location
+		})
+		view.Counterparts = append(view.Counterparts, cp)
 	}
-	sort.Slice(view.Integrations, func(i, j int) bool {
-		a, b := view.Integrations[i], view.Integrations[j]
-		if a.Counterpart != b.Counterpart {
-			return a.Counterpart < b.Counterpart
-		}
-		if a.Method != b.Method {
-			return a.Method < b.Method
-		}
-		if a.Path != b.Path {
-			return a.Path < b.Path
-		}
-		return a.Location < b.Location
+	sort.Slice(view.Counterparts, func(i, j int) bool {
+		return view.Counterparts[i].Name < view.Counterparts[j].Name
 	})
 	return view
+}
+
+// groupLabel maps a broker reason to its error-type sub-header. Field-level
+// reasons bucket under a label; every other (resource-level) reason returns ""
+// to print ungrouped.
+func groupLabel(reason string) string {
+	switch reason {
+	case "missing_in_consumer", "missing_in_provider":
+		return "absent fields"
+	case "type_mismatch":
+		return "type mismatches"
+	case "optional_in_consumer_required_in_provider", "optional_in_provider_required_in_consumer":
+		return "optional fields"
+	default:
+		return ""
+	}
+}
+
+// breakLine renders one break counterpart-first. Property mismatches read
+// "{property}: {counterpart state} in {counterpart} - {participant state} in
+// {participant}", with each side's state derived from the broker reason; the
+// counterpart's state goes left by whichever role (consumer/provider) it plays.
+// Every other reason prints the raw broker reason verbatim.
+func breakLine(change BreakingChange, participant, counterpart, provider string) string {
+	var consumerState, providerState string
+	switch change.Reason {
+	case "missing_in_consumer":
+		consumerState, providerState = "absent", "required"
+	case "missing_in_provider":
+		consumerState, providerState = "required", "absent"
+	case "type_mismatch":
+		consumerState, providerState = change.Details["checked_property_type"], change.Details["counterpart_property_type"]
+		if change.CheckedResource.Direction == "provides" {
+			consumerState, providerState = providerState, consumerState
+		}
+	case "optional_in_consumer_required_in_provider":
+		consumerState, providerState = "optional", "required"
+	case "optional_in_provider_required_in_consumer":
+		consumerState, providerState = "required", "optional"
+	default:
+		return change.Reason
+	}
+
+	counterpartState, participantState := consumerState, providerState
+	if counterpart == provider {
+		counterpartState, participantState = providerState, consumerState
+	}
+	return fmt.Sprintf("%s: %s in %s - %s in %s", change.Details["property"], counterpartState, counterpart, participantState, participant)
 }

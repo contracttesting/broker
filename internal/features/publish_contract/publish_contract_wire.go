@@ -1,10 +1,6 @@
 package publish_contract
 
-import (
-	"encoding/json"
-
-	"github.com/contracttesting/cli/internal/shared"
-)
+import "encoding/json"
 
 type PublishContractRequestBody struct {
 	Participant string          `json:"participant"`
@@ -13,5 +9,5 @@ type PublishContractRequestBody struct {
 }
 
 type PublishContractResponseBody struct {
-	shared.BrokerResponseBody
+	Message string `json:"message"`
 }
