@@ -35,29 +35,33 @@ type BreakGroup struct {
 	Breaks []string
 }
 
-// Check writes the flat failure view: a headline, then one group per
-// counterpart — a header line, its resources, and each resource's breaks
-// bucketed under "* " error-type sub-headers (ungrouped breaks print flat).
-// Plain text only: no color, no icons, no summary.
-func Check(w io.Writer, v CheckView) {
-	fmt.Fprintf(w, "%q cannot be deployed in %q environment\n", v.Participant, v.Environment)
-	for _, cp := range v.Counterparts {
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "%s is not compatible with %s\n", v.Participant, cp.Name)
-		for _, r := range cp.Resources {
-			fmt.Fprintf(w, "  %s %s (%s)\n", r.Method, r.Path, r.Location)
-			for _, g := range r.Groups {
-				if g.Label != "" {
-					fmt.Fprintf(w, "    * %s\n", g.Label)
-					for _, b := range g.Breaks {
-						fmt.Fprintf(w, "      - %s\n", b)
-					}
-					continue
-				}
-				for _, b := range g.Breaks {
-					fmt.Fprintf(w, "    - %s\n", b)
-				}
+// Check writes the plain-text failure view: a headline, then one blank-line-
+// separated block per counterpart, each listing its resources and their breaks
+// bucketed under error-type sub-headers. No color, no icons, no summary.
+func Check(w io.Writer, view CheckView) {
+	fmt.Fprintf(w, "%q cannot be deployed in %q environment\n", view.Participant, view.Environment)
+	for _, counterpart := range view.Counterparts {
+		fmt.Fprintln(w) // blank line between counterpart blocks
+		fmt.Fprintf(w, "%s is not compatible with %s\n", view.Participant, counterpart.Name)
+		for _, resource := range counterpart.Resources {
+			fmt.Fprintf(w, "  %s %s (%s)\n", resource.Method, resource.Path, resource.Location)
+			for _, group := range resource.Groups {
+				writeBreakGroup(w, group)
 			}
 		}
+	}
+}
+
+// writeBreakGroup writes one bucket of breaks under a resource. A labelled group
+// prints a "* " header with its breaks indented beneath it; an unlabelled group
+// prints its breaks flush under the resource.
+func writeBreakGroup(w io.Writer, group BreakGroup) {
+	indent := "    "
+	if group.Label != "" {
+		fmt.Fprintf(w, "    * %s\n", group.Label)
+		indent = "      "
+	}
+	for _, line := range group.Breaks {
+		fmt.Fprintf(w, "%s- %s\n", indent, line)
 	}
 }
