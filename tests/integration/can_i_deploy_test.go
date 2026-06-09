@@ -682,6 +682,17 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
 	s.False(got.Deployable)
 
+	// Optional resource fields must serialize as JSON null, never "". A provided
+	// resource has no consumed_provider; a request resource has no
+	// response_status_code. Asserted on the raw body because the DTO above decodes
+	// null -> "" and would hide the difference.
+	s.NotContains(body, `"consumed_provider":""`)
+	s.NotContains(body, `"response_status_code":""`)
+	s.NotContains(body, `"version":""`)
+	s.Contains(body, `"consumed_provider":null`)
+	s.Contains(body, `"response_status_code":null`)
+	s.Contains(body, `"version":null`)
+
 	s.Require().Len(got.Breaks, 2, "breaks must surface both sides: consumer (pets) and provider (app)")
 
 	petsBreaks := got.Breaks["pets"]

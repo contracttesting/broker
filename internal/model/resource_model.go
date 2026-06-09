@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/guregu/null"
 )
 
 const (
@@ -31,13 +33,13 @@ type Resource struct {
 	ID                 int64               `json:"-"`
 	Direction          Direction           `json:"direction"`
 	Kind               ResourceKind        `json:"kind"`
-	ConsumedProvider   string              `json:"consumed_provider"`
+	ConsumedProvider   null.String         `json:"consumed_provider"`
 	Endpoint           string              `json:"endpoint"`
 	Method             string              `json:"method"`
-	ResponseStatusCode string              `json:"response_status_code"`
+	ResponseStatusCode null.String         `json:"response_status_code"`
 	Properties         map[string]Property `json:"-"`
 	DeployedVersions   map[string]string   `json:"-"`
-	Version            string              `json:"version"`
+	Version            null.String         `json:"version"`
 	Participant        *Participant        `json:"-"`
 }
 
@@ -82,14 +84,14 @@ func (resouce *Resource) IsProvider() bool {
 }
 
 func (resouce *Resource) ProviderHash() string {
-	providerName := resouce.ConsumedProvider
+	providerName := resouce.ConsumedProvider.String
 	if resouce.IsProvider() {
 		providerName = resouce.ParticipantName()
 	}
 
 	parts := []string{providerName, resouce.Endpoint, resouce.Method}
 	if resouce.Kind == RestResponse {
-		parts = append(parts, resouce.ResponseStatusCode)
+		parts = append(parts, resouce.ResponseStatusCode.String)
 	}
 
 	return hashParts(parts)
@@ -100,9 +102,9 @@ func (resouce *Resource) ConsumerHash() string {
 		return ""
 	}
 
-	parts := []string{resouce.ParticipantName(), resouce.ConsumedProvider, resouce.Endpoint, resouce.Method}
+	parts := []string{resouce.ParticipantName(), resouce.ConsumedProvider.String, resouce.Endpoint, resouce.Method}
 	if resouce.Kind == RestResponse {
-		parts = append(parts, resouce.ResponseStatusCode)
+		parts = append(parts, resouce.ResponseStatusCode.String)
 	}
 
 	return hashParts(parts)
@@ -125,10 +127,10 @@ func (resouce *Resource) CanonicalKey() string {
 		string(resouce.Direction),
 		string(resouce.Kind),
 		resouce.ParticipantName(),
-		resouce.ConsumedProvider,
+		resouce.ConsumedProvider.String,
 		resouce.Endpoint,
 		resouce.Method,
-		resouce.ResponseStatusCode,
+		resouce.ResponseStatusCode.String,
 		strings.Join(propertyKeys, ";;"),
 	}, ";;")
 }
@@ -142,14 +144,19 @@ func NewConsumedRestRequest(
 	provider, endpoint, method string,
 	properties map[string]Property,
 ) *Resource {
-	return &Resource{
-		Direction:        Consumes,
-		Kind:             RestRequest,
-		ConsumedProvider: provider,
-		Endpoint:         endpoint,
-		Method:           method,
-		Properties:       properties,
+	resource := &Resource{
+		Direction:  Consumes,
+		Kind:       RestRequest,
+		Endpoint:   endpoint,
+		Method:     method,
+		Properties: properties,
 	}
+
+	if provider != "" {
+		resource.ConsumedProvider = null.StringFrom(provider)
+	}
+
+	return resource
 }
 
 func NewProvidedRestRequest(
@@ -169,27 +176,40 @@ func NewConsumedRestResponse(
 	provider, endpoint, method, statusCode string,
 	properties map[string]Property,
 ) *Resource {
-	return &Resource{
-		Direction:          Consumes,
-		Kind:               RestResponse,
-		ConsumedProvider:   provider,
-		Endpoint:           endpoint,
-		Method:             method,
-		ResponseStatusCode: statusCode,
-		Properties:         properties,
+	resource := &Resource{
+		Direction:  Consumes,
+		Kind:       RestResponse,
+		Endpoint:   endpoint,
+		Method:     method,
+		Properties: properties,
 	}
+
+	if provider != "" {
+		resource.ConsumedProvider = null.StringFrom(provider)
+	}
+
+	if statusCode != "" {
+		resource.ResponseStatusCode = null.StringFrom(statusCode)
+	}
+
+	return resource
 }
 
 func NewProvidedRestResponse(
 	endpoint, method, statusCode string,
 	properties map[string]Property,
 ) *Resource {
-	return &Resource{
-		Direction:          Provides,
-		Kind:               RestResponse,
-		Endpoint:           endpoint,
-		Method:             method,
-		ResponseStatusCode: statusCode,
-		Properties:         properties,
+	resource := &Resource{
+		Direction:  Provides,
+		Kind:       RestResponse,
+		Endpoint:   endpoint,
+		Method:     method,
+		Properties: properties,
 	}
+
+	if statusCode != "" {
+		resource.ResponseStatusCode = null.StringFrom(statusCode)
+	}
+
+	return resource
 }

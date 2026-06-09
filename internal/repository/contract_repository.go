@@ -500,13 +500,13 @@ func (r *ContractRepository) insertResource(
 	}
 
 	statusCode := sql.NullString{
-		String: resource.ResponseStatusCode,
-		Valid:  resource.ResponseStatusCode != "",
+		String: resource.ResponseStatusCode.String,
+		Valid:  resource.ResponseStatusCode.Valid,
 	}
 
 	provider := sql.NullString{
-		String: resource.ConsumedProvider,
-		Valid:  resource.ConsumedProvider != "",
+		String: resource.ConsumedProvider.String,
+		Valid:  resource.ConsumedProvider.Valid,
 	}
 
 	providerHash := sql.NullString{

@@ -5,6 +5,7 @@ import (
 
 	"github.com/contracttesting/broker/internal/compatibility_checker"
 	"github.com/contracttesting/broker/internal/model"
+	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,10 +13,10 @@ func consumerResource() *model.Resource {
 	return &model.Resource{
 		Direction:          model.Consumes,
 		Kind:               model.RestResponse,
-		ConsumedProvider:   "api",
+		ConsumedProvider:   null.StringFrom("api"),
 		Endpoint:           "/things",
 		Method:             "get",
-		ResponseStatusCode: "200",
+		ResponseStatusCode: null.StringFrom("200"),
 		Participant:        &model.Participant{Name: "front"},
 		Properties: map[string]model.Property{
 			"$.id": {Path: "$.id", Type: "integer"},
@@ -29,7 +30,7 @@ func providerResource() *model.Resource {
 		Kind:               model.RestResponse,
 		Endpoint:           "/things",
 		Method:             "get",
-		ResponseStatusCode: "200",
+		ResponseStatusCode: null.StringFrom("200"),
 		Participant:        &model.Participant{Name: "api"},
 		Properties: map[string]model.Property{
 			"$.id": {Path: "$.id", Type: "string"},
@@ -40,7 +41,7 @@ func providerResource() *model.Resource {
 func TestProviderResourceNotFound(t *testing.T) {
 	consumer := &model.Resource{
 		Direction:        model.Consumes,
-		ConsumedProvider: "accounts",
+		ConsumedProvider: null.StringFrom("accounts"),
 		Participant:      &model.Participant{Name: "front"},
 	}
 
@@ -64,7 +65,7 @@ func TestPropertyBreakDetails(t *testing.T) {
 	consumerRequest := &model.Resource{
 		Direction:        model.Consumes,
 		Kind:             model.RestRequest,
-		ConsumedProvider: "api",
+		ConsumedProvider: null.StringFrom("api"),
 		Endpoint:         "/things",
 		Method:           "post",
 		Participant:      &model.Participant{Name: "front"},
@@ -150,7 +151,7 @@ func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 func TestProviderNotDeployedDetails(t *testing.T) {
 	consumer := &model.Resource{
 		Direction:        model.Consumes,
-		ConsumedProvider: "accounts",
+		ConsumedProvider: null.StringFrom("accounts"),
 		Participant:      &model.Participant{Name: "front"},
 	}
 

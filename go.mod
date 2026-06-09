@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/gofiber/fiber/v3 v3.2.0
+	github.com/guregu/null v4.0.0+incompatible
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.11.1

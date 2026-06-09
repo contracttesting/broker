@@ -18,9 +18,6 @@ func NewCompatibilityReport() *CompatibilityReport {
 	}
 }
 
-// AppendResult records the outcome of one resource check against the named
-// dependency, keeping a single aggregated result per dependency: the
-// dependency is deployable only if every one of its resource checks is.
 func (r *CompatibilityReport) AppendResult(dependency string, result CompatibilityResult) {
 	if r.Results == nil {
 		r.Results = make(map[string]CompatibilityResult)

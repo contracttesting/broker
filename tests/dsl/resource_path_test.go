@@ -17,7 +17,7 @@ func TestToResource_ConsumerRestRequest_Parses(t *testing.T) {
 	require.NotNil(t, resource)
 	assert.Equal(t, model.Consumes, resource.Direction)
 	assert.Equal(t, model.RestRequest, resource.Kind)
-	assert.Equal(t, "pets-service", resource.ConsumedProvider)
+	assert.Equal(t, "pets-service", resource.ConsumedProvider.String)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "post", resource.Method)
 	assert.Empty(t, resource.ResponseStatusCode)
@@ -46,7 +46,7 @@ func TestToResource_ProviderRestResponse_Parses(t *testing.T) {
 	assert.Equal(t, model.RestResponse, resource.Kind)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
-	assert.Equal(t, "200", resource.ResponseStatusCode)
+	assert.Equal(t, "200", resource.ResponseStatusCode.String)
 }
 
 func TestToResource_UnrecognizedPath_Panics(t *testing.T) {

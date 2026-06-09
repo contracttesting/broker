@@ -6,6 +6,7 @@ import (
 
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
+	"github.com/guregu/null"
 )
 
 func (c *CompatibilityChecker) checkConsumer(
@@ -23,7 +24,7 @@ func (c *CompatibilityChecker) checkConsumer(
 			ReasonProviderResourceNotFound,
 		))
 
-		report.AppendResult(consumer.ConsumedProvider, CompatibilityResult{
+		report.AppendResult(consumer.ConsumedProvider.String, CompatibilityResult{
 			Deployable: false,
 		})
 
@@ -37,23 +38,23 @@ func (c *CompatibilityChecker) checkConsumer(
 			provider.DeployedEnvironments(),
 		))
 
-		report.AppendResult(consumer.ConsumedProvider, CompatibilityResult{
+		report.AppendResult(consumer.ConsumedProvider.String, CompatibilityResult{
 			Deployable: false,
 		})
 
 		return
 	}
 
-	provider.Version = version
+	provider.Version = null.StringFrom(version)
 
 	breaks := checkResources(&consumer, &provider)
 	for _, breakingChange := range breaks {
 		report.Append(breakingChange)
 	}
 
-	report.AppendResult(consumer.ConsumedProvider, CompatibilityResult{
+	report.AppendResult(consumer.ConsumedProvider.String, CompatibilityResult{
 		CounterpartParticipantID: provider.ParticipantID(),
-		CounterpartVersion:       provider.Version,
+		CounterpartVersion:       provider.Version.String,
 		Deployable:               len(breaks) == 0,
 	})
 }

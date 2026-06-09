@@ -6,6 +6,7 @@ import (
 
 	"github.com/contracttesting/broker/internal/contract_differ"
 	"github.com/contracttesting/broker/internal/model"
+	"github.com/guregu/null"
 )
 
 type tableRow struct {
@@ -54,22 +55,33 @@ func (c *tableRow) toContractModel() *model.Contract {
 }
 
 func (c *tableRow) toResourceModel() model.Resource {
-	return model.Resource{
-		ID:                 c.ResourceID,
-		Direction:          model.Direction(c.ResourceDirection),
-		Kind:               model.ResourceKind(c.ResourceKind),
-		ConsumedProvider:   c.ResourceConsumedProvider.String,
-		Endpoint:           c.ResourceEndpoint,
-		Method:             c.ResourceMethod,
-		ResponseStatusCode: c.ResourceResponseStatusCode.String,
-		Version:            c.ResourceVersion,
-		Properties:         make(map[string]model.Property),
-		DeployedVersions:   make(map[string]string),
+	resource := model.Resource{
+		ID:               c.ResourceID,
+		Direction:        model.Direction(c.ResourceDirection),
+		Kind:             model.ResourceKind(c.ResourceKind),
+		Endpoint:         c.ResourceEndpoint,
+		Method:           c.ResourceMethod,
+		Properties:       make(map[string]model.Property),
+		DeployedVersions: make(map[string]string),
 		Participant: &model.Participant{
 			ID:   c.ParticipantID,
 			Name: c.ParticipantName,
 		},
 	}
+
+	if c.ResourceConsumedProvider.String != "" {
+		resource.ConsumedProvider = null.StringFrom(c.ResourceConsumedProvider.String)
+	}
+
+	if c.ResourceResponseStatusCode.String != "" {
+		resource.ResponseStatusCode = null.StringFrom(c.ResourceResponseStatusCode.String)
+	}
+
+	if c.ResourceVersion != "" {
+		resource.Version = null.StringFrom(c.ResourceVersion)
+	}
+
+	return resource
 }
 
 func (c *tableRow) toPropertyModel() model.Property {
