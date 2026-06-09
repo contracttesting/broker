@@ -2,7 +2,9 @@ package can_i_deploy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/contracttesting/cli/internal/ui"
@@ -44,7 +46,12 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 		}
 
 		if !resp.Deployable {
-			printBreakdown(command.OutOrStdout(), resp.CheckView(participant, environment))
+			data, err := json.Marshal(resp.Breaks)
+			if err != nil {
+				return fmt.Errorf("marshal breaks: %w", err)
+			}
+			fmt.Println(string(data))
+			os.Exit(1)
 			return ui.ErrSilent
 		}
 
