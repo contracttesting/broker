@@ -1,0 +1,106 @@
+package integration_test
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+
+	"github.com/contracttesting/broker/internal/model"
+	"github.com/contracttesting/broker/internal/repository"
+)
+
+const ordersParticipantBody = `{"participant":"orders-service"}`
+
+const ordersContractBody = `{
+  "provides": {
+    "rest": {
+      "/orders": {
+        "get": {
+          "responses": {
+            "200": "Order"
+          }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Order": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    }
+  }
+}`
+
+func (s *IntegrationSuite) publishOrdersContract() {
+	status, _ := s.post("/api/participants", ordersParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, _ = s.post("/api/contracts", `{"participant":"orders-service","version":"1","contract":`+ordersContractBody+`}`)
+	s.Require().Equal(http.StatusOK, status)
+}
+
+func (s *IntegrationSuite) loadOrdersResource() model.Resource {
+	repo := repository.NewContractRepository(s.Pool)
+
+	contract, found := repo.LoadContractByNameAndVersion(context.Background(), "orders-service", "1")
+	s.Require().True(found)
+	s.Require().Len(contract.Resources, 1)
+
+	for _, resource := range contract.Resources {
+		return resource
+	}
+	return model.Resource{}
+}
+
+func (s *IntegrationSuite) TestLoadContract_AbsentOptionalFieldsMarshalAsNull() {
+	s.publishOrdersContract()
+
+	resource := s.loadOrdersResource()
+
+	s.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for a provided resource")
+	s.False(resource.Version.Valid, "expected Version to be null when not deployed")
+
+	provider, err := json.Marshal(resource.ConsumedProvider)
+	s.Require().NoError(err)
+	s.Equal("null", string(provider))
+
+	version, err := json.Marshal(resource.Version)
+	s.Require().NoError(err)
+	s.Equal("null", string(version))
+}
+
+func (s *IntegrationSuite) TestLoadContract_LegacyEmptyStringFieldsSurfaceAsNull() {
+	s.publishOrdersContract()
+
+	_, err := s.Pool.Exec(context.Background(),
+		`UPDATE resources SET consumed_provider = '', response_status_code = ''`,
+	)
+	s.Require().NoError(err)
+
+	resource := s.loadOrdersResource()
+
+	s.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for empty value")
+	s.False(resource.ResponseStatusCode.Valid, "expected ResponseStatusCode to be null for empty value")
+
+	statusCode, err := json.Marshal(resource.ResponseStatusCode)
+	s.Require().NoError(err)
+	s.Equal("null", string(statusCode))
+}
+
+func (s *IntegrationSuite) TestLoadContract_PopulatedOptionalFieldsArePreserved() {
+	s.publishOrdersContract()
+
+	_, err := s.Pool.Exec(context.Background(),
+		`UPDATE resources SET consumed_provider = 'pets'`,
+	)
+	s.Require().NoError(err)
+
+	resource := s.loadOrdersResource()
+
+	s.True(resource.ConsumedProvider.Valid)
+	s.Equal("pets", resource.ConsumedProvider.String)
+	s.True(resource.ResponseStatusCode.Valid)
+	s.Equal("200", resource.ResponseStatusCode.String)
+}

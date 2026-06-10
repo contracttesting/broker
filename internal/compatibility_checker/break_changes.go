@@ -26,7 +26,7 @@ const (
 )
 
 type BreakingChange struct {
-	CheckedResource     *model.Resource   `json:"checked_resource"`
+	CheckedResource     *model.Resource   `json:"checked_resource,omitempty"`
 	CounterpartResource *model.Resource   `json:"counterpart_resource,omitempty"`
 	Reason              BreakingReason    `json:"reason"`
 	Details             map[string]string `json:"details,omitempty"`
@@ -45,7 +45,7 @@ func (b *BreakingChange) ConsumerName() string {
 }
 
 func (b *BreakingChange) ProviderName() string {
-	return b.consumerResource().ConsumedProvider
+	return b.consumerResource().ConsumedProvider.String
 }
 
 func NewBreakingChange(

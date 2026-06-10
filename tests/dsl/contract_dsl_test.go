@@ -73,10 +73,10 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 
 	assert.Equal(t, model.Consumes, resource.Direction)
 	assert.Equal(t, model.RestResponse, resource.Kind)
-	assert.Equal(t, "pets-service", resource.ConsumedProvider)
+	assert.Equal(t, "pets-service", resource.ConsumedProvider.String)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
-	assert.Equal(t, "200", resource.ResponseStatusCode)
+	assert.Equal(t, "200", resource.ResponseStatusCode.String)
 
 	assert.Contains(t, resource.Properties, "$")
 	assert.Contains(t, resource.Properties, "$.id")
@@ -218,7 +218,7 @@ func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing
 
 	assert.Equal(t, model.Consumes, response.Direction)
 	assert.Equal(t, model.RestResponse, response.Kind)
-	assert.Equal(t, "201", response.ResponseStatusCode)
+	assert.Equal(t, "201", response.ResponseStatusCode.String)
 	assert.Contains(t, response.Properties, "$.name")
 }
 
@@ -237,7 +237,7 @@ func TestHydrateContract_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 	assert.Empty(t, resource.ConsumedProvider)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
-	assert.Equal(t, "200", resource.ResponseStatusCode)
+	assert.Equal(t, "200", resource.ResponseStatusCode.String)
 	assert.Contains(t, resource.Properties, "$.id")
 }
 

@@ -22,7 +22,7 @@ func (c *CompatibilityChecker) checkProvider(
 
 		report.AppendResult(consumer.ParticipantName(), CompatibilityResult{
 			CounterpartParticipantID: consumer.ParticipantID(),
-			CounterpartVersion:       consumer.Version,
+			CounterpartVersion:       consumer.Version.String,
 			Deployable:               len(consumerBreaks) == 0,
 		})
 	}

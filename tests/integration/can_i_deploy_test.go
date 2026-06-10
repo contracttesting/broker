@@ -681,6 +681,12 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	var got canIDeployResponse
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
 	s.False(got.Deployable)
+	s.NotContains(body, `"consumed_provider":""`)
+	s.NotContains(body, `"response_status_code":""`)
+	s.NotContains(body, `"version":""`)
+	s.Contains(body, `"consumed_provider":null`)
+	s.Contains(body, `"response_status_code":null`)
+	s.Contains(body, `"version":null`)
 
 	s.Require().Len(got.Breaks, 2, "breaks must surface both sides: consumer (pets) and provider (app)")
 
