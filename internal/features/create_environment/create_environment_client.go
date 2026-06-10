@@ -17,25 +17,28 @@ func NewCreateEnvironmentClient(httpClient *components.HTTPClient) *CreateEnviro
 	return &CreateEnvironmentClient{httpClient: httpClient}
 }
 
-func (c *CreateEnvironmentClient) Create(ctx context.Context, input *CreateEnvironmentInput) (string, error) {
-	body, err := json.Marshal(input)
+func (c *CreateEnvironmentClient) Create(
+	ctx context.Context,
+	requestBody *CreateEnvironmentRequestBody,
+) (string, error) {
+	bodyJSON, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize environment to JSON: %w", err)
 	}
 
-	resp, err := c.httpClient.Post(ctx, "/api/environments", body)
+	response, err := c.httpClient.Post(ctx, "/api/environments", bodyJSON)
 	if err != nil {
 		return "", fmt.Errorf("cannot post environment to broker: %w", err)
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return "", fmt.Errorf("cannot post environment to broker: %s", resp.String())
-	}
-
-	var result CreateEnvironmentResponse
-	if err := json.Unmarshal(resp.Bytes(), &result); err != nil {
+	var responseBody CreateEnvironmentResponseBody
+	if err := json.Unmarshal(response.Bytes(), &responseBody); err != nil {
 		return "", fmt.Errorf("cannot parse environment response: %w", err)
 	}
 
-	return result.Message, nil
+	if response.StatusCode() != http.StatusOK {
+		return "", fmt.Errorf("cannot post environment to broker: %s", responseBody.Message)
+	}
+
+	return responseBody.Message, nil
 }

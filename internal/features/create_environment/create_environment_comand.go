@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -22,14 +23,17 @@ func NewCreateEnvironmentCommand(client *CreateEnvironmentClient) *cobra.Command
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &CreateEnvironmentInput{Name: name}
+		requestBody := &CreateEnvironmentRequestBody{
+			Participant: name,
+		}
 
-		message, err := client.Create(ctx, input)
+		message, err := client.Create(ctx, requestBody)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprintln(command.OutOrStdout(), message)
+		ui.Success(command.OutOrStdout(), "🌍", message)
+
 		return nil
 	}
 

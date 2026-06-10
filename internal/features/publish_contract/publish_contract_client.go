@@ -19,29 +19,25 @@ func NewPublishContractClient(httpClient *components.HTTPClient) *PublishContrac
 	}
 }
 
-func (c *PublishContractClient) PublishContract(ctx context.Context, input *PublishContractInput) (string, error) {
-	body, err := json.Marshal(publishContractBody{
-		Name:     input.Participant,
-		Version:  input.Version,
-		Contract: input.ContractJSON,
-	})
+func (c *PublishContractClient) PublishContract(ctx context.Context, requestBody *PublishContractRequestBody) (string, error) {
+	requestBodyJSON, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize contract to JSON: %w", err)
 	}
 
-	resp, err := c.httpClient.Post(ctx, "/api/contracts", body)
+	response, err := c.httpClient.Post(ctx, "/api/contracts", requestBodyJSON)
 	if err != nil {
 		return "", fmt.Errorf("cannot post contract to broker: %w", err)
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return "", fmt.Errorf("cannot post contract to broker: %s", resp.String())
-	}
-
-	var result PublishContractResponse
-	if err := json.Unmarshal(resp.Bytes(), &result); err != nil {
+	var responseBody PublishContractResponseBody
+	if err := json.Unmarshal(response.Bytes(), &responseBody); err != nil {
 		return "", fmt.Errorf("cannot parse contract response: %w", err)
 	}
 
-	return result.Message, nil
+	if response.StatusCode() != http.StatusOK {
+		return "", fmt.Errorf("cannot post contract to broker: %s", responseBody.Message)
+	}
+
+	return responseBody.Message, nil
 }

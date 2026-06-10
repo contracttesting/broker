@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -12,10 +13,9 @@ const requestTimeout = 30 * time.Second
 
 func NewRenameParticipantCommand(client *RenameParticipantClient) *cobra.Command {
 	commandHandler := func(command *cobra.Command, args []string) error {
-		command.SilenceUsage = true
-
 		oldName := args[0]
 		newName := args[1]
+
 		if oldName == "" || newName == "" {
 			return fmt.Errorf("participant names must not be empty")
 		}
@@ -23,14 +23,17 @@ func NewRenameParticipantCommand(client *RenameParticipantClient) *cobra.Command
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &RenameParticipantInput{OldName: oldName, NewName: newName}
+		requestBody := &RenameParticipantRequestBody{
+			Name:    oldName,
+			NewName: newName,
+		}
 
-		message, err := client.Rename(ctx, input)
+		message, err := client.Rename(ctx, requestBody)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprintln(command.OutOrStdout(), message)
+		ui.Success(command.OutOrStdout(), "✏️", message)
 		return nil
 	}
 

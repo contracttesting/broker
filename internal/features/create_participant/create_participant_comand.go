@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -12,8 +13,6 @@ const requestTimeout = 30 * time.Second
 
 func NewCreateParticipantCommand(client *CreateParticipantClient) *cobra.Command {
 	commandHandler := func(command *cobra.Command, args []string) error {
-		command.SilenceUsage = true
-
 		name := args[0]
 		if name == "" {
 			return fmt.Errorf("participant name must not be empty")
@@ -22,14 +21,17 @@ func NewCreateParticipantCommand(client *CreateParticipantClient) *cobra.Command
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &CreateParticipantInput{Name: name}
+		requestBody := &CreateParticipantRequestBody{
+			Participant: name,
+		}
 
-		message, err := client.Create(ctx, input)
+		message, err := client.Create(ctx, requestBody)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprintln(command.OutOrStdout(), message)
+		ui.Success(command.OutOrStdout(), "🎭", message)
+
 		return nil
 	}
 

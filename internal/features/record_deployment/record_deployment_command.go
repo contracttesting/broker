@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -29,18 +30,18 @@ func NewRecordDeploymentCommand(client *RecordDeploymentClient) *cobra.Command {
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &RecordDeploymentInput{
+		requestBody := &RecordDeploymentRequestBody{
 			Participant: participant,
 			Version:     version,
 			Environment: environment,
 		}
 
-		message, err := client.Record(ctx, input)
+		message, err := client.Record(ctx, requestBody)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprintln(command.OutOrStdout(), message)
+		ui.Success(command.OutOrStdout(), "🎉", message)
 		return nil
 	}
 

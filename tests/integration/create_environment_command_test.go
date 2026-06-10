@@ -1,4 +1,4 @@
-package create_environment_test
+package integration_test
 
 import (
 	"bytes"
@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	brokerURL = "http://localhost:8080"
-	name      = "production"
-	endpoint  = brokerURL + "/api/environments"
-)
-
 func TestCreateEnvironmentCommand(t *testing.T) {
+	const (
+		brokerURL = "http://localhost:8080"
+		name      = "production"
+		endpoint  = brokerURL + "/api/environments"
+	)
+
 	t.Run("creates an environment, posts name, prints the message, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
@@ -48,8 +48,8 @@ func TestCreateEnvironmentCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"name":"production"}`, string(capturedBody))
-		assert.Equal(t, "environment created\n", out.String())
+		assert.JSONEq(t, `{"participant":"production"}`, string(capturedBody))
+		assert.Contains(t, out.String(), "environment created")
 		assert.Empty(t, errOut.String())
 	})
 

@@ -1,4 +1,4 @@
-package create_participant_test
+package integration_test
 
 import (
 	"bytes"
@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	brokerURL = "http://localhost:8080"
-	name      = "pets-service"
-	endpoint  = brokerURL + "/api/participants"
-)
-
 func TestCreateParticipantCommand(t *testing.T) {
+	const (
+		brokerURL = "http://localhost:8080"
+		name      = "pets-service"
+		endpoint  = brokerURL + "/api/participants"
+	)
+
 	t.Run("creates a participant, posts name, prints the message, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
@@ -48,8 +48,8 @@ func TestCreateParticipantCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"name":"pets-service"}`, string(capturedBody))
-		assert.Equal(t, "participant created\n", out.String())
+		assert.JSONEq(t, `{"participant":"pets-service"}`, string(capturedBody))
+		assert.Contains(t, out.String(), "participant created")
 		assert.Empty(t, errOut.String())
 	})
 
@@ -59,7 +59,7 @@ func TestCreateParticipantCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"success":false,"message":"participant already exists"}`))
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"success":false,"message":"participant invalid input"}`))
 
 		command := create_participant.NewCreateParticipantCommand(
 			create_participant.NewCreateParticipantClient(httpClient),
@@ -72,6 +72,6 @@ func TestCreateParticipantCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "participant already exists")
+		assert.Contains(t, err.Error(), "participant invalid input")
 	})
 }

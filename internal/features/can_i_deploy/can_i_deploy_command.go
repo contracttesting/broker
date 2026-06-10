@@ -2,9 +2,12 @@ package can_i_deploy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -30,27 +33,30 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		input := &CanIDeployInput{
+		requestBody := &CanIDeployRequestBody{
 			Participant: participant,
 			Version:     version,
 			Environment: environment,
 		}
 
-		resp, err := client.Check(ctx, input)
+		resp, err := client.Check(ctx, requestBody)
 		if err != nil {
-			fmt.Fprintln(command.ErrOrStderr(), err)
-			return err
+			ui.Failure(command.ErrOrStderr(), "❌", err.Error())
+			return ui.ErrSilent
 		}
 
 		if !resp.Deployable {
-			fmt.Fprintln(command.OutOrStdout(), "not deployable")
-			for _, message := range resp.BreakingChangeMessages() {
-				fmt.Fprintf(command.OutOrStdout(), "  - %s\n", message)
+			data, err := json.Marshal(resp.Breaks)
+			if err != nil {
+				return fmt.Errorf("marshal breaks: %w", err)
 			}
-			return errNotDeployable
+			fmt.Println(string(data))
+			os.Exit(1)
+			return ui.ErrSilent
 		}
 
-		fmt.Fprintln(command.OutOrStdout(), "deployable")
+		ui.Success(command.OutOrStdout(), "🚀", fmt.Sprintf("%s can be deployed to %s", participant, environment))
+
 		return nil
 	}
 
@@ -63,8 +69,8 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 	command.Flags().String("version", "", "Version to check, e.g. a commit hash or semver tag (required)")
 	command.Flags().String("environment", "", "Target environment name (required)")
-	_ = command.MarkFlagRequired("version")
-	_ = command.MarkFlagRequired("environment")
+	command.MarkFlagRequired("version")
+	command.MarkFlagRequired("environment")
 
 	return command
 }

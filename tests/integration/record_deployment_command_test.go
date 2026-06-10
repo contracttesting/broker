@@ -1,4 +1,4 @@
-package record_deployment_test
+package integration_test
 
 import (
 	"bytes"
@@ -13,16 +13,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	brokerURL   = "http://localhost:8080"
-	participant = "api"
-	version     = "v1"
-	environment = "production"
-	endpoint    = brokerURL + "/api/deployments"
-)
-
 func TestRecordDeploymentCommand(t *testing.T) {
-	t.Run("records a deployment, posts name+version+environment, prints the message, exits 0", func(t *testing.T) {
+	const (
+		brokerURL   = "http://localhost:8080"
+		participant = "api"
+		version     = "v1"
+		environment = "production"
+		endpoint    = brokerURL + "/api/deployments"
+	)
+
+	t.Run("records a deployment, posts participant+version+environment, prints the message, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -50,8 +50,8 @@ func TestRecordDeploymentCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"name":"api","version":"v1","environment":"production"}`, string(capturedBody))
-		assert.Equal(t, "deployment recorded\n", out.String())
+		assert.JSONEq(t, `{"participant":"api","version":"v1","environment":"production"}`, string(capturedBody))
+		assert.Contains(t, out.String(), "deployment recorded")
 		assert.Empty(t, errOut.String())
 	})
 

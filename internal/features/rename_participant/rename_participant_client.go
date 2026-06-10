@@ -17,11 +17,8 @@ func NewRenameParticipantClient(httpClient *components.HTTPClient) *RenamePartic
 	return &RenameParticipantClient{httpClient: httpClient}
 }
 
-func (c *RenameParticipantClient) Rename(ctx context.Context, input *RenameParticipantInput) (string, error) {
-	body, err := json.Marshal(renameParticipantBody{
-		Name:    input.OldName,
-		NewName: input.NewName,
-	})
+func (c *RenameParticipantClient) Rename(ctx context.Context, requestBody *RenameParticipantRequestBody) (string, error) {
+	body, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize participant rename to JSON: %w", err)
 	}
@@ -31,13 +28,13 @@ func (c *RenameParticipantClient) Rename(ctx context.Context, input *RenameParti
 		return "", fmt.Errorf("cannot post participant rename to broker: %w", err)
 	}
 
-	if resp.StatusCode() != http.StatusOK {
-		return "", fmt.Errorf("cannot post participant rename to broker: %s", resp.String())
-	}
-
-	var result RenameParticipantResponse
+	var result RenameParticipantResponseBody
 	if err := json.Unmarshal(resp.Bytes(), &result); err != nil {
 		return "", fmt.Errorf("cannot parse participant rename response: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return "", fmt.Errorf("cannot post participant rename to broker: %s", result.Message)
 	}
 
 	return result.Message, nil
