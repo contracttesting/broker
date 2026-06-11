@@ -27,7 +27,7 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 	a := newContractWithOnePetsResource("pets-service")
 
 	b := newContractWithOnePetsResource("pets-service")
-	b.AddResource(model.NewProvidedRestResponse("/pets/{id}", "get", "200", map[string]model.Property{
+	b.AddResource(model.NewProvidedRestResponse("/pets/*", "get", "200", map[string]model.Property{
 		"$": model.NewProperty("$", "object", false),
 	}))
 

@@ -44,7 +44,7 @@ func TestDiff_ReportsAddedResource(t *testing.T) {
 		"$.id": rootId,
 	}
 	resource := model.NewProvidedRestResponse(
-		"/pets/{id}",
+		"/pets/*",
 		"get",
 		"200",
 		properties,
@@ -54,7 +54,7 @@ func TestDiff_ReportsAddedResource(t *testing.T) {
 	assert.Len(t, diff.Resources, 1)
 	for _, change := range diff.Resources {
 		assert.Equal(t, contract_differ.ChangeAdded, change.Kind)
-		assert.Equal(t, "/pets/{id}", change.Resource.Endpoint)
+		assert.Equal(t, "/pets/*", change.Resource.Endpoint)
 	}
 }
 
@@ -74,7 +74,7 @@ func TestDiff_RemovedResource(t *testing.T) {
 		"$.id": model.NewProperty("$.id", "string", false),
 	}
 	resource := model.NewProvidedRestResponse(
-		"/pets/{id}",
+		"/pets/*",
 		"get",
 		"200",
 		properties,
@@ -85,7 +85,7 @@ func TestDiff_RemovedResource(t *testing.T) {
 	assert.Len(t, diff.Resources, 1)
 	for _, change := range diff.Resources {
 		assert.Equal(t, contract_differ.ChangeRemoved, change.Kind)
-		assert.Equal(t, "/pets/{id}", change.Resource.Endpoint)
+		assert.Equal(t, "/pets/*", change.Resource.Endpoint)
 		assert.Len(t, change.Properties, 2)
 		for _, propChange := range change.Properties {
 			assert.Equal(t, contract_differ.ChangeRemoved, propChange.Kind)

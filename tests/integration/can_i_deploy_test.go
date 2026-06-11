@@ -434,7 +434,7 @@ const dualRoleUsersV1Contract = `
           "responses": { "200": "CreateUserResponse" }
         }
       },
-      "/users/{userId}": {
+      "/users/*": {
         "get": { "responses": { "200": "User" } }
       }
     }
@@ -468,7 +468,7 @@ const dualRolePetsV1Contract = `
   "consumes": {
     "users": {
       "rest": {
-        "/users/{userId}": {
+        "/users/*": {
           "get": { "responses": { "200": "User" } }
         }
       }
@@ -482,7 +482,7 @@ const dualRolePetsV1Contract = `
           "responses": { "200": "Pet" }
         }
       },
-      "/pets/{petId}": {
+      "/pets/*": {
         "get": { "responses": { "200": "Pet" } }
       }
     }
@@ -512,17 +512,12 @@ const dualRolePetsV1Contract = `
   }
 }`
 
-// v2 introduces exactly three breaks: the consumes side now expects userId as
-// string (users provides integer), POST /pets gains a new required request
-// field breed (app v1 does not send it), and the GET /pets/{petId} response
-// drops name (app v1 expects it). PetSummary keeps the POST /pets response
-// intact so the break count stays at three.
 const dualRolePetsV2Contract = `
 {
   "consumes": {
     "users": {
       "rest": {
-        "/users/{userId}": {
+        "/users/*": {
           "get": { "responses": { "200": "User" } }
         }
       }
@@ -536,7 +531,7 @@ const dualRolePetsV2Contract = `
           "responses": { "200": "Pet" }
         }
       },
-      "/pets/{petId}": {
+      "/pets/*": {
         "get": { "responses": { "200": "PetSummary" } }
       }
     }
@@ -585,7 +580,7 @@ const dualRoleAppV1Contract = `
             "responses": { "200": "CreateUserResponse" }
           }
         },
-        "/users/{userId}": {
+        "/users/*": {
           "get": { "responses": { "200": "User" } }
         }
       }
@@ -598,7 +593,7 @@ const dualRoleAppV1Contract = `
             "responses": { "200": "Pet" }
           }
         },
-        "/pets/{petId}": {
+        "/pets/*": {
           "get": { "responses": { "200": "Pet" } }
         }
       }
@@ -697,7 +692,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	s.Equal("consumes", consumerSide.CheckedResource.Direction)
 	s.Equal("rest_response", consumerSide.CheckedResource.Kind)
 	s.Equal("users", consumerSide.CheckedResource.Provider)
-	s.Equal("/users/{userId}", consumerSide.CheckedResource.Endpoint)
+	s.Equal("/users/*", consumerSide.CheckedResource.Endpoint)
 	s.Equal("get", consumerSide.CheckedResource.Method)
 	s.Equal("200", consumerSide.CheckedResource.StatusCode)
 	s.Require().NotNil(consumerSide.CounterpartResource)
@@ -731,7 +726,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	missingInProvider, ok := byReason["missing_in_provider"]
 	s.Require().True(ok)
 	s.Equal("rest_response", missingInProvider.CheckedResource.Kind)
-	s.Equal("/pets/{petId}", missingInProvider.CheckedResource.Endpoint)
+	s.Equal("/pets/*", missingInProvider.CheckedResource.Endpoint)
 	s.Equal("get", missingInProvider.CheckedResource.Method)
 	s.Equal("200", missingInProvider.CheckedResource.StatusCode)
 	s.Equal(map[string]string{"property": "$.name"}, missingInProvider.Details)

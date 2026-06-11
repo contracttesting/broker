@@ -62,7 +62,7 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(happyContractJSON), &dslContract))
 
 	contract := model.NewContract(model.NewParticipant("petstore-app"), "1", happyContractJSON)
-	dslContract.HydrateContract(contract)
+	require.NoError(t, dslContract.HydrateContract(contract))
 
 	require.Len(t, contract.Resources, 1)
 
@@ -190,7 +190,7 @@ func hydrate(t *testing.T, raw string) *model.Contract {
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
 	contract := model.NewContract(model.NewParticipant("petstore-app"), "1", raw)
-	dslContract.HydrateContract(contract)
+	require.NoError(t, dslContract.HydrateContract(contract))
 	return contract
 }
 
@@ -299,6 +299,6 @@ func TestHydrateContract_Unhappy_PanicsOnSchemaTooDeep(t *testing.T) {
 	assert.PanicsWithValue(
 		t,
 		"schema Pet is too deep with more than 10 levels",
-		func() { dslContract.HydrateContract(contract) },
+		func() { _ = dslContract.HydrateContract(contract) },
 	)
 }

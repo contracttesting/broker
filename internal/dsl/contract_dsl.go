@@ -13,8 +13,24 @@ type Contract struct {
 	Schemas          SchemasMap          `json:"schemas,omitzero"`
 }
 
-func (c *Contract) HydrateContract(contract *model.Contract) {
+func (c *Contract) HydrateContract(contract *model.Contract) error {
+	for endpoint := range c.Provides.Rest {
+		if err := validateEndpoint(endpoint); err != nil {
+			return err
+		}
+	}
+
+	for _, consumes := range c.ConsumesServices {
+		for endpoint := range consumes.Rest {
+			if err := validateEndpoint(endpoint); err != nil {
+				return err
+			}
+		}
+	}
+
 	c.hydrateResources(contract, NewResourcePath(""), *c)
+
+	return nil
 }
 
 func (c *Contract) hydrateResources(
@@ -65,10 +81,12 @@ func (c *Contract) hydrateResources(
 	case Rest:
 		rest := unknown
 		for endpoint, methods := range rest {
+			endpointPath := resourcePath.Append("rest", normalizeEndpoint(endpoint))
+
 			if methods.Get.IsNonZero() {
 				c.hydrateResources(
 					contract,
-					resourcePath.Append("rest", endpoint),
+					endpointPath,
 					methods.Get,
 				)
 			}
@@ -76,7 +94,7 @@ func (c *Contract) hydrateResources(
 			if methods.Post.IsNonZero() {
 				c.hydrateResources(
 					contract,
-					resourcePath.Append("rest", endpoint),
+					endpointPath,
 					methods.Post,
 				)
 			}
@@ -84,7 +102,7 @@ func (c *Contract) hydrateResources(
 			if methods.Put.IsNonZero() {
 				c.hydrateResources(
 					contract,
-					resourcePath.Append("rest", endpoint),
+					endpointPath,
 					methods.Put,
 				)
 			}
@@ -92,7 +110,7 @@ func (c *Contract) hydrateResources(
 			if methods.Delete.IsNonZero() {
 				c.hydrateResources(
 					contract,
-					resourcePath.Append("rest", endpoint),
+					endpointPath,
 					methods.Delete,
 				)
 			}
