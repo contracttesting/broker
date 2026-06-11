@@ -512,11 +512,6 @@ const dualRolePetsV1Contract = `
   }
 }`
 
-// v2 introduces exactly three breaks: the consumes side now expects userId as
-// string (users provides integer), POST /pets gains a new required request
-// field breed (app v1 does not send it), and the GET /pets/* response
-// drops name (app v1 expects it). PetSummary keeps the POST /pets response
-// intact so the break count stays at three.
 const dualRolePetsV2Contract = `
 {
   "consumes": {
