@@ -78,9 +78,10 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(CanIDeployResponseBody{
-		Message:    "Contract checked successfully",
-		Deployable: len(report.Breaks) == 0,
-		Breaks:     report.Breaks,
+		Message:           "Contract checked successfully",
+		Deployable:        len(report.Breaks) == 0,
+		Environment:       requestBody.Environment,
+		Incompatibilities: buildIncompatibilities(report, requestBody.Version),
 	})
 }
 

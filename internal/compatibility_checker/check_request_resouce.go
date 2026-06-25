@@ -17,7 +17,7 @@ func checkRequestResource(
 			breaks = append(breaks, NewPropertyBreakChange(
 				checked,
 				counterpart,
-				ReasonMissingInConsumer,
+				ReasonPropertyMissingInConsumer,
 				providerPropertyPath,
 			))
 
@@ -29,7 +29,7 @@ func checkRequestResource(
 			breaks = append(breaks, NewPropertyBreakChange(
 				checked,
 				counterpart,
-				ReasonTypeMismatch,
+				ReasonPropertyTypeMismatch,
 				providerPropertyPath,
 			))
 
@@ -41,7 +41,7 @@ func checkRequestResource(
 			breaks = append(breaks, NewPropertyBreakChange(
 				checked,
 				counterpart,
-				ReasonOptionalInConsumerRequiredInProvider,
+				ReasonPropertyOptionalInConsumerRequiredInProvider,
 				providerPropertyPath,
 			))
 		}

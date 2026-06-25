@@ -8,7 +8,7 @@ func checkResources(checked *model.Resource, counterpart *model.Resource) []Brea
 		consumer, provider = counterpart, checked
 	}
 
-	switch consumer.Kind {
+	switch consumer.Interaction {
 	case model.RestRequest:
 		return checkRequestResource(checked, counterpart, consumer, provider)
 	default:

@@ -72,7 +72,7 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 	}
 
 	assert.Equal(t, model.Consumes, resource.Direction)
-	assert.Equal(t, model.RestResponse, resource.Kind)
+	assert.Equal(t, model.RestResponse, resource.Interaction)
 	assert.Equal(t, "pets-service", resource.ConsumedProvider.String)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
@@ -201,7 +201,7 @@ func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing
 
 	var request, response model.Resource
 	for _, r := range contract.Resources {
-		switch r.Kind {
+		switch r.Interaction {
 		case model.RestRequest:
 			request = r
 		case model.RestResponse:
@@ -210,14 +210,14 @@ func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing
 	}
 
 	assert.Equal(t, model.Consumes, request.Direction)
-	assert.Equal(t, model.RestRequest, request.Kind)
+	assert.Equal(t, model.RestRequest, request.Interaction)
 	assert.Equal(t, "/pets", request.Endpoint)
 	assert.Equal(t, "post", request.Method)
 	assert.Empty(t, request.ResponseStatusCode)
 	assert.Contains(t, request.Properties, "$.id")
 
 	assert.Equal(t, model.Consumes, response.Direction)
-	assert.Equal(t, model.RestResponse, response.Kind)
+	assert.Equal(t, model.RestResponse, response.Interaction)
 	assert.Equal(t, "201", response.ResponseStatusCode.String)
 	assert.Contains(t, response.Properties, "$.name")
 }
@@ -233,7 +233,7 @@ func TestHydrateContract_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 	}
 
 	assert.Equal(t, model.Provides, resource.Direction)
-	assert.Equal(t, model.RestResponse, resource.Kind)
+	assert.Equal(t, model.RestResponse, resource.Interaction)
 	assert.Empty(t, resource.ConsumedProvider)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)

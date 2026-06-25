@@ -12,7 +12,7 @@ import (
 func consumerResource() *model.Resource {
 	return &model.Resource{
 		Direction:          model.Consumes,
-		Kind:               model.RestResponse,
+		Interaction:        model.RestResponse,
 		ConsumedProvider:   null.StringFrom("api"),
 		Endpoint:           "/things",
 		Method:             "get",
@@ -27,7 +27,7 @@ func consumerResource() *model.Resource {
 func providerResource() *model.Resource {
 	return &model.Resource{
 		Direction:          model.Provides,
-		Kind:               model.RestResponse,
+		Interaction:        model.RestResponse,
 		Endpoint:           "/things",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
@@ -64,7 +64,7 @@ func TestPropertyBreakDetails(t *testing.T) {
 	providerResponse := providerResource()
 	consumerRequest := &model.Resource{
 		Direction:        model.Consumes,
-		Kind:             model.RestRequest,
+		Interaction:      model.RestRequest,
 		ConsumedProvider: null.StringFrom("api"),
 		Endpoint:         "/things",
 		Method:           "post",
@@ -72,33 +72,33 @@ func TestPropertyBreakDetails(t *testing.T) {
 	}
 	providerRequest := &model.Resource{
 		Direction:   model.Provides,
-		Kind:        model.RestRequest,
+		Interaction: model.RestRequest,
 		Endpoint:    "/things",
 		Method:      "post",
 		Participant: &model.Participant{Name: "api"},
 	}
 
 	typeMismatch := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonTypeMismatch, "$.id",
+		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 	missingInProvider := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonMissingInProvider, "$.name",
+		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyMissingInProvider, "$.name",
 	)
 	optionalInProvider := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonOptionalInProviderRequiredInConsumer, "$.id",
+		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "$.id",
 	)
 	missingInConsumer := compatibility_checker.NewPropertyBreakChange(
-		consumerRequest, providerRequest, compatibility_checker.ReasonMissingInConsumer, "$.user",
+		consumerRequest, providerRequest, compatibility_checker.ReasonPropertyMissingInConsumer, "$.user",
 	)
 	optionalInConsumer := compatibility_checker.NewPropertyBreakChange(
-		consumerRequest, providerRequest, compatibility_checker.ReasonOptionalInConsumerRequiredInProvider, "$.flag",
+		consumerRequest, providerRequest, compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, "$.flag",
 	)
 
-	assert.Equal(t, compatibility_checker.ReasonTypeMismatch, typeMismatch.Reason)
-	assert.Equal(t, compatibility_checker.ReasonMissingInProvider, missingInProvider.Reason)
-	assert.Equal(t, compatibility_checker.ReasonOptionalInProviderRequiredInConsumer, optionalInProvider.Reason)
-	assert.Equal(t, compatibility_checker.ReasonMissingInConsumer, missingInConsumer.Reason)
-	assert.Equal(t, compatibility_checker.ReasonOptionalInConsumerRequiredInProvider, optionalInConsumer.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyTypeMismatch, typeMismatch.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyMissingInProvider, missingInProvider.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, optionalInProvider.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyMissingInConsumer, missingInConsumer.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, optionalInConsumer.Reason)
 
 	assert.Equal(t, map[string]string{
 		"property":                  "$.id",
@@ -122,10 +122,10 @@ func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 	providerRes := providerResource()
 
 	consumerChecked := compatibility_checker.NewPropertyBreakChange(
-		consumerRes, providerRes, compatibility_checker.ReasonTypeMismatch, "$.id",
+		consumerRes, providerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 	providerChecked := compatibility_checker.NewPropertyBreakChange(
-		providerRes, consumerRes, compatibility_checker.ReasonTypeMismatch, "$.id",
+		providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 
 	assert.Equal(t, map[string]string{
@@ -176,10 +176,10 @@ func TestReportAppendKeysByConsumerName(t *testing.T) {
 	providerRes := providerResource()
 
 	consumerChecked := compatibility_checker.NewPropertyBreakChange(
-		consumerRes, providerRes, compatibility_checker.ReasonTypeMismatch, "$.id",
+		consumerRes, providerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 	providerChecked := compatibility_checker.NewPropertyBreakChange(
-		providerRes, consumerRes, compatibility_checker.ReasonTypeMismatch, "$.id",
+		providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 
 	report := compatibility_checker.NewCompatibilityReport()

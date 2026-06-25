@@ -6,26 +6,34 @@ import (
 	"net/http"
 )
 
-type checkedResource struct {
-	Direction  string `json:"direction"`
-	Kind       string `json:"kind"`
-	Provider   string `json:"consumed_provider"`
-	Endpoint   string `json:"endpoint"`
-	Method     string `json:"method"`
-	StatusCode string `json:"response_status_code"`
-	Version    string `json:"version"`
+type party struct {
+	Name    string  `json:"name"`
+	Version *string `json:"version"`
 }
 
 type breakItem struct {
-	CheckedResource     checkedResource   `json:"checked_resource"`
-	CounterpartResource *checkedResource  `json:"counterpart_resource,omitempty"`
-	Reason              string            `json:"reason"`
-	Details             map[string]string `json:"details,omitempty"`
+	Interaction string            `json:"interaction"`
+	Method      string            `json:"method"`
+	Endpoint    string            `json:"endpoint"`
+	StatusCode  *string           `json:"statusCode"`
+	Property    *string           `json:"property"`
+	Reason      string            `json:"reason"`
+	Details     map[string]string `json:"details,omitempty"`
+}
+
+type incompatibility struct {
+	Consumer      party       `json:"consumer"`
+	Provider      party       `json:"provider"`
+	Checked       string      `json:"checked"`
+	BreakingCount int         `json:"breakingCount"`
+	Breaks        []breakItem `json:"breaks"`
 }
 
 type canIDeployResponse struct {
-	Deployable bool                   `json:"deployable"`
-	Breaks     map[string][]breakItem `json:"breaks"`
+	Message           string            `json:"message"`
+	Deployable        bool              `json:"deployable"`
+	Environment       string            `json:"environment"`
+	Incompatibilities []incompatibility `json:"incompatibilities"`
 }
 
 const apiV1ProviderContract = `
@@ -117,7 +125,7 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
-	s.JSONEq(`{"message":"Contract checked successfully","deployable":true}`, body)
+	s.JSONEq(`{"message":"Contract checked successfully","deployable":true,"environment":"production","incompatibilities":[]}`, body)
 
 	s.Equal(1, s.countRows("compatibility_matrix"))
 	var v1Deployable bool
@@ -134,36 +142,44 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	var got canIDeployResponse
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
 	s.False(got.Deployable)
+	s.Equal("production", got.Environment)
 
-	frontBreaks := got.Breaks["front"]
-	s.Require().Len(frontBreaks, 2)
+	s.Require().Len(got.Incompatibilities, 1)
+	inc := got.Incompatibilities[0]
+	s.Equal("front", inc.Consumer.Name)
+	s.Require().NotNil(inc.Consumer.Version)
+	s.Equal("v2", *inc.Consumer.Version)
+	s.Equal("api", inc.Provider.Name)
+	s.Require().NotNil(inc.Provider.Version)
+	s.Equal("v1", *inc.Provider.Version)
+	s.Equal("consumer", inc.Checked)
+	s.Equal(2, inc.BreakingCount)
+	s.Require().Len(inc.Breaks, 2)
 
 	byReason := map[string]breakItem{}
-	for _, b := range frontBreaks {
-		s.Equal("consumes", b.CheckedResource.Direction)
-		s.Equal("rest_response", b.CheckedResource.Kind)
-		s.Equal("api", b.CheckedResource.Provider)
-		s.Equal("/things", b.CheckedResource.Endpoint)
-		s.Equal("get", b.CheckedResource.Method)
-		s.Equal("200", b.CheckedResource.StatusCode)
-
-		s.Require().NotNil(b.CounterpartResource)
-		s.Equal("provides", b.CounterpartResource.Direction)
-
+	for _, b := range inc.Breaks {
+		s.Equal("response", b.Interaction)
+		s.Equal("get", b.Method)
+		s.Equal("/things", b.Endpoint)
+		s.Require().NotNil(b.StatusCode)
+		s.Equal("200", *b.StatusCode)
 		byReason[b.Reason] = b
 	}
 
-	typeMismatch, ok := byReason["type_mismatch"]
+	typeMismatch, ok := byReason["property_type_mismatch"]
 	s.Require().True(ok)
+	s.Require().NotNil(typeMismatch.Property)
+	s.Equal("$.id", *typeMismatch.Property)
 	s.Equal(map[string]string{
-		"property":                  "$.id",
-		"checked_property_type":     "integer",
-		"counterpart_property_type": "string",
+		"checkedPropertyType":     "integer",
+		"counterpartPropertyType": "string",
 	}, typeMismatch.Details)
 
-	missing, ok := byReason["missing_in_provider"]
+	missing, ok := byReason["property_missing_in_provider"]
 	s.Require().True(ok)
-	s.Equal(map[string]string{"property": "$.name"}, missing.Details)
+	s.Require().NotNil(missing.Property)
+	s.Equal("$.name", *missing.Property)
+	s.Empty(missing.Details)
 
 	s.Equal(2, s.countRows("compatibility_matrix"))
 	var v2Deployable bool
@@ -217,24 +233,30 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
 	s.False(got.Deployable)
 
-	frontBreaks := got.Breaks["front"]
-	s.Require().Len(frontBreaks, 1)
+	s.Require().Len(got.Incompatibilities, 1)
+	inc := got.Incompatibilities[0]
+	s.Equal("front", inc.Consumer.Name)
+	s.Require().NotNil(inc.Consumer.Version)
+	s.Equal("v1", *inc.Consumer.Version)
+	s.Equal("api", inc.Provider.Name)
+	s.Require().NotNil(inc.Provider.Version)
+	s.Equal("v1", *inc.Provider.Version)
+	s.Equal("provider", inc.Checked)
+	s.Equal(1, inc.BreakingCount)
+	s.Require().Len(inc.Breaks, 1)
 
-	b := frontBreaks[0]
-	s.Equal("provides", b.CheckedResource.Direction)
-	s.Equal("/things", b.CheckedResource.Endpoint)
-	s.Equal("get", b.CheckedResource.Method)
-	s.Equal("200", b.CheckedResource.StatusCode)
-
-	s.Require().NotNil(b.CounterpartResource)
-	s.Equal("consumes", b.CounterpartResource.Direction)
-	s.Equal("api", b.CounterpartResource.Provider)
-
-	s.Equal("type_mismatch", b.Reason)
+	b := inc.Breaks[0]
+	s.Equal("response", b.Interaction)
+	s.Equal("/things", b.Endpoint)
+	s.Equal("get", b.Method)
+	s.Require().NotNil(b.StatusCode)
+	s.Equal("200", *b.StatusCode)
+	s.Require().NotNil(b.Property)
+	s.Equal("$.id", *b.Property)
+	s.Equal("property_type_mismatch", b.Reason)
 	s.Equal(map[string]string{
-		"property":                  "$.id",
-		"checked_property_type":     "string",
-		"counterpart_property_type": "integer",
+		"checkedPropertyType":     "string",
+		"counterpartPropertyType": "integer",
 	}, b.Details)
 }
 
@@ -271,13 +293,22 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
 	s.False(got.Deployable)
 
-	providers := make([]string, 0, len(got.Breaks["app"]))
-	for _, b := range got.Breaks["app"] {
+	s.Require().Len(got.Incompatibilities, 3)
+	providers := make([]string, 0, len(got.Incompatibilities))
+	for _, inc := range got.Incompatibilities {
+		s.Equal("app", inc.Consumer.Name)
+		s.Require().NotNil(inc.Consumer.Version)
+		s.Equal("v1", *inc.Consumer.Version)
+		s.Equal("consumer", inc.Checked)
+		s.Nil(inc.Provider.Version)
+		s.Equal(1, inc.BreakingCount)
+		s.Require().Len(inc.Breaks, 1)
+
+		b := inc.Breaks[0]
 		s.Equal("provider_resource_not_found", b.Reason)
-		s.Equal("consumes", b.CheckedResource.Direction)
-		s.Nil(b.CounterpartResource)
+		s.Nil(b.Property)
 		s.Empty(b.Details)
-		providers = append(providers, b.CheckedResource.Provider)
+		providers = append(providers, inc.Provider.Name)
 	}
 	s.ElementsMatch([]string{"users", "auth", "catalog"}, providers)
 
@@ -348,11 +379,16 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
 	s.False(got.Deployable)
 
-	s.Require().Len(got.Breaks["app"], 1)
-	b := got.Breaks["app"][0]
-	s.Equal("catalog", b.CheckedResource.Provider)
-	s.Equal("type_mismatch", b.Reason)
-	s.Equal("$.id", b.Details["property"])
+	s.Require().Len(got.Incompatibilities, 1)
+	inc := got.Incompatibilities[0]
+	s.Equal("app", inc.Consumer.Name)
+	s.Equal("catalog", inc.Provider.Name)
+	s.Equal("consumer", inc.Checked)
+	s.Require().Len(inc.Breaks, 1)
+	b := inc.Breaks[0]
+	s.Equal("property_type_mismatch", b.Reason)
+	s.Require().NotNil(b.Property)
+	s.Equal("$.id", *b.Property)
 
 	s.Equal(3, s.countRows("compatibility_matrix"))
 
@@ -415,13 +451,19 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	s.False(got.Deployable)
-	s.Require().Len(got.Breaks["front"], 1)
+	s.Require().Len(got.Incompatibilities, 1)
 
-	b := got.Breaks["front"][0]
-	s.Equal("consumes", b.CheckedResource.Direction)
-	s.Equal("api", b.CheckedResource.Provider)
+	inc := got.Incompatibilities[0]
+	s.Equal("front", inc.Consumer.Name)
+	s.Equal("api", inc.Provider.Name)
+	s.Nil(inc.Provider.Version)
+	s.Equal("consumer", inc.Checked)
+	s.Require().Len(inc.Breaks, 1)
+
+	b := inc.Breaks[0]
 	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
-	s.Equal("staging", b.Details["deployed_environments"])
+	s.Nil(b.Property)
+	s.Equal("staging", b.Details["deployedEnvironments"])
 }
 
 const dualRoleUsersV1Contract = `
@@ -648,7 +690,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 		status, body := s.post("/api/can-i-deploy",
 			`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
 		s.Require().Equalf(http.StatusOK, status, "can-i-deploy %s %s", participant, version)
-		s.Require().JSONEqf(`{"message":"Contract checked successfully","deployable":true}`, body,
+		s.Require().JSONEqf(`{"message":"Contract checked successfully","deployable":true,"environment":"production","incompatibilities":[]}`, body,
 			"can-i-deploy %s %s", participant, version)
 		mustPost("/api/deployments",
 			`{"participant":"`+participant+`","version":"`+version+`","environment":"production"}`)
@@ -673,63 +715,37 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	status, body := s.post("/api/can-i-deploy", `{"participant":"pets","version":"v2","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
 
-	var got canIDeployResponse
-	s.Require().NoError(json.Unmarshal([]byte(body), &got))
-	s.False(got.Deployable)
-	s.NotContains(body, `"consumed_provider":""`)
-	s.NotContains(body, `"response_status_code":""`)
+	s.NotContains(body, `"statusCode":""`)
+	s.NotContains(body, `"property":""`)
 	s.NotContains(body, `"version":""`)
-	s.Contains(body, `"consumed_provider":null`)
-	s.Contains(body, `"response_status_code":null`)
-	s.Contains(body, `"version":null`)
+	s.Contains(body, `"statusCode":null`)
 
-	s.Require().Len(got.Breaks, 2, "breaks must surface both sides: consumer (pets) and provider (app)")
-
-	petsBreaks := got.Breaks["pets"]
-	s.Require().Len(petsBreaks, 1)
-
-	consumerSide := petsBreaks[0]
-	s.Equal("consumes", consumerSide.CheckedResource.Direction)
-	s.Equal("rest_response", consumerSide.CheckedResource.Kind)
-	s.Equal("users", consumerSide.CheckedResource.Provider)
-	s.Equal("/users/*", consumerSide.CheckedResource.Endpoint)
-	s.Equal("get", consumerSide.CheckedResource.Method)
-	s.Equal("200", consumerSide.CheckedResource.StatusCode)
-	s.Require().NotNil(consumerSide.CounterpartResource)
-	s.Equal("provides", consumerSide.CounterpartResource.Direction)
-	s.Equal("type_mismatch", consumerSide.Reason)
-	s.Equal(map[string]string{
-		"property":                  "$.userId",
-		"checked_property_type":     "string",
-		"counterpart_property_type": "integer",
-	}, consumerSide.Details)
-
-	appBreaks := got.Breaks["app"]
-	s.Require().Len(appBreaks, 2)
-
-	byReason := map[string]breakItem{}
-	for _, b := range appBreaks {
-		s.Equal("provides", b.CheckedResource.Direction)
-		s.Require().NotNil(b.CounterpartResource)
-		s.Equal("consumes", b.CounterpartResource.Direction)
-		s.Equal("pets", b.CounterpartResource.Provider)
-		byReason[b.Reason] = b
-	}
-
-	missingInConsumer, ok := byReason["missing_in_consumer"]
-	s.Require().True(ok)
-	s.Equal("rest_request", missingInConsumer.CheckedResource.Kind)
-	s.Equal("/pets", missingInConsumer.CheckedResource.Endpoint)
-	s.Equal("post", missingInConsumer.CheckedResource.Method)
-	s.Equal(map[string]string{"property": "$.breed"}, missingInConsumer.Details)
-
-	missingInProvider, ok := byReason["missing_in_provider"]
-	s.Require().True(ok)
-	s.Equal("rest_response", missingInProvider.CheckedResource.Kind)
-	s.Equal("/pets/*", missingInProvider.CheckedResource.Endpoint)
-	s.Equal("get", missingInProvider.CheckedResource.Method)
-	s.Equal("200", missingInProvider.CheckedResource.StatusCode)
-	s.Equal(map[string]string{"property": "$.name"}, missingInProvider.Details)
+	s.JSONEq(`{
+		"message": "Contract checked successfully",
+		"deployable": false,
+		"environment": "production",
+		"incompatibilities": [
+			{
+				"consumer": {"name": "app", "version": "v1"},
+				"provider": {"name": "pets", "version": "v2"},
+				"checked": "provider",
+				"breakingCount": 2,
+				"breaks": [
+					{"interaction": "request", "method": "post", "endpoint": "/pets", "statusCode": null, "property": "$.breed", "reason": "property_missing_in_consumer"},
+					{"interaction": "response", "method": "get", "endpoint": "/pets/*", "statusCode": "200", "property": "$.name", "reason": "property_missing_in_provider"}
+				]
+			},
+			{
+				"consumer": {"name": "pets", "version": "v2"},
+				"provider": {"name": "users", "version": "v1"},
+				"checked": "consumer",
+				"breakingCount": 1,
+				"breaks": [
+					{"interaction": "response", "method": "get", "endpoint": "/users/*", "statusCode": "200", "property": "$.userId", "reason": "property_type_mismatch", "details": {"checkedPropertyType": "string", "counterpartPropertyType": "integer"}}
+				]
+			}
+		]
+	}`, body)
 
 	type matrixRow struct {
 		Counterpart string
@@ -780,9 +796,14 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
 	s.Require().NoError(json.Unmarshal([]byte(body), &got))
 
 	s.False(got.Deployable)
-	s.Require().Len(got.Breaks["front"], 1)
+	s.Require().Len(got.Incompatibilities, 1)
 
-	b := got.Breaks["front"][0]
+	inc := got.Incompatibilities[0]
+	s.Nil(inc.Provider.Version)
+	s.Require().Len(inc.Breaks, 1)
+
+	b := inc.Breaks[0]
 	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
+	s.Nil(b.Property)
 	s.Empty(b.Details)
 }

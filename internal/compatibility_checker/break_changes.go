@@ -9,13 +9,13 @@ import (
 type BreakingReason string
 
 const (
-	ReasonProviderResourceNotFound                 BreakingReason = "provider_resource_not_found"
-	ReasonMissingInProvider                        BreakingReason = "missing_in_provider"
-	ReasonMissingInConsumer                        BreakingReason = "missing_in_consumer"
-	ReasonTypeMismatch                             BreakingReason = "type_mismatch"
-	ReasonOptionalInProviderRequiredInConsumer     BreakingReason = "optional_in_provider_required_in_consumer"
-	ReasonOptionalInConsumerRequiredInProvider     BreakingReason = "optional_in_consumer_required_in_provider"
-	ReasonProviderResourceNotDeployedInEnvironment BreakingReason = "provider_resource_not_deployed_in_environment"
+	ReasonProviderResourceNotFound                     BreakingReason = "provider_resource_not_found"
+	ReasonPropertyMissingInProvider                    BreakingReason = "property_missing_in_provider"
+	ReasonPropertyMissingInConsumer                    BreakingReason = "property_missing_in_consumer"
+	ReasonPropertyTypeMismatch                         BreakingReason = "property_type_mismatch"
+	ReasonPropertyOptionalInProviderRequiredInConsumer BreakingReason = "property_optional_in_provider_required_in_consumer"
+	ReasonPropertyOptionalInConsumerRequiredInProvider BreakingReason = "property_optional_in_consumer_required_in_provider"
+	ReasonProviderResourceNotDeployedInEnvironment     BreakingReason = "provider_resource_not_deployed_in_environment"
 )
 
 const (
@@ -68,7 +68,7 @@ func NewPropertyBreakChange(
 ) BreakingChange {
 	details := map[string]string{detailKeyProperty: property}
 
-	if reason == ReasonTypeMismatch {
+	if reason == ReasonPropertyTypeMismatch {
 		details[detailKeyCheckedPropertyType] = checked.Properties[property].Type
 		details[detailKeyCounterpartPropertyType] = counterpart.Properties[property].Type
 	}

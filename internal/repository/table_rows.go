@@ -20,7 +20,7 @@ type tableRow struct {
 
 	ResourceID                 int64
 	ResourceDirection          string
-	ResourceKind               string
+	ResourceInteraction        string
 	ResourceConsumedProvider   sql.NullString
 	ResourceEndpoint           string
 	ResourceMethod             string
@@ -58,7 +58,7 @@ func (c *tableRow) toResourceModel() model.Resource {
 	resource := model.Resource{
 		ID:               c.ResourceID,
 		Direction:        model.Direction(c.ResourceDirection),
-		Kind:             model.ResourceKind(c.ResourceKind),
+		Interaction:      model.Interaction(c.ResourceInteraction),
 		Endpoint:         c.ResourceEndpoint,
 		Method:           c.ResourceMethod,
 		Properties:       make(map[string]model.Property),
