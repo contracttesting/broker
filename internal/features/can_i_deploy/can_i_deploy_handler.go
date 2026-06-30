@@ -61,13 +61,13 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 		return h.respondInvalidInput(ctx)
 	}
 
-	report := h.compatibilityChecker.Check(
+	compatibilityReport := h.compatibilityChecker.Check(
 		ctx.Context(),
 		contract,
 		environment,
 	)
 
-	for _, result := range report.Results {
+	for _, result := range compatibilityReport.Results {
 		h.compatibilityMatrixRepository.Insert(ctx.Context(), &model.CompatibilityMatrix{
 			ParticipantID:            contract.ParticipantID(),
 			Version:                  contract.Version,
@@ -79,9 +79,11 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 
 	return ctx.Status(fiber.StatusOK).JSON(CanIDeployResponseBody{
 		Message:           "Contract checked successfully",
-		Deployable:        len(report.Breaks) == 0,
+		Participant:       requestBody.Participant,
+		Version:           requestBody.Version,
 		Environment:       requestBody.Environment,
-		Incompatibilities: buildIncompatibilities(report, requestBody.Version),
+		Deployable:        len(compatibilityReport.Breaks) == 0,
+		Incompatibilities: buildIncompatibilities(compatibilityReport, requestBody.Participant, requestBody.Version),
 	})
 }
 

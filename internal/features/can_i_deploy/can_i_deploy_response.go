@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	checkedConsumer = "consumer"
-	checkedProvider = "provider"
+	roleConsumer = "consumer"
+	roleProvider = "provider"
 
 	interactionRequest  = "request"
 	interactionResponse = "response"
@@ -31,27 +31,27 @@ type edgeKey struct {
 
 // buildIncompatibilities reshapes the flat list of breaking changes detected by the
 // compatibility checker into one incompatibility per dependency edge, lifting the break
-// coordinates to the top level. It is a pure function: no database access.
+// coordinates to the top level. It is a pure function: no database access. The checked
+// side (the subject being deployed) takes its identity from the request; the counterpart
+// side takes its deployed identity from the stored resource.
 func buildIncompatibilities(
 	report *compatibility_checker.CompatibilityReport,
-	checkedVersion string,
+	participant string,
+	version string,
 ) []Incompatibility {
 	grouped := map[edgeKey][]Break{}
 
-	for _, breaks := range report.Breaks {
-		for _, breakingChange := range breaks {
-			key := edgeKeyOf(breakingChange, checkedVersion)
-			grouped[key] = append(grouped[key], breakOf(breakingChange))
-		}
+	for _, breakingChange := range report.Breaks {
+		key := edgeKeyOf(breakingChange, participant, version)
+		grouped[key] = append(grouped[key], breakOf(breakingChange))
 	}
 
 	incompatibilities := make([]Incompatibility, 0, len(grouped))
 	for key, breaks := range grouped {
 		sortBreaks(breaks)
 		incompatibilities = append(incompatibilities, Incompatibility{
-			Consumer:      Party{Name: key.consumerName, Version: key.consumerVersion},
-			Provider:      Party{Name: key.providerName, Version: key.providerVersion},
-			Checked:       key.checked,
+			Consumer:      Party{Participant: key.consumerName, Version: key.consumerVersion, Role: roleConsumer, Checked: key.checked == roleConsumer},
+			Provider:      Party{Participant: key.providerName, Version: key.providerVersion, Role: roleProvider, Checked: key.checked == roleProvider},
 			BreakingCount: len(breaks),
 			Breaks:        breaks,
 		})
@@ -63,33 +63,36 @@ func buildIncompatibilities(
 }
 
 // edgeKeyOf derives the dependency edge for a break. The checked side (the participant
-// being deployed) takes checkedVersion; the counterpart takes its resource's deployed
-// version, or null when there is no counterpart (resource-level reasons).
-func edgeKeyOf(b compatibility_checker.BreakingChange, checkedVersion string) edgeKey {
+// being deployed) takes the request's participant/version; the counterpart takes its
+// resource's deployed identity, or null when there is no counterpart (resource-level
+// reasons such as provider_resource_not_found).
+func edgeKeyOf(b compatibility_checker.ContractBreakingChange, participant string, version string) edgeKey {
 	checked := b.CheckedResource
 	counterpart := b.CounterpartResource
 
 	if checked.IsConsumer() {
+		providerName := checked.ConsumedProvider.String
 		providerVersion := null.String{}
 		if counterpart != nil {
-			providerVersion = counterpart.Version
+			providerName = counterpart.ParticipantName
+			providerVersion = counterpart.ParticipantVersion
 		}
 
 		return edgeKey{
-			consumerName:    checked.ParticipantName(),
-			consumerVersion: null.StringFrom(checkedVersion),
-			providerName:    checked.ConsumedProvider.String,
+			consumerName:    participant,
+			consumerVersion: null.StringFrom(version),
+			providerName:    providerName,
 			providerVersion: providerVersion,
-			checked:         checkedConsumer,
+			checked:         roleConsumer,
 		}
 	}
 
 	return edgeKey{
-		consumerName:    counterpart.ParticipantName(),
-		consumerVersion: counterpart.Version,
-		providerName:    checked.ParticipantName(),
-		providerVersion: null.StringFrom(checkedVersion),
-		checked:         checkedProvider,
+		consumerName:    counterpart.ParticipantName,
+		consumerVersion: counterpart.ParticipantVersion,
+		providerName:    participant,
+		providerVersion: null.StringFrom(version),
+		checked:         roleProvider,
 	}
 }
 
@@ -97,7 +100,7 @@ func edgeKeyOf(b compatibility_checker.BreakingChange, checkedVersion string) ed
 // checked resource (always present) and moving the property path out of details. The
 // reason keeps its full name so it stays explicit about whether the break is property-
 // level (property_*) or resource-level (provider_resource_*).
-func breakOf(b compatibility_checker.BreakingChange) Break {
+func breakOf(b compatibility_checker.ContractBreakingChange) Break {
 	checked := b.CheckedResource
 
 	return Break{
@@ -163,14 +166,14 @@ func sortIncompatibilities(incompatibilities []Incompatibility) {
 	sort.Slice(incompatibilities, func(i, j int) bool {
 		a, b := incompatibilities[i], incompatibilities[j]
 
-		if a.Consumer.Name != b.Consumer.Name {
-			return a.Consumer.Name < b.Consumer.Name
+		if a.Consumer.Participant != b.Consumer.Participant {
+			return a.Consumer.Participant < b.Consumer.Participant
 		}
-		if a.Provider.Name != b.Provider.Name {
-			return a.Provider.Name < b.Provider.Name
+		if a.Provider.Participant != b.Provider.Participant {
+			return a.Provider.Participant < b.Provider.Participant
 		}
-		if a.Checked != b.Checked {
-			return a.Checked < b.Checked
+		if a.Consumer.Checked != b.Consumer.Checked {
+			return a.Consumer.Checked
 		}
 		if a.Consumer.Version.ValueOrZero() != b.Consumer.Version.ValueOrZero() {
 			return a.Consumer.Version.ValueOrZero() < b.Consumer.Version.ValueOrZero()

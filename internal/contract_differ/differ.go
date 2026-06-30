@@ -16,7 +16,6 @@ type ContractDiff struct {
 
 type ResourceChange struct {
 	Kind       ChangeKind
-	Resource   model.Resource
 	Properties map[string]PropertyChange
 }
 
@@ -26,66 +25,63 @@ type PropertyChange struct {
 	After  model.Property
 }
 
-func Diff(oldContract *model.Contract, newContract *model.Contract) ContractDiff {
-	var upcoming map[string]model.Resource
+// ResourceProperties is one resource's properties keyed by path. The differ is
+// fed these maps keyed by resource hash so it never depends on the resource type
+// (uploaded vs counterpart) — it only compares properties under matching keys.
+type ResourceProperties = map[string]model.Property
 
-	if newContract != nil {
-		upcoming = newContract.Resources
-	}
+func Diff(old, next map[string]ResourceProperties) ContractDiff {
+	resourcesChanges := map[string]ResourceChange{}
 
-	resoucesChanges := map[string]ResourceChange{}
-
-	for resourceKey, oldResource := range oldContract.Resources {
-		newResource, exists := upcoming[resourceKey]
+	for resourceKey, oldProperties := range old {
+		nextProperties, exists := next[resourceKey]
 		// If the resource is not present in the new contract, it was removed
 		if !exists {
-			resoucesChanges[resourceKey] = removedResourceChange(oldResource)
+			resourcesChanges[resourceKey] = removedResourceChange(oldProperties)
 			continue
 		}
 
 		// If the resource is present in the new contract and is different, it was modified
-		if resourceChanges, resourceWasChanged := modifiedResourceChange(oldResource, newResource); resourceWasChanged {
-			resoucesChanges[resourceKey] = resourceChanges
+		if resourceChanges, resourceWasChanged := modifiedResourceChange(oldProperties, nextProperties); resourceWasChanged {
+			resourcesChanges[resourceKey] = resourceChanges
 		}
 	}
 
-	for newResourceKey, newResource := range upcoming {
+	for newResourceKey, newProperties := range next {
 		// If the resource is not present in the previous contract, it was added
-		if _, exists := oldContract.Resources[newResourceKey]; !exists {
-			resoucesChanges[newResourceKey] = addedResourceChange(newResource)
+		if _, exists := old[newResourceKey]; !exists {
+			resourcesChanges[newResourceKey] = addedResourceChange(newProperties)
 		}
 	}
 
-	return ContractDiff{Resources: resoucesChanges}
+	return ContractDiff{Resources: resourcesChanges}
 }
 
-func addedResourceChange(r model.Resource) ResourceChange {
-	propertiesChanged := make(map[string]PropertyChange, len(r.Properties))
+func addedResourceChange(properties ResourceProperties) ResourceChange {
+	propertiesChanged := make(map[string]PropertyChange, len(properties))
 
-	for propertyPath, property := range r.Properties {
-		// If the property is present in the previous resource, it was added
+	for propertyPath, property := range properties {
 		propertiesChanged[propertyPath] = PropertyChange{Kind: ChangeAdded, After: property}
 	}
 
-	return ResourceChange{Kind: ChangeAdded, Resource: r, Properties: propertiesChanged}
+	return ResourceChange{Kind: ChangeAdded, Properties: propertiesChanged}
 }
 
-func removedResourceChange(r model.Resource) ResourceChange {
-	propertiesChanged := make(map[string]PropertyChange, len(r.Properties))
+func removedResourceChange(properties ResourceProperties) ResourceChange {
+	propertiesChanged := make(map[string]PropertyChange, len(properties))
 
-	for propertyPath, property := range r.Properties {
-		// If the property is present in the previous resource, it was removed
+	for propertyPath, property := range properties {
 		propertiesChanged[propertyPath] = PropertyChange{Kind: ChangeRemoved, Before: property}
 	}
 
-	return ResourceChange{Kind: ChangeRemoved, Resource: r, Properties: propertiesChanged}
+	return ResourceChange{Kind: ChangeRemoved, Properties: propertiesChanged}
 }
 
-func modifiedResourceChange(prev, next model.Resource) (ResourceChange, bool) {
+func modifiedResourceChange(prev, next ResourceProperties) (ResourceChange, bool) {
 	propertiesChanged := map[string]PropertyChange{}
 
-	for propertyPath, property := range prev.Properties {
-		nextProperty, exists := next.Properties[propertyPath]
+	for propertyPath, property := range prev {
+		nextProperty, exists := next[propertyPath]
 		// If the property is not present in the next resource, it was removed
 		if !exists {
 			propertiesChanged[propertyPath] = PropertyChange{Kind: ChangeRemoved, Before: property}
@@ -98,9 +94,9 @@ func modifiedResourceChange(prev, next model.Resource) (ResourceChange, bool) {
 		}
 	}
 
-	for path, nextProperty := range next.Properties {
+	for path, nextProperty := range next {
 		// If the property is not present in the previous resource, it was added
-		if _, exists := prev.Properties[path]; !exists {
+		if _, exists := prev[path]; !exists {
 			propertiesChanged[path] = PropertyChange{Kind: ChangeAdded, After: nextProperty}
 		}
 	}
@@ -111,5 +107,5 @@ func modifiedResourceChange(prev, next model.Resource) (ResourceChange, bool) {
 	}
 
 	// If properties were changed, the resource was modified
-	return ResourceChange{Kind: ChangeModified, Resource: next, Properties: propertiesChanged}, true
+	return ResourceChange{Kind: ChangeModified, Properties: propertiesChanged}, true
 }

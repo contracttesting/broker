@@ -9,29 +9,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func consumerResource() *model.Resource {
-	return &model.Resource{
+func consumerResource() *model.CounterpartResource {
+	return &model.CounterpartResource{
 		Direction:          model.Consumes,
 		Interaction:        model.RestResponse,
 		ConsumedProvider:   null.StringFrom("api"),
 		Endpoint:           "/things",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
-		Participant:        &model.Participant{Name: "front"},
+		ParticipantName:    "front",
 		Properties: map[string]model.Property{
 			"$.id": {Path: "$.id", Type: "integer"},
 		},
 	}
 }
 
-func providerResource() *model.Resource {
-	return &model.Resource{
+func providerResource() *model.CounterpartResource {
+	return &model.CounterpartResource{
 		Direction:          model.Provides,
 		Interaction:        model.RestResponse,
 		Endpoint:           "/things",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
-		Participant:        &model.Participant{Name: "api"},
+		ParticipantName:    "api",
 		Properties: map[string]model.Property{
 			"$.id": {Path: "$.id", Type: "string"},
 		},
@@ -39,13 +39,13 @@ func providerResource() *model.Resource {
 }
 
 func TestProviderResourceNotFound(t *testing.T) {
-	consumer := &model.Resource{
+	consumer := &model.CounterpartResource{
 		Direction:        model.Consumes,
 		ConsumedProvider: null.StringFrom("accounts"),
-		Participant:      &model.Participant{Name: "front"},
+		ParticipantName:  "front",
 	}
 
-	change := compatibility_checker.NewBreakingChange(
+	change := compatibility_checker.NewContractBreakingChange(
 		consumer,
 		nil,
 		compatibility_checker.ReasonProviderResourceNotFound,
@@ -62,20 +62,20 @@ func TestProviderResourceNotFound(t *testing.T) {
 func TestPropertyBreakDetails(t *testing.T) {
 	consumerResponse := consumerResource()
 	providerResponse := providerResource()
-	consumerRequest := &model.Resource{
+	consumerRequest := &model.CounterpartResource{
 		Direction:        model.Consumes,
 		Interaction:      model.RestRequest,
 		ConsumedProvider: null.StringFrom("api"),
 		Endpoint:         "/things",
 		Method:           "post",
-		Participant:      &model.Participant{Name: "front"},
+		ParticipantName:  "front",
 	}
-	providerRequest := &model.Resource{
-		Direction:   model.Provides,
-		Interaction: model.RestRequest,
-		Endpoint:    "/things",
-		Method:      "post",
-		Participant: &model.Participant{Name: "api"},
+	providerRequest := &model.CounterpartResource{
+		Direction:       model.Provides,
+		Interaction:     model.RestRequest,
+		Endpoint:        "/things",
+		Method:          "post",
+		ParticipantName: "api",
 	}
 
 	typeMismatch := compatibility_checker.NewPropertyBreakChange(
@@ -149,10 +149,10 @@ func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 }
 
 func TestProviderNotDeployedDetails(t *testing.T) {
-	consumer := &model.Resource{
+	consumer := &model.CounterpartResource{
 		Direction:        model.Consumes,
 		ConsumedProvider: null.StringFrom("accounts"),
-		Participant:      &model.Participant{Name: "front"},
+		ParticipantName:  "front",
 	}
 
 	deployed := compatibility_checker.NewProviderNotDeployedBreakingChange(
@@ -171,7 +171,7 @@ func TestProviderNotDeployedDetails(t *testing.T) {
 	assert.Nil(t, nowhere.Details)
 }
 
-func TestReportAppendKeysByConsumerName(t *testing.T) {
+func TestReportAppendCollectsBreaksAsList(t *testing.T) {
 	consumerRes := consumerResource()
 	providerRes := providerResource()
 
@@ -183,9 +183,8 @@ func TestReportAppendKeysByConsumerName(t *testing.T) {
 	)
 
 	report := compatibility_checker.NewCompatibilityReport()
-	report.Append(consumerChecked)
-	report.Append(providerChecked)
+	report.AppendContractBreakChange(consumerChecked)
+	report.AppendContractBreakChange(providerChecked)
 
-	assert.Len(t, report.Breaks, 1)
-	assert.Len(t, report.Breaks["front"], 2)
+	assert.Len(t, report.Breaks, 2)
 }

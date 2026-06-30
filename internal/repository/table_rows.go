@@ -46,7 +46,7 @@ func (c *tableRow) toContractModel() *model.Contract {
 		ID:          c.ContractID,
 		Version:     c.ContractVersion,
 		RawContract: c.ContractRawContract,
-		Resources:   make(map[string]model.Resource),
+		Resources:   make(map[string]model.CounterpartResource),
 		Participant: &model.Participant{
 			ID:   c.ParticipantID,
 			Name: c.ParticipantName,
@@ -54,19 +54,16 @@ func (c *tableRow) toContractModel() *model.Contract {
 	}
 }
 
-func (c *tableRow) toResourceModel() model.Resource {
-	resource := model.Resource{
-		ID:               c.ResourceID,
+func (c *tableRow) toResourceModel() model.CounterpartResource {
+	resource := model.CounterpartResource{
 		Direction:        model.Direction(c.ResourceDirection),
 		Interaction:      model.Interaction(c.ResourceInteraction),
 		Endpoint:         c.ResourceEndpoint,
 		Method:           c.ResourceMethod,
 		Properties:       make(map[string]model.Property),
 		DeployedVersions: make(map[string]string),
-		Participant: &model.Participant{
-			ID:   c.ParticipantID,
-			Name: c.ParticipantName,
-		},
+		ParticipantName:  c.ParticipantName,
+		ParticipantID:    c.ParticipantID,
 	}
 
 	if c.ResourceConsumedProvider.String != "" {
@@ -78,10 +75,20 @@ func (c *tableRow) toResourceModel() model.Resource {
 	}
 
 	if c.ResourceVersion != "" {
-		resource.Version = null.StringFrom(c.ResourceVersion)
+		resource.ParticipantVersion = null.StringFrom(c.ResourceVersion)
 	}
 
 	return resource
+}
+
+// primaryHash returns the resource's own identity hash as stored in the row —
+// provider_hash for providers, consumer_hash for consumers. It is the loaded
+// contract's map key (no recompute).
+func (c *tableRow) primaryHash() string {
+	if c.ResourceDirection == string(model.Provides) {
+		return c.ResourceProviderHash
+	}
+	return c.ResourceConsumerHash.String
 }
 
 func (c *tableRow) toPropertyModel() model.Property {
@@ -105,22 +112,22 @@ type insertPropertyVersionRow struct {
 	ChangeType string
 }
 
-func newInsertPropertyVersionRowAdded(c *model.Contract, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(c, p, contract_differ.ChangeAdded)
+func newInsertPropertyVersionRowAdded(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
+	return newInsertPropertyVersionRow(contractID, propertyID, p, contract_differ.ChangeAdded)
 }
 
-func newInsertPropertyVersionRowModified(c *model.Contract, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(c, p, contract_differ.ChangeModified)
+func newInsertPropertyVersionRowModified(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
+	return newInsertPropertyVersionRow(contractID, propertyID, p, contract_differ.ChangeModified)
 }
 
-func newInsertPropertyVersionRowRemoved(c *model.Contract, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(c, p, contract_differ.ChangeRemoved)
+func newInsertPropertyVersionRowRemoved(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
+	return newInsertPropertyVersionRow(contractID, propertyID, p, contract_differ.ChangeRemoved)
 }
 
-func newInsertPropertyVersionRow(c *model.Contract, p model.Property, change contract_differ.ChangeKind) *insertPropertyVersionRow {
+func newInsertPropertyVersionRow(contractID, propertyID int64, p model.Property, change contract_differ.ChangeKind) *insertPropertyVersionRow {
 	return &insertPropertyVersionRow{
-		PropertyID: p.ID,
-		ContractID: c.ID,
+		PropertyID: propertyID,
+		ContractID: contractID,
 		Type:       nullString(p.Type),
 		Optional:   sql.NullBool{Bool: p.Optional, Valid: true},
 		ChangeType: string(change),
@@ -133,18 +140,18 @@ type insertResourceVersionRow struct {
 	ChangeType string
 }
 
-func newInsertResourceVersionRowAdded(c *model.Contract, r model.Resource) *insertResourceVersionRow {
+func newInsertResourceVersionRowAdded(contractID, resourceID int64) *insertResourceVersionRow {
 	return &insertResourceVersionRow{
-		ResourceID: r.ID,
-		ContractID: c.ID,
+		ResourceID: resourceID,
+		ContractID: contractID,
 		ChangeType: string(contract_differ.ChangeAdded),
 	}
 }
 
-func newInsertResourceVersionRowRemoved(c *model.Contract, r model.Resource) *insertResourceVersionRow {
+func newInsertResourceVersionRowRemoved(contractID, resourceID int64) *insertResourceVersionRow {
 	return &insertResourceVersionRow{
-		ResourceID: r.ID,
-		ContractID: c.ID,
+		ResourceID: resourceID,
+		ContractID: contractID,
 		ChangeType: string(contract_differ.ChangeRemoved),
 	}
 }

@@ -18,21 +18,14 @@ const (
 	ReasonProviderResourceNotDeployedInEnvironment     BreakingReason = "provider_resource_not_deployed_in_environment"
 )
 
-const (
-	detailKeyProperty                = "property"
-	detailKeyCheckedPropertyType     = "checked_property_type"
-	detailKeyCounterpartPropertyType = "counterpart_property_type"
-	detailKeyDeployedEnvironments    = "deployed_environments"
-)
-
-type BreakingChange struct {
-	CheckedResource     *model.Resource   `json:"checked_resource,omitempty"`
-	CounterpartResource *model.Resource   `json:"counterpart_resource,omitempty"`
-	Reason              BreakingReason    `json:"reason"`
-	Details             map[string]string `json:"details,omitempty"`
+type ContractBreakingChange struct {
+	CheckedResource     *model.CounterpartResource `json:"checked_resource,omitempty"`
+	CounterpartResource *model.CounterpartResource `json:"counterpart_resource,omitempty"`
+	Reason              BreakingReason             `json:"reason"`
+	Details             map[string]string          `json:"details,omitempty"`
 }
 
-func (b *BreakingChange) consumerResource() *model.Resource {
+func (b *ContractBreakingChange) ConsumerResource() *model.CounterpartResource {
 	if b.CheckedResource.IsConsumer() {
 		return b.CheckedResource
 	}
@@ -40,61 +33,61 @@ func (b *BreakingChange) consumerResource() *model.Resource {
 	return b.CounterpartResource
 }
 
-func (b *BreakingChange) ConsumerName() string {
-	return b.consumerResource().ParticipantName()
+func (b *ContractBreakingChange) ConsumerName() string {
+	return b.ConsumerResource().ParticipantName
 }
 
-func (b *BreakingChange) ProviderName() string {
-	return b.consumerResource().ConsumedProvider.String
+func (b *ContractBreakingChange) ProviderName() string {
+	return b.ConsumerResource().ConsumedProvider.String
 }
 
-func NewBreakingChange(
-	checked *model.Resource,
-	counterpart *model.Resource,
+func NewContractBreakingChange(
+	checkedResource *model.CounterpartResource,
+	counterpartResource *model.CounterpartResource,
 	reason BreakingReason,
-) BreakingChange {
-	return BreakingChange{
-		CheckedResource:     checked,
-		CounterpartResource: counterpart,
+) ContractBreakingChange {
+	return ContractBreakingChange{
+		CheckedResource:     checkedResource,
+		CounterpartResource: counterpartResource,
 		Reason:              reason,
 	}
 }
 
 func NewPropertyBreakChange(
-	checked *model.Resource,
-	counterpart *model.Resource,
+	checkedResource *model.CounterpartResource,
+	counterpartResource *model.CounterpartResource,
 	reason BreakingReason,
-	property string,
-) BreakingChange {
-	details := map[string]string{detailKeyProperty: property}
+	propertyPath string,
+) ContractBreakingChange {
+	details := map[string]string{"property": propertyPath}
 
 	if reason == ReasonPropertyTypeMismatch {
-		details[detailKeyCheckedPropertyType] = checked.Properties[property].Type
-		details[detailKeyCounterpartPropertyType] = counterpart.Properties[property].Type
+		details["checked_property_type"] = checkedResource.Properties[propertyPath].Type
+		details["counterpart_property_type"] = counterpartResource.Properties[propertyPath].Type
 	}
 
-	return BreakingChange{
-		CheckedResource:     checked,
-		CounterpartResource: counterpart,
+	return ContractBreakingChange{
+		CheckedResource:     checkedResource,
+		CounterpartResource: counterpartResource,
 		Reason:              reason,
 		Details:             details,
 	}
 }
 
 func NewProviderNotDeployedBreakingChange(
-	consumer *model.Resource,
+	consumerResource *model.CounterpartResource,
 	deployedEnvironments []string,
-) BreakingChange {
+) ContractBreakingChange {
 	var details map[string]string
 
 	if len(deployedEnvironments) > 0 {
 		details = map[string]string{
-			detailKeyDeployedEnvironments: strings.Join(deployedEnvironments, ", "),
+			"deployed_environments": strings.Join(deployedEnvironments, ", "),
 		}
 	}
 
-	return BreakingChange{
-		CheckedResource: consumer,
+	return ContractBreakingChange{
+		CheckedResource: consumerResource,
 		Reason:          ReasonProviderResourceNotDeployedInEnvironment,
 		Details:         details,
 	}

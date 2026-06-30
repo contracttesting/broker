@@ -1,6 +1,8 @@
 package can_i_deploy
 
-import "github.com/guregu/null"
+import (
+	"github.com/guregu/null"
+)
 
 const ContractNotFound = "contract not found"
 const ParticipantNotFound = "participant not found"
@@ -12,8 +14,10 @@ type CanIDeployRequestBody struct {
 }
 
 type Party struct {
-	Name    string      `json:"name"`
-	Version null.String `json:"version"`
+	Participant string      `json:"participant"`
+	Version     null.String `json:"version"`
+	Role        string      `json:"role"`
+	Checked     bool        `json:"checked"`
 }
 
 type Break struct {
@@ -29,15 +33,16 @@ type Break struct {
 type Incompatibility struct {
 	Consumer      Party   `json:"consumer"`
 	Provider      Party   `json:"provider"`
-	Checked       string  `json:"checked"`
 	BreakingCount int     `json:"breakingCount"`
 	Breaks        []Break `json:"breaks"`
 }
 
 type CanIDeployResponseBody struct {
 	Message           string            `json:"message"`
-	Deployable        bool              `json:"deployable"`
+	Participant       string            `json:"participant"`
+	Version           string            `json:"version"`
 	Environment       string            `json:"environment"`
+	Deployable        bool              `json:"deployable"`
 	Incompatibilities []Incompatibility `json:"incompatibilities"`
 }
 

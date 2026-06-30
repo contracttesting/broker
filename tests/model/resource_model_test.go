@@ -8,33 +8,29 @@ import (
 )
 
 func TestResource_ProviderHash_BridgesConsumerAndProvider(t *testing.T) {
-	consumer := model.NewConsumedRestResponse("pets-service", "/pets", "get", "200", nil)
-	provider := model.NewProvidedRestResponse("/pets", "get", "200", nil)
-	provider.AddParticipant(model.NewParticipant("pets-service"))
+	consumer := model.NewRestResponseConsumer("pets-service", "/pets", "get", "200", nil)
+	provider := model.NewRestResponseProvider("/pets", "get", "200", nil)
 
-	assert.Equal(t, consumer.ProviderHash(), provider.ProviderHash())
+	// A consumer derives the provider hash from the provider it consumes; the
+	// provider derives it from its own participant name. They must match.
+	assert.Equal(t, consumer.ProviderHash("web-app"), provider.ProviderHash("pets-service"))
 }
 
 func TestResource_ConsumerHash_EmptyForProvidedResource(t *testing.T) {
-	provider := model.NewProvidedRestResponse("/pets", "get", "200", nil)
-	provider.AddParticipant(model.NewParticipant("pets-service"))
+	provider := model.NewRestResponseProvider("/pets", "get", "200", nil)
 
-	assert.Empty(t, provider.ConsumerHash())
+	assert.Empty(t, provider.ConsumerHash("pets-service"))
 }
 
 func TestResource_PrimaryHash_ConsumerDirection_EqualsConsumerHash(t *testing.T) {
-	consumer := model.NewConsumedRestResponse("pets-service", "/pets", "get", "200", nil)
-	consumer.AddParticipant(model.NewParticipant("web-app"))
+	consumer := model.NewRestResponseConsumer("pets-service", "/pets", "get", "200", nil)
 
-	assert.Equal(t, consumer.ConsumerHash(), consumer.PrimaryHash())
+	assert.Equal(t, consumer.ConsumerHash("web-app"), consumer.PrimaryHash("web-app"))
 }
 
 func TestResource_ConsumerHash_RestResponse_IncludesStatusCode(t *testing.T) {
-	a := model.NewConsumedRestResponse("pets-service", "/pets", "get", "200", nil)
-	a.AddParticipant(model.NewParticipant("web-app"))
+	a := model.NewRestResponseConsumer("pets-service", "/pets", "get", "200", nil)
+	b := model.NewRestResponseConsumer("pets-service", "/pets", "get", "404", nil)
 
-	b := model.NewConsumedRestResponse("pets-service", "/pets", "get", "404", nil)
-	b.AddParticipant(model.NewParticipant("web-app"))
-
-	assert.NotEqual(t, a.ConsumerHash(), b.ConsumerHash())
+	assert.NotEqual(t, a.ConsumerHash("web-app"), b.ConsumerHash("web-app"))
 }

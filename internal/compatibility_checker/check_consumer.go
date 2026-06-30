@@ -11,50 +11,50 @@ import (
 
 func (c *CompatibilityChecker) checkConsumer(
 	ctx context.Context,
-	consumer model.Resource,
+	consumerResource model.CounterpartResource,
 	environment *model.Environment,
 	report *CompatibilityReport,
 ) {
-	provider, err := c.repository.LoadProviderResourceOfConsumer(ctx, consumer)
+	providerResource, err := c.repository.GetProviderResourceByConsumerResource(ctx, consumerResource)
 
 	if errors.Is(err, repository.ErrProviderResourceNotFound) {
-		report.Append(NewBreakingChange(
-			&consumer,
+		report.AppendContractBreakChange(NewContractBreakingChange(
+			&consumerResource,
 			nil,
 			ReasonProviderResourceNotFound,
 		))
 
-		report.AppendResult(consumer.ConsumedProvider.String, CompatibilityResult{
+		report.AppendResult(consumerResource.ConsumedProvider.String, CompatibilityResult{
 			Deployable: false,
 		})
 
 		return
 	}
 
-	version, deployed := provider.DeployedVersionIn(environment.Name)
+	version, deployed := providerResource.DeployedVersionIn(environment.Name)
 	if !deployed {
-		report.Append(NewProviderNotDeployedBreakingChange(
-			&consumer,
-			provider.DeployedEnvironments(),
+		report.AppendContractBreakChange(NewProviderNotDeployedBreakingChange(
+			&consumerResource,
+			providerResource.DeployedEnvironments(),
 		))
 
-		report.AppendResult(consumer.ConsumedProvider.String, CompatibilityResult{
+		report.AppendResult(consumerResource.ConsumedProvider.String, CompatibilityResult{
 			Deployable: false,
 		})
 
 		return
 	}
 
-	provider.Version = null.StringFrom(version)
+	providerResource.ParticipantVersion = null.StringFrom(version)
 
-	breaks := checkResources(&consumer, &provider)
+	breaks := checkResources(&consumerResource, &providerResource)
 	for _, breakingChange := range breaks {
-		report.Append(breakingChange)
+		report.AppendContractBreakChange(breakingChange)
 	}
 
-	report.AppendResult(consumer.ConsumedProvider.String, CompatibilityResult{
-		CounterpartParticipantID: provider.ParticipantID(),
-		CounterpartVersion:       provider.Version.String,
+	report.AppendResult(consumerResource.ConsumedProvider.String, CompatibilityResult{
+		CounterpartParticipantID: providerResource.ParticipantID,
+		CounterpartVersion:       providerResource.ParticipantVersion.String,
 		Deployable:               len(breaks) == 0,
 	})
 }

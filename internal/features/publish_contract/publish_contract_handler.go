@@ -46,7 +46,7 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondParticipantNotFound(ctx)
 	}
 
-	contract := model.NewContract(participant, version, string(requestBody.Contract))
+	contract := model.NewUploadedContract(participant, version, string(requestBody.Contract))
 	if err := dslContract.HydrateContract(contract); err != nil {
 		return ctr.respondInvalidEndpoint(ctx, err)
 	}
@@ -69,7 +69,7 @@ func (ctr *PublishContractHandler) respondParticipantNotFound(ctx fiber.Ctx) err
 	})
 }
 
-func (ctr *PublishContractHandler) upsert(ctx fiber.Ctx, contract *model.Contract) {
+func (ctr *PublishContractHandler) upsert(ctx fiber.Ctx, contract *model.UploadedContract) {
 	if ctr.contractRepository.HasContractsForParticipant(ctx.Context(), contract.ParticipantID()) {
 		ctr.contractRepository.Update(ctx.Context(), contract)
 

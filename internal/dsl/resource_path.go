@@ -75,9 +75,9 @@ func (rp *ResourcePath) ExtractNamedArgs(regex *regexp.Regexp) (map[string]strin
 	return args, true
 }
 
-func (rp *ResourcePath) ToResource(properties map[string]model.Property) *model.Resource {
+func (rp *ResourcePath) ToResource(properties map[string]model.Property) *model.UploadedResource {
 	if args, ok := rp.ExtractNamedArgs(consumerRestRequestRegex); ok {
-		return model.NewConsumedRestRequest(
+		return model.NewRestRequestConsumer(
 			args["provider"],
 			args["endpoint"],
 			args["method"],
@@ -86,7 +86,7 @@ func (rp *ResourcePath) ToResource(properties map[string]model.Property) *model.
 	}
 
 	if args, ok := rp.ExtractNamedArgs(consumerRestResponseRegex); ok {
-		return model.NewConsumedRestResponse(
+		return model.NewRestResponseConsumer(
 			args["provider"],
 			args["endpoint"],
 			args["method"],
@@ -96,7 +96,7 @@ func (rp *ResourcePath) ToResource(properties map[string]model.Property) *model.
 	}
 
 	if args, ok := rp.ExtractNamedArgs(providerRestRequestRegex); ok {
-		return model.NewProvidedRestRequest(
+		return model.NewRestRequestProvider(
 			args["endpoint"],
 			args["method"],
 			properties,
@@ -104,7 +104,7 @@ func (rp *ResourcePath) ToResource(properties map[string]model.Property) *model.
 	}
 
 	if args, ok := rp.ExtractNamedArgs(providerRestResponseRegex); ok {
-		return model.NewProvidedRestResponse(
+		return model.NewRestResponseProvider(
 			args["endpoint"],
 			args["method"],
 			args["status"],

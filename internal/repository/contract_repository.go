@@ -371,7 +371,7 @@ func (r *ContractRepository) LoadChecksumForVersion(ctx context.Context, partici
 
 func (r *ContractRepository) Create(
 	ctx context.Context,
-	contract *model.Contract,
+	contract *model.UploadedContract,
 ) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -383,12 +383,12 @@ func (r *ContractRepository) Create(
 	r.insertContract(ctx, tx, contract)
 
 	for _, resource := range contract.Resources {
-		r.insertResource(ctx, tx, &resource)
-		r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(contract, resource))
+		resourceID := r.insertResource(ctx, tx, contract.Participant, &resource)
+		r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(contract.ID, resourceID))
 
 		for _, property := range resource.Properties {
-			r.insertNewProperty(ctx, tx, resource.ID, &property)
-			r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(contract, property))
+			propertyID := r.insertNewProperty(ctx, tx, resourceID, &property)
+			r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(contract.ID, propertyID, property))
 		}
 	}
 
@@ -399,7 +399,7 @@ func (r *ContractRepository) Create(
 
 func (r *ContractRepository) Update(
 	ctx context.Context,
-	next *model.Contract,
+	next *model.UploadedContract,
 ) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -408,9 +408,9 @@ func (r *ContractRepository) Update(
 
 	defer tx.Rollback(ctx)
 
-	contract := r.LoadLatestContractByName(ctx, next.Participant.Name)
+	old := r.LoadLatestContractByName(ctx, next.Participant.Name)
 
-	diff := contract_differ.Diff(contract, next)
+	diff := contract_differ.Diff(loadedProperties(old), uploadedProperties(next))
 
 	if len(diff.Resources) == 0 {
 		if err := tx.Commit(ctx); err != nil {
@@ -420,49 +420,52 @@ func (r *ContractRepository) Update(
 		return
 	}
 
-	next.ID = contract.ID
-
 	r.insertContract(ctx, tx, next)
 
-	for _, resourceChange := range diff.Resources {
+	for key, resourceChange := range diff.Resources {
 		switch resourceChange.Kind {
 		case contract_differ.ChangeAdded:
-			resource := resourceChange.Resource
-			r.insertResource(ctx, tx, &resource)
-			r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(next, resource))
+			resource := next.Resources[key]
+			resourceID := r.insertResource(ctx, tx, next.Participant, &resource)
+			r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(next.ID, resourceID))
 
 			for _, property := range resource.Properties {
-				r.insertNewProperty(ctx, tx, resource.ID, &property)
-				r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next, property))
+				propertyID := r.insertNewProperty(ctx, tx, resourceID, &property)
+				r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
 			}
 
 		case contract_differ.ChangeModified:
-			resource := contract.Resources[resourceChange.Resource.PrimaryHash()]
+			resource := next.Resources[key]
+			resourceID, _ := r.findResourceIDByHash(ctx, tx, key, resource.Direction)
 
 			for _, propertyChange := range resourceChange.Properties {
 				switch propertyChange.Kind {
 				case contract_differ.ChangeAdded:
 					property := propertyChange.After
-					r.insertNewProperty(ctx, tx, resource.ID, &property)
-					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next, property))
+					propertyID := r.insertNewProperty(ctx, tx, resourceID, &property)
+					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
 
 				case contract_differ.ChangeModified:
 					property := propertyChange.After
-					property.ID = resource.Properties[propertyChange.After.Path].ID
-					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowModified(next, property))
+					propertyID, _ := r.findPropertyID(ctx, tx, resourceID, property.Path)
+					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowModified(next.ID, propertyID, property))
 
 				case contract_differ.ChangeRemoved:
-					property := resource.Properties[propertyChange.Before.Path]
-					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next, property))
+					property := propertyChange.Before
+					propertyID, _ := r.findPropertyID(ctx, tx, resourceID, property.Path)
+					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
 				}
 			}
 
 		case contract_differ.ChangeRemoved:
-			resource := contract.Resources[resourceChange.Resource.PrimaryHash()]
-			r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowRemoved(next, resource))
+			resource := old.Resources[key]
+			resourceID, _ := r.findResourceIDByHash(ctx, tx, key, resource.Direction)
+			r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowRemoved(next.ID, resourceID))
 
-			for _, property := range resource.Properties {
-				r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next, property))
+			for _, propertyChange := range resourceChange.Properties {
+				property := propertyChange.Before
+				propertyID, _ := r.findPropertyID(ctx, tx, resourceID, property.Path)
+				r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
 			}
 		}
 	}
@@ -472,10 +475,28 @@ func (r *ContractRepository) Update(
 	}
 }
 
+// loadedProperties / uploadedProperties project each contract's resources to the
+// shape the differ needs: properties keyed by the resource's identity hash.
+func loadedProperties(contract *model.Contract) map[string]contract_differ.ResourceProperties {
+	out := make(map[string]contract_differ.ResourceProperties, len(contract.Resources))
+	for key, resource := range contract.Resources {
+		out[key] = resource.Properties
+	}
+	return out
+}
+
+func uploadedProperties(contract *model.UploadedContract) map[string]contract_differ.ResourceProperties {
+	out := make(map[string]contract_differ.ResourceProperties, len(contract.Resources))
+	for key, resource := range contract.Resources {
+		out[key] = resource.Properties
+	}
+	return out
+}
+
 func (r *ContractRepository) insertContract(
 	ctx context.Context,
 	tx pgx.Tx,
-	contract *model.Contract,
+	contract *model.UploadedContract,
 ) {
 	if err := tx.QueryRow(
 		ctx,
@@ -492,11 +513,11 @@ func (r *ContractRepository) insertContract(
 func (r *ContractRepository) insertResource(
 	ctx context.Context,
 	tx pgx.Tx,
-	resource *model.Resource,
-) {
-	if id, ok := r.findExistingResourceID(ctx, tx, resource); ok {
-		resource.ID = id
-		return
+	participant *model.Participant,
+	resource *model.UploadedResource,
+) int64 {
+	if id, ok := r.findResourceIDByHash(ctx, tx, resource.PrimaryHash(participant.Name), resource.Direction); ok {
+		return id
 	}
 
 	statusCode := sql.NullString{
@@ -509,20 +530,14 @@ func (r *ContractRepository) insertResource(
 		Valid:  resource.ConsumedProvider.Valid,
 	}
 
-	providerHash := sql.NullString{
-		String: resource.ProviderHash(),
-		Valid:  resource.ProviderHash() != "",
-	}
+	providerHash := nullString(resource.ProviderHash(participant.Name))
+	consumerHash := nullString(resource.ConsumerHash(participant.Name))
 
-	consumerHash := sql.NullString{
-		String: resource.ConsumerHash(),
-		Valid:  resource.ConsumerHash() != "",
-	}
-
+	var id int64
 	if err := tx.QueryRow(
 		ctx,
 		insertResourceQuery,
-		resource.ParticipantID(),
+		participant.ID,
 		resource.Direction.String(),
 		resource.Interaction.String(),
 		provider,
@@ -531,23 +546,22 @@ func (r *ContractRepository) insertResource(
 		statusCode,
 		providerHash,
 		consumerHash,
-	).Scan(&resource.ID); err != nil {
+	).Scan(&id); err != nil {
 		panic(fmt.Errorf("error inserting resource: %w", err))
 	}
+
+	return id
 }
 
-func (r *ContractRepository) findExistingResourceID(
+func (r *ContractRepository) findResourceIDByHash(
 	ctx context.Context,
 	tx pgx.Tx,
-	resource *model.Resource,
+	hash string,
+	direction model.Direction,
 ) (int64, bool) {
-	var query, hash string
-	if resource.Direction == model.Provides {
+	query := findResourceIDByConsumerHashQuery
+	if direction == model.Provides {
 		query = findResourceIDByProviderHashQuery
-		hash = resource.ProviderHash()
-	} else {
-		query = findResourceIDByConsumerHashQuery
-		hash = resource.ConsumerHash()
 	}
 
 	var id int64
@@ -566,25 +580,39 @@ func (r *ContractRepository) insertNewProperty(
 	tx pgx.Tx,
 	resourceID int64,
 	property *model.Property,
-) {
-	var existingID int64
-	err := tx.QueryRow(ctx, findPropertyIDByResourceAndPathQuery, resourceID, property.Path).Scan(&existingID)
-	if err == nil {
-		property.ID = existingID
-		return
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		panic(fmt.Errorf("error looking up existing property: %w", err))
+) int64 {
+	if id, ok := r.findPropertyID(ctx, tx, resourceID, property.Path); ok {
+		return id
 	}
 
+	var id int64
 	if err := tx.QueryRow(
 		ctx,
 		insertPropertyQuery,
 		resourceID,
 		property.Path,
-	).Scan(&property.ID); err != nil {
+	).Scan(&id); err != nil {
 		panic(fmt.Errorf("error inserting property: %w", err))
 	}
+
+	return id
+}
+
+func (r *ContractRepository) findPropertyID(
+	ctx context.Context,
+	tx pgx.Tx,
+	resourceID int64,
+	path string,
+) (int64, bool) {
+	var id int64
+	err := tx.QueryRow(ctx, findPropertyIDByResourceAndPathQuery, resourceID, path).Scan(&id)
+	if err == nil {
+		return id, true
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false
+	}
+	panic(fmt.Errorf("error looking up existing property: %w", err))
 }
 
 func (r *ContractRepository) insertPropertyVersion(
@@ -646,6 +674,7 @@ func (r *ContractRepository) LoadContractByNameAndVersion(
 	if err != nil {
 		panic(fmt.Errorf("error loading contract tree by name and version: %w", err))
 	}
+
 	defer rows.Close()
 
 	return scanContractTree(rows)
@@ -694,7 +723,7 @@ func scanContractTree(rows pgx.Rows) (*model.Contract, bool) {
 		}
 
 		resource := row.toResourceModel()
-		key := resource.PrimaryHash()
+		key := row.primaryHash()
 		if _, seen := contract.Resources[key]; !seen {
 			contract.Resources[key] = resource
 		}
@@ -736,15 +765,20 @@ func (r *ContractRepository) FindCurrentConsumersOfProviderInEnv(
 	return consumers
 }
 
-func (r *ContractRepository) LoadProviderResourceOfConsumer(
+func (r *ContractRepository) GetProviderResourceByConsumerResource(
 	ctx context.Context,
-	consumer model.Resource,
-) (model.Resource, error) {
+	consumer model.CounterpartResource,
+) (model.CounterpartResource, error) {
+	parts := []string{consumer.ConsumedProvider.String, consumer.Endpoint, consumer.Method}
+	if consumer.Interaction == model.RestResponse {
+		parts = append(parts, consumer.ResponseStatusCode.String)
+	}
+
 	rows, err := r.pool.Query(
 		ctx,
 		loadProviderResourceWithDeploymentsQuery,
 		string(model.Provides),
-		consumer.ProviderHash(),
+		model.Hash(parts...),
 	)
 
 	if err != nil {
@@ -754,7 +788,7 @@ func (r *ContractRepository) LoadProviderResourceOfConsumer(
 	defer rows.Close()
 
 	var found bool
-	var provider model.Resource
+	var provider model.CounterpartResource
 
 	for rows.Next() {
 		var row tableRow
@@ -795,22 +829,27 @@ func (r *ContractRepository) LoadProviderResourceOfConsumer(
 	}
 
 	if !found {
-		return model.Resource{}, ErrProviderResourceNotFound
+		return model.CounterpartResource{}, ErrProviderResourceNotFound
 	}
 
 	return provider, nil
 }
 
-func (r *ContractRepository) FindConsumersOfProviderAndEnvironment(
+func (r *ContractRepository) GetConsumersResourcesByProviderResourceAndEnvironment(
 	ctx context.Context,
-	provider model.Resource,
+	provider model.CounterpartResource,
 	environment *model.Environment,
-) []model.Resource {
+) []model.CounterpartResource {
+	parts := []string{provider.ParticipantName, provider.Endpoint, provider.Method}
+	if provider.Interaction == model.RestResponse {
+		parts = append(parts, provider.ResponseStatusCode.String)
+	}
+
 	rows, err := r.pool.Query(
 		ctx,
 		findResourcesByDirectionAndProviderHashQuery,
 		string(model.Consumes),
-		provider.ProviderHash(),
+		model.Hash(parts...),
 		environment.ID,
 	)
 
@@ -820,7 +859,7 @@ func (r *ContractRepository) FindConsumersOfProviderAndEnvironment(
 
 	defer rows.Close()
 
-	consumersMap := make(map[int64]model.Resource)
+	consumersMap := make(map[int64]model.CounterpartResource)
 
 	for rows.Next() {
 		var row tableRow
@@ -854,7 +893,7 @@ func (r *ContractRepository) FindConsumersOfProviderAndEnvironment(
 		consumersMap[row.ResourceID].Properties[row.PropertyPath] = row.toPropertyModel()
 	}
 
-	consumers := make([]model.Resource, 0, len(consumersMap))
+	consumers := make([]model.CounterpartResource, 0, len(consumersMap))
 
 	for _, consumer := range consumersMap {
 		consumers = append(consumers, consumer)

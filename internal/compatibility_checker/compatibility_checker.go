@@ -19,12 +19,12 @@ func NewCompatibilityChecker(repository *repository.ContractRepository) *Compati
 
 func (c *CompatibilityChecker) Check(
 	ctx context.Context,
-	uploaded *model.Contract,
+	contract *model.Contract,
 	environment *model.Environment,
 ) *CompatibilityReport {
 	report := NewCompatibilityReport()
 
-	for _, resource := range uploaded.Resources {
+	for _, resource := range contract.Resources {
 		switch resource.Direction {
 		case model.Consumes:
 			c.checkConsumer(ctx, resource, environment, report)

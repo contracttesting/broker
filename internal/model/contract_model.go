@@ -7,49 +7,42 @@ import (
 	"strings"
 )
 
-type Contract struct {
+// UploadedContract is built by hydrating a published contract. It owns the
+// participant and supplies the participant name wherever a resource hash is
+// needed (the in-memory map key and the checksum).
+type UploadedContract struct {
 	ID          int64
 	Version     string
 	RawContract string
-	Resources   map[string]Resource
+	Resources   map[string]UploadedResource
 	Participant *Participant
 }
 
-func NewContract(participant *Participant, version string, rawContract string) *Contract {
-	return &Contract{
+func NewUploadedContract(participant *Participant, version string, rawContract string) *UploadedContract {
+	return &UploadedContract{
 		Participant: participant,
 		Version:     version,
 		RawContract: rawContract,
 	}
 }
 
-func (contract *Contract) ParticipantID() int64 {
+func (contract *UploadedContract) ParticipantID() int64 {
 	return contract.Participant.ID
 }
 
-func (contract *Contract) AddResource(resource *Resource) {
+func (contract *UploadedContract) AddResource(resource *UploadedResource) {
 	if contract.Resources == nil {
-		contract.Resources = make(map[string]Resource)
+		contract.Resources = make(map[string]UploadedResource)
 	}
 
-	resource.AddParticipant(contract.Participant)
-
-	contract.Resources[resource.PrimaryHash()] = *resource
+	contract.Resources[resource.PrimaryHash(contract.Participant.Name)] = *resource
 }
 
-func (resouce Resource) PrimaryHash() string {
-	if resouce.Direction == Provides {
-		return resouce.ProviderHash()
-	}
-
-	return resouce.ConsumerHash()
-}
-
-func (contract *Contract) CanonicalKey() string {
+func (contract *UploadedContract) CanonicalKey() string {
 	resourceKeys := make([]string, 0, len(contract.Resources))
 
 	for _, resource := range contract.Resources {
-		resourceKeys = append(resourceKeys, resource.CanonicalKey())
+		resourceKeys = append(resourceKeys, resource.CanonicalKey(contract.Participant.Name))
 	}
 
 	sort.Strings(resourceKeys)
@@ -60,7 +53,21 @@ func (contract *Contract) CanonicalKey() string {
 	}, ";;")
 }
 
-func (contract *Contract) Checksum() string {
+func (contract *UploadedContract) Checksum() string {
 	sum := sha256.Sum256([]byte(contract.CanonicalKey()))
 	return hex.EncodeToString(sum[:])
+}
+
+// Contract is a contract loaded from the database. Its resources are
+// CounterpartResource values keyed by their stored identity hash.
+type Contract struct {
+	ID          int64
+	Version     string
+	RawContract string
+	Resources   map[string]CounterpartResource
+	Participant *Participant
+}
+
+func (contract *Contract) ParticipantID() int64 {
+	return contract.Participant.ID
 }

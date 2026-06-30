@@ -8,21 +8,21 @@ import (
 
 func (c *CompatibilityChecker) checkProvider(
 	ctx context.Context,
-	provider model.Resource,
+	providerResource model.CounterpartResource,
 	environment *model.Environment,
 	report *CompatibilityReport,
 ) {
-	consumers := c.repository.FindConsumersOfProviderAndEnvironment(ctx, provider, environment)
+	consumers := c.repository.GetConsumersResourcesByProviderResourceAndEnvironment(ctx, providerResource, environment)
 
-	for _, consumer := range consumers {
-		consumerBreaks := checkResources(&provider, &consumer)
+	for _, consumerResource := range consumers {
+		consumerBreaks := checkResources(&providerResource, &consumerResource)
 		for _, breakingChange := range consumerBreaks {
-			report.Append(breakingChange)
+			report.AppendContractBreakChange(breakingChange)
 		}
 
-		report.AppendResult(consumer.ParticipantName(), CompatibilityResult{
-			CounterpartParticipantID: consumer.ParticipantID(),
-			CounterpartVersion:       consumer.Version.String,
+		report.AppendResult(consumerResource.ParticipantName, CompatibilityResult{
+			CounterpartParticipantID: consumerResource.ParticipantID,
+			CounterpartVersion:       consumerResource.ParticipantVersion.String,
 			Deployable:               len(consumerBreaks) == 0,
 		})
 	}

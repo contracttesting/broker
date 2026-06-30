@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newContractWithOnePetsResource(participantName string) *model.Contract {
-	contract := model.NewContract(model.NewParticipant(participantName), "1", "raw")
-	contract.AddResource(model.NewProvidedRestResponse("/pets", "get", "200", map[string]model.Property{
+func newContractWithOnePetsResource(participantName string) *model.UploadedContract {
+	contract := model.NewUploadedContract(model.NewParticipant(participantName), "1", "raw")
+	contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
 	}))
@@ -27,7 +27,7 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 	a := newContractWithOnePetsResource("pets-service")
 
 	b := newContractWithOnePetsResource("pets-service")
-	b.AddResource(model.NewProvidedRestResponse("/pets/*", "get", "200", map[string]model.Property{
+	b.AddResource(model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
 		"$": model.NewProperty("$", "object", false),
 	}))
 

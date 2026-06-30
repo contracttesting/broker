@@ -8,13 +8,13 @@ type CompatibilityResult struct {
 
 type CompatibilityReport struct {
 	Results map[string]CompatibilityResult `json:"results"`
-	Breaks  map[string][]BreakingChange    `json:"breaks"`
+	Breaks  []ContractBreakingChange       `json:"breaks"`
 }
 
 func NewCompatibilityReport() *CompatibilityReport {
 	return &CompatibilityReport{
 		Results: make(map[string]CompatibilityResult),
-		Breaks:  make(map[string][]BreakingChange),
+		Breaks:  []ContractBreakingChange{},
 	}
 }
 
@@ -37,10 +37,6 @@ func (r *CompatibilityReport) AppendResult(dependency string, result Compatibili
 	r.Results[dependency] = existing
 }
 
-func (r *CompatibilityReport) Append(b BreakingChange) {
-	if r.Breaks == nil {
-		r.Breaks = make(map[string][]BreakingChange)
-	}
-
-	r.Breaks[b.ConsumerName()] = append(r.Breaks[b.ConsumerName()], b)
+func (r *CompatibilityReport) AppendContractBreakChange(b ContractBreakingChange) {
+	r.Breaks = append(r.Breaks, b)
 }

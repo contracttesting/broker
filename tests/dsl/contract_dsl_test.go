@@ -61,12 +61,12 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(happyContractJSON), &dslContract))
 
-	contract := model.NewContract(model.NewParticipant("petstore-app"), "1", happyContractJSON)
+	contract := model.NewUploadedContract(model.NewParticipant("petstore-app"), "1", happyContractJSON)
 	require.NoError(t, dslContract.HydrateContract(contract))
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
@@ -183,13 +183,13 @@ const refResolvesJSON = `{
   }
 }`
 
-func hydrate(t *testing.T, raw string) *model.Contract {
+func hydrate(t *testing.T, raw string) *model.UploadedContract {
 	t.Helper()
 
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
-	contract := model.NewContract(model.NewParticipant("petstore-app"), "1", raw)
+	contract := model.NewUploadedContract(model.NewParticipant("petstore-app"), "1", raw)
 	require.NoError(t, dslContract.HydrateContract(contract))
 	return contract
 }
@@ -199,7 +199,7 @@ func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing
 
 	require.Len(t, contract.Resources, 2)
 
-	var request, response model.Resource
+	var request, response model.UploadedResource
 	for _, r := range contract.Resources {
 		switch r.Interaction {
 		case model.RestRequest:
@@ -227,7 +227,7 @@ func TestHydrateContract_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
@@ -246,7 +246,7 @@ func TestHydrateContract_PrimitiveTopLevel_EmitsRootPrimitive(t *testing.T) {
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
@@ -261,7 +261,7 @@ func TestHydrateContract_ArrayOfObjects_WalksItemsViaSchemaPointer(t *testing.T)
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
@@ -279,7 +279,7 @@ func TestHydrateContract_RefResolves_SubstitutesReferencedSchema(t *testing.T) {
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
@@ -294,7 +294,7 @@ func TestHydrateContract_Unhappy_PanicsOnSchemaTooDeep(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(cyclicContractJSON), &dslContract))
 
-	contract := model.NewContract(model.NewParticipant("petstore-app"), "1", cyclicContractJSON)
+	contract := model.NewUploadedContract(model.NewParticipant("petstore-app"), "1", cyclicContractJSON)
 
 	assert.PanicsWithValue(
 		t,
