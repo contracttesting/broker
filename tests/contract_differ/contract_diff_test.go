@@ -11,7 +11,7 @@ import (
 const participantName = "pets-service"
 
 func newContractWithOnePetsResource() *model.UploadedContract {
-	contract := model.NewUploadedContract(model.NewParticipant(participantName), "1", "raw")
+	contract := model.NewUploadedContract(0, participantName, "1", "raw")
 	contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
@@ -32,7 +32,7 @@ func props(contract *model.UploadedContract) map[string]contract_differ.Resource
 func TestDiff_NoChanges_BetweenEquivalentContracts(t *testing.T) {
 	prev := newContractWithOnePetsResource()
 	next := newContractWithOnePetsResource()
-	diff := contract_differ.Diff(props(prev), props(next))
+	diff := contract_differ.DiffResourceProperties(props(prev), props(next))
 	assert.Empty(t, diff.Resources)
 }
 
@@ -44,9 +44,9 @@ func TestDiff_ReportsAddedResource(t *testing.T) {
 		"$.id": model.NewProperty("$.id", "string", false),
 	})
 	next.AddResource(added)
-	key := added.PrimaryHash(participantName)
+	key := added.PrimaryHash()
 
-	diff := contract_differ.Diff(props(prev), props(next))
+	diff := contract_differ.DiffResourceProperties(props(prev), props(next))
 
 	assert.Len(t, diff.Resources, 1)
 	assert.Equal(t, contract_differ.ChangeAdded, diff.Resources[key].Kind)
@@ -54,7 +54,7 @@ func TestDiff_ReportsAddedResource(t *testing.T) {
 
 func TestDiff_NextNil_AllResourcesRemoved(t *testing.T) {
 	prev := newContractWithOnePetsResource()
-	diff := contract_differ.Diff(props(prev), nil)
+	diff := contract_differ.DiffResourceProperties(props(prev), nil)
 	assert.Len(t, diff.Resources, 1)
 	for _, change := range diff.Resources {
 		assert.Equal(t, contract_differ.ChangeRemoved, change.Kind)
@@ -68,10 +68,10 @@ func TestDiff_RemovedResource(t *testing.T) {
 		"$.id": model.NewProperty("$.id", "string", false),
 	})
 	oldContract.AddResource(removed)
-	key := removed.PrimaryHash(participantName)
+	key := removed.PrimaryHash()
 
 	newContract := newContractWithOnePetsResource()
-	diff := contract_differ.Diff(props(oldContract), props(newContract))
+	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
 
 	assert.Len(t, diff.Resources, 1)
 	assert.Equal(t, contract_differ.ChangeRemoved, diff.Resources[key].Kind)
@@ -83,14 +83,14 @@ func TestDiff_RemovedResource(t *testing.T) {
 
 func TestDiff_ModifiedResource_PropertyAdded(t *testing.T) {
 	oldContract := newContractWithOnePetsResource()
-	newContract := model.NewUploadedContract(model.NewParticipant(participantName), "1", "raw")
+	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
 	newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":      model.NewProperty("$", "object", false),
 		"$.id":   model.NewProperty("$.id", "string", false),
 		"$.name": model.NewProperty("$.name", "string", false),
 	}))
 
-	diff := contract_differ.Diff(props(oldContract), props(newContract))
+	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
 
 	assert.Len(t, diff.Resources, 1)
 	for _, change := range diff.Resources {
@@ -101,7 +101,7 @@ func TestDiff_ModifiedResource_PropertyAdded(t *testing.T) {
 }
 
 func TestDiff_ModifiedResource_PropertyRemoved(t *testing.T) {
-	oldContract := model.NewUploadedContract(model.NewParticipant(participantName), "1", "raw")
+	oldContract := model.NewUploadedContract(0, participantName, "1", "raw")
 	oldContract.AddResource(
 		model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 			"$":      model.NewProperty("$", "object", false),
@@ -111,7 +111,7 @@ func TestDiff_ModifiedResource_PropertyRemoved(t *testing.T) {
 	)
 	newContract := newContractWithOnePetsResource()
 
-	diff := contract_differ.Diff(props(oldContract), props(newContract))
+	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
 
 	assert.Len(t, diff.Resources, 1)
 	for _, change := range diff.Resources {
@@ -123,13 +123,13 @@ func TestDiff_ModifiedResource_PropertyRemoved(t *testing.T) {
 
 func TestDiff_ModifiedResource_PropertyTypeChanged(t *testing.T) {
 	oldContract := newContractWithOnePetsResource()
-	newContract := model.NewUploadedContract(model.NewParticipant(participantName), "1", "raw")
+	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
 	newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "int", false),
 	}))
 
-	diff := contract_differ.Diff(props(oldContract), props(newContract))
+	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
 
 	assert.Len(t, diff.Resources, 1)
 	for _, resourceChange := range diff.Resources {

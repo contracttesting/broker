@@ -11,50 +11,46 @@ import (
 
 func (c *CompatibilityChecker) checkConsumer(
 	ctx context.Context,
-	consumerResource model.CounterpartResource,
+	consumerResource model.PersistedResource,
 	environment *model.Environment,
-	report *CompatibilityReport,
+	report *ContractCompatibilityReport,
 ) {
-	providerResource, err := c.repository.GetProviderResourceByConsumerResource(ctx, consumerResource)
+	providerResource, err := c.repository.GetProviderResourceByConsumerResource(ctx, consumerResource.ProviderHash)
+
+	incompatibleItem := NewIncompatibleItem()
 
 	if errors.Is(err, repository.ErrProviderResourceNotFound) {
-		report.AppendContractBreakChange(NewContractBreakingChange(
-			&consumerResource,
-			nil,
-			ReasonProviderResourceNotFound,
-		))
+		incompatibleItem.AppendContractBreakChange(
+			NewProviderResourceNotFound(&consumerResource),
+		)
 
-		report.AppendResult(consumerResource.ConsumedProvider.String, CompatibilityResult{
-			Deployable: false,
-		})
+		report.AppendResult(consumerResource.ConsumedProvider.String, incompatibleItem)
 
 		return
 	}
 
 	version, deployed := providerResource.DeployedVersionIn(environment.Name)
 	if !deployed {
-		report.AppendContractBreakChange(NewProviderNotDeployedBreakingChange(
+		incompatibleItem.IncompatibleCounterpart.ParticipantID = providerResource.ParticipantID
+
+		incompatibleItem.AppendContractBreakChange(NewProviderResourceNotDeployed(
 			&consumerResource,
 			providerResource.DeployedEnvironments(),
 		))
 
-		report.AppendResult(consumerResource.ConsumedProvider.String, CompatibilityResult{
-			Deployable: false,
-		})
+		report.AppendResult(consumerResource.ConsumedProvider.String, incompatibleItem)
 
 		return
 	}
 
 	providerResource.ParticipantVersion = null.StringFrom(version)
+	incompatibleItem.IncompatibleCounterpart.ParticipantID = providerResource.ParticipantID
+	incompatibleItem.IncompatibleCounterpart.ParticipantVersion = providerResource.ParticipantVersion
+	incompatibleItem.IncompatibleCounterpart.ParticipantName = providerResource.ParticipantName
 
-	breaks := checkResources(&consumerResource, &providerResource)
-	for _, breakingChange := range breaks {
-		report.AppendContractBreakChange(breakingChange)
+	for _, breakingChange := range checkResources(&consumerResource, &providerResource) {
+		incompatibleItem.AppendContractBreakChange(breakingChange)
 	}
 
-	report.AppendResult(consumerResource.ConsumedProvider.String, CompatibilityResult{
-		CounterpartParticipantID: providerResource.ParticipantID,
-		CounterpartVersion:       providerResource.ParticipantVersion.String,
-		Deployable:               len(breaks) == 0,
-	})
+	report.AppendResult(consumerResource.ConsumedProvider.String, incompatibleItem)
 }

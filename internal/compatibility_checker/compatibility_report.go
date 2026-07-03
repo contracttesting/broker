@@ -1,42 +1,66 @@
 package compatibility_checker
 
-type CompatibilityResult struct {
-	CounterpartParticipantID int64
-	CounterpartVersion       string
-	Deployable               bool
+import (
+	"github.com/guregu/null"
+)
+
+type IncompatibleCounterpart struct {
+	ParticipantID      int64       `json:"-"`
+	ParticipantName    string      `json:"participantName"`
+	ParticipantVersion null.String `json:"participantVersion"`
 }
 
-type CompatibilityReport struct {
-	Results map[string]CompatibilityResult `json:"results"`
-	Breaks  []ContractBreakingChange       `json:"breaks"`
+type IncompatibleItem struct {
+	Deployable              bool                     `json:"deployable"`
+	IncompatibleCounterpart IncompatibleCounterpart  `json:"incompatibleCounterpart"`
+	Breaks                  []ContractBreakingChange `json:"breaks"`
 }
 
-func NewCompatibilityReport() *CompatibilityReport {
-	return &CompatibilityReport{
-		Results: make(map[string]CompatibilityResult),
-		Breaks:  []ContractBreakingChange{},
+func NewIncompatibleItem() *IncompatibleItem {
+	return &IncompatibleItem{
+		Breaks: make([]ContractBreakingChange, 0),
 	}
 }
 
-func (r *CompatibilityReport) AppendResult(dependency string, result CompatibilityResult) {
-	if r.Results == nil {
-		r.Results = make(map[string]CompatibilityResult)
-	}
-
-	existing, seen := r.Results[dependency]
-	if !seen {
-		r.Results[dependency] = result
-		return
-	}
-
-	existing.Deployable = existing.Deployable && result.Deployable
-	if existing.CounterpartParticipantID == 0 {
-		existing.CounterpartParticipantID = result.CounterpartParticipantID
-		existing.CounterpartVersion = result.CounterpartVersion
-	}
-	r.Results[dependency] = existing
-}
-
-func (r *CompatibilityReport) AppendContractBreakChange(b ContractBreakingChange) {
+func (r *IncompatibleItem) AppendContractBreakChange(b ContractBreakingChange) {
 	r.Breaks = append(r.Breaks, b)
+	r.Deployable = false
+}
+
+type ContractCompatibilityReport struct {
+	ParticipantName string
+	Version         string
+	Environment     string
+	Results         map[string]IncompatibleItem
+}
+
+func NewContractCompatibilityReport(
+	participantName, version, environment string,
+) *ContractCompatibilityReport {
+	return &ContractCompatibilityReport{
+		ParticipantName: participantName,
+		Version:         version,
+		Environment:     environment,
+		Results:         make(map[string]IncompatibleItem),
+	}
+}
+
+func (r *ContractCompatibilityReport) AppendResult(dependency string, result *IncompatibleItem) {
+	existing := r.Results[dependency]
+
+	if existing.Breaks == nil {
+		existing.Breaks = []ContractBreakingChange{}
+	}
+
+	existing.Breaks = append(existing.Breaks, result.Breaks...)
+
+	if existing.IncompatibleCounterpart.ParticipantID == 0 {
+		existing.IncompatibleCounterpart.ParticipantID = result.IncompatibleCounterpart.ParticipantID
+		existing.IncompatibleCounterpart.ParticipantVersion = result.IncompatibleCounterpart.ParticipantVersion
+		existing.IncompatibleCounterpart.ParticipantName = dependency
+	}
+
+	existing.Deployable = len(existing.Breaks) == 0
+
+	r.Results[dependency] = existing
 }

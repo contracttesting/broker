@@ -3,10 +3,10 @@ package compatibility_checker
 import "github.com/contracttesting/broker/internal/model"
 
 func checkResponseResource(
-	checked *model.CounterpartResource,
-	counterpart *model.CounterpartResource,
-	consumer *model.CounterpartResource,
-	provider *model.CounterpartResource,
+	checked *model.PersistedResource,
+	counterpart *model.PersistedResource,
+	consumer *model.PersistedResource,
+	provider *model.PersistedResource,
 ) []ContractBreakingChange {
 	var breaks []ContractBreakingChange
 

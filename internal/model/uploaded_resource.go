@@ -1,13 +1,11 @@
 package model
 
 import (
-	"sort"
-	"strings"
-
 	"github.com/guregu/null"
 )
 
 type UploadedResource struct {
+	ParticipantName    string
 	Direction          Direction
 	Interaction        Interaction
 	ConsumedProvider   null.String
@@ -25,8 +23,8 @@ func (r *UploadedResource) IsProvider() bool {
 	return r.Direction == Provides
 }
 
-func (r *UploadedResource) ProviderHash(participant string) string {
-	providerName := participant
+func (r *UploadedResource) ProviderHash() string {
+	providerName := r.ParticipantName
 	if r.IsConsumer() {
 		providerName = r.ConsumedProvider.String
 	}
@@ -39,12 +37,12 @@ func (r *UploadedResource) ProviderHash(participant string) string {
 	return Hash(parts...)
 }
 
-func (r *UploadedResource) ConsumerHash(participant string) string {
+func (r *UploadedResource) ConsumerHash() string {
 	if !r.IsConsumer() {
 		return ""
 	}
 
-	parts := []string{participant, r.ConsumedProvider.String, r.Endpoint, r.Method}
+	parts := []string{r.ParticipantName, r.ConsumedProvider.String, r.Endpoint, r.Method}
 	if r.Interaction == RestResponse {
 		parts = append(parts, r.ResponseStatusCode.String)
 	}
@@ -52,33 +50,12 @@ func (r *UploadedResource) ConsumerHash(participant string) string {
 	return Hash(parts...)
 }
 
-func (r *UploadedResource) PrimaryHash(participant string) string {
+func (r *UploadedResource) PrimaryHash() string {
 	if r.IsProvider() {
-		return r.ProviderHash(participant)
+		return r.ProviderHash()
 	}
 
-	return r.ConsumerHash(participant)
-}
-
-func (r *UploadedResource) CanonicalKey(participant string) string {
-	propertyKeys := make([]string, 0, len(r.Properties))
-
-	for _, property := range r.Properties {
-		propertyKeys = append(propertyKeys, property.CanonicalKey())
-	}
-
-	sort.Strings(propertyKeys)
-
-	return strings.Join([]string{
-		string(r.Direction),
-		string(r.Interaction),
-		participant,
-		r.ConsumedProvider.String,
-		r.Endpoint,
-		r.Method,
-		r.ResponseStatusCode.String,
-		strings.Join(propertyKeys, ";;"),
-	}, ";;")
+	return r.ConsumerHash()
 }
 
 func NewRestRequestConsumer(

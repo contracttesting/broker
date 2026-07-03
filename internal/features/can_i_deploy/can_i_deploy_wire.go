@@ -1,7 +1,7 @@
 package can_i_deploy
 
 import (
-	"github.com/guregu/null"
+	"github.com/contracttesting/broker/internal/compatibility_checker"
 )
 
 const ContractNotFound = "contract not found"
@@ -13,37 +13,13 @@ type CanIDeployRequestBody struct {
 	Environment string `json:"environment"`
 }
 
-type Party struct {
-	Participant string      `json:"participant"`
-	Version     null.String `json:"version"`
-	Role        string      `json:"role"`
-	Checked     bool        `json:"checked"`
-}
-
-type Break struct {
-	Interaction string            `json:"interaction"`
-	Method      string            `json:"method"`
-	Endpoint    string            `json:"endpoint"`
-	StatusCode  null.String       `json:"statusCode"`
-	Property    null.String       `json:"property"`
-	Reason      string            `json:"reason"`
-	Details     map[string]string `json:"details,omitempty"`
-}
-
-type Incompatibility struct {
-	Consumer      Party   `json:"consumer"`
-	Provider      Party   `json:"provider"`
-	BreakingCount int     `json:"breakingCount"`
-	Breaks        []Break `json:"breaks"`
-}
-
 type CanIDeployResponseBody struct {
-	Message           string            `json:"message"`
-	Participant       string            `json:"participant"`
-	Version           string            `json:"version"`
-	Environment       string            `json:"environment"`
-	Deployable        bool              `json:"deployable"`
-	Incompatibilities []Incompatibility `json:"incompatibilities"`
+	Message     string                                             `json:"message"`
+	Participant string                                             `json:"participant"`
+	Version     string                                             `json:"version"`
+	Environment string                                             `json:"environment"`
+	Deployable  bool                                               `json:"deployable"`
+	Results     map[string]compatibility_checker.IncompatibleItem `json:"results"`
 }
 
 type CanIDeployErrorResponseBody struct {

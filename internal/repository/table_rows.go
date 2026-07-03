@@ -9,15 +9,19 @@ import (
 	"github.com/guregu/null"
 )
 
+// This struct is used to build the entire contract avoiding N+1 problem
 type tableRow struct {
+	// Participant
 	ParticipantID   int64
 	ParticipantName string
 
+	// Contract
 	ContractID          int64
 	ContractVersion     string
 	ContractRawContract string
 	ContractCreatedAt   time.Time
 
+	// Resource
 	ResourceID                 int64
 	ResourceDirection          string
 	ResourceInteraction        string
@@ -30,40 +34,44 @@ type tableRow struct {
 	ResourceCreatedAt          time.Time
 	ResourceVersion            string
 
-	PropertyID   int64
-	PropertyPath string
-
+	// Property
+	PropertyID                int64
+	PropertyPath              string
 	PropertyVersionType       sql.NullString
 	PropertyVersionOptional   sql.NullBool
 	PropertyVersionChangeType string
 
+	// Deploy & Environment
 	DeploymentEnvironment sql.NullString
 	DeploymentVersion     sql.NullString
 }
 
-func (c *tableRow) toContractModel() *model.Contract {
-	return &model.Contract{
-		ID:          c.ContractID,
-		Version:     c.ContractVersion,
-		RawContract: c.ContractRawContract,
-		Resources:   make(map[string]model.CounterpartResource),
-		Participant: &model.Participant{
-			ID:   c.ParticipantID,
-			Name: c.ParticipantName,
-		},
+func (c *tableRow) toPersistedContractModel() *model.PersistedContract {
+	return &model.PersistedContract{
+		ID:              c.ContractID,
+		ParticipantID:   c.ParticipantID,
+		ParticipantName: c.ParticipantName,
+		Version:         c.ContractVersion,
+		RawContract:     c.ContractRawContract,
+		Resources:       make(map[string]model.PersistedResource),
 	}
 }
 
-func (c *tableRow) toResourceModel() model.CounterpartResource {
-	resource := model.CounterpartResource{
-		Direction:        model.Direction(c.ResourceDirection),
-		Interaction:      model.Interaction(c.ResourceInteraction),
-		Endpoint:         c.ResourceEndpoint,
-		Method:           c.ResourceMethod,
-		Properties:       make(map[string]model.Property),
-		DeployedVersions: make(map[string]string),
+func (c *tableRow) toResourceModel() model.PersistedResource {
+	resource := model.PersistedResource{
+		Direction:          model.Direction(c.ResourceDirection),
+		Interaction:        model.Interaction(c.ResourceInteraction),
+		Endpoint:           c.ResourceEndpoint,
+		Method:             c.ResourceMethod,
+		Properties:         make(map[string]model.Property),
+		DeployedVersions:   make(map[string]string),
 		ParticipantName:  c.ParticipantName,
 		ParticipantID:    c.ParticipantID,
+		ProviderHash:     c.ResourceProviderHash,
+	}
+
+	if c.ResourceVersion != "" {
+		resource.ParticipantVersion = null.StringFrom(c.ResourceVersion)
 	}
 
 	if c.ResourceConsumedProvider.String != "" {
@@ -74,21 +82,11 @@ func (c *tableRow) toResourceModel() model.CounterpartResource {
 		resource.ResponseStatusCode = null.StringFrom(c.ResourceResponseStatusCode.String)
 	}
 
-	if c.ResourceVersion != "" {
-		resource.ParticipantVersion = null.StringFrom(c.ResourceVersion)
+	if c.ResourceConsumerHash.String != "" {
+		resource.ConsumerHash = null.StringFrom(c.ResourceConsumerHash.String)
 	}
 
 	return resource
-}
-
-// primaryHash returns the resource's own identity hash as stored in the row —
-// provider_hash for providers, consumer_hash for consumers. It is the loaded
-// contract's map key (no recompute).
-func (c *tableRow) primaryHash() string {
-	if c.ResourceDirection == string(model.Provides) {
-		return c.ResourceProviderHash
-	}
-	return c.ResourceConsumerHash.String
 }
 
 func (c *tableRow) toPropertyModel() model.Property {
@@ -98,10 +96,6 @@ func (c *tableRow) toPropertyModel() model.Property {
 		Type:     c.PropertyVersionType.String,
 		Optional: c.PropertyVersionOptional.Bool,
 	}
-}
-
-func nullString(s string) sql.NullString {
-	return sql.NullString{String: s, Valid: s != ""}
 }
 
 type insertPropertyVersionRow struct {
@@ -128,7 +122,7 @@ func newInsertPropertyVersionRow(contractID, propertyID int64, p model.Property,
 	return &insertPropertyVersionRow{
 		PropertyID: propertyID,
 		ContractID: contractID,
-		Type:       nullString(p.Type),
+		Type:       sql.NullString{String: p.Type, Valid: p.Type != ""},
 		Optional:   sql.NullBool{Bool: p.Optional, Valid: true},
 		ChangeType: string(change),
 	}

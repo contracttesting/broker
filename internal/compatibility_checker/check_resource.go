@@ -2,7 +2,7 @@ package compatibility_checker
 
 import "github.com/contracttesting/broker/internal/model"
 
-func checkResources(checked *model.CounterpartResource, counterpart *model.CounterpartResource) []ContractBreakingChange {
+func checkResources(checked *model.PersistedResource, counterpart *model.PersistedResource) []ContractBreakingChange {
 	consumer, provider := checked, counterpart
 	if !checked.IsConsumer() {
 		consumer, provider = counterpart, checked

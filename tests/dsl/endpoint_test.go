@@ -54,7 +54,7 @@ func hydrateEndpointContract(t *testing.T, raw string) (*model.UploadedContract,
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
-	contract := model.NewUploadedContract(model.NewParticipant("things-app"), "1", raw)
+	contract := model.NewUploadedContract(0, "things-app", "1", raw)
 	return contract, dslContract.HydrateContract(contract)
 }
 
@@ -94,7 +94,7 @@ func TestHydrateContract_TrailingSlash_NormalizesToSameResource(t *testing.T) {
 	plainResource := singleEndpointResource(t, plain)
 
 	assert.Equal(t, "/users", slashedResource.Endpoint)
-	assert.Equal(t, plainResource.ProviderHash("things-app"), slashedResource.ProviderHash("things-app"))
+	assert.Equal(t, plainResource.ProviderHash(), slashedResource.ProviderHash())
 }
 
 func TestHydrateContract_EndpointRules_Rejects(t *testing.T) {

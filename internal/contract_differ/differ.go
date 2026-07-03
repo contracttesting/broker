@@ -25,15 +25,12 @@ type PropertyChange struct {
 	After  model.Property
 }
 
-// ResourceProperties is one resource's properties keyed by path. The differ is
-// fed these maps keyed by resource hash so it never depends on the resource type
-// (uploaded vs counterpart) — it only compares properties under matching keys.
 type ResourceProperties = map[string]model.Property
 
-func Diff(old, next map[string]ResourceProperties) ContractDiff {
+func DiffResourceProperties(current, next map[string]ResourceProperties) ContractDiff {
 	resourcesChanges := map[string]ResourceChange{}
 
-	for resourceKey, oldProperties := range old {
+	for resourceKey, oldProperties := range current {
 		nextProperties, exists := next[resourceKey]
 		// If the resource is not present in the new contract, it was removed
 		if !exists {
@@ -49,12 +46,14 @@ func Diff(old, next map[string]ResourceProperties) ContractDiff {
 
 	for newResourceKey, newProperties := range next {
 		// If the resource is not present in the previous contract, it was added
-		if _, exists := old[newResourceKey]; !exists {
+		if _, exists := current[newResourceKey]; !exists {
 			resourcesChanges[newResourceKey] = addedResourceChange(newProperties)
 		}
 	}
 
-	return ContractDiff{Resources: resourcesChanges}
+	return ContractDiff{
+		Resources: resourcesChanges,
+	}
 }
 
 func addedResourceChange(properties ResourceProperties) ResourceChange {
@@ -107,5 +106,8 @@ func modifiedResourceChange(prev, next ResourceProperties) (ResourceChange, bool
 	}
 
 	// If properties were changed, the resource was modified
-	return ResourceChange{Kind: ChangeModified, Properties: propertiesChanged}, true
+	return ResourceChange{
+		Kind:       ChangeModified,
+		Properties: propertiesChanged,
+	}, true
 }

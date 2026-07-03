@@ -19,13 +19,13 @@ const (
 )
 
 type ContractBreakingChange struct {
-	CheckedResource     *model.CounterpartResource `json:"checked_resource,omitempty"`
-	CounterpartResource *model.CounterpartResource `json:"counterpart_resource,omitempty"`
-	Reason              BreakingReason             `json:"reason"`
-	Details             map[string]string          `json:"details,omitempty"`
+	CheckedResource     *model.PersistedResource `json:"checkedResource,omitempty"`
+	CounterpartResource *model.PersistedResource `json:"counterpartResource,omitempty"`
+	Reason              BreakingReason           `json:"reason"`
+	Details             map[string]string        `json:"details,omitempty"`
 }
 
-func (b *ContractBreakingChange) ConsumerResource() *model.CounterpartResource {
+func (b *ContractBreakingChange) ConsumerResource() *model.PersistedResource {
 	if b.CheckedResource.IsConsumer() {
 		return b.CheckedResource
 	}
@@ -42,8 +42,8 @@ func (b *ContractBreakingChange) ProviderName() string {
 }
 
 func NewContractBreakingChange(
-	checkedResource *model.CounterpartResource,
-	counterpartResource *model.CounterpartResource,
+	checkedResource *model.PersistedResource,
+	counterpartResource *model.PersistedResource,
 	reason BreakingReason,
 ) ContractBreakingChange {
 	return ContractBreakingChange{
@@ -53,17 +53,24 @@ func NewContractBreakingChange(
 	}
 }
 
+func NewProviderResourceNotFound(checkedResource *model.PersistedResource) ContractBreakingChange {
+	return ContractBreakingChange{
+		CheckedResource: checkedResource,
+		Reason:          ReasonProviderResourceNotFound,
+	}
+}
+
 func NewPropertyBreakChange(
-	checkedResource *model.CounterpartResource,
-	counterpartResource *model.CounterpartResource,
+	checkedResource *model.PersistedResource,
+	counterpartResource *model.PersistedResource,
 	reason BreakingReason,
 	propertyPath string,
 ) ContractBreakingChange {
 	details := map[string]string{"property": propertyPath}
 
 	if reason == ReasonPropertyTypeMismatch {
-		details["checked_property_type"] = checkedResource.Properties[propertyPath].Type
-		details["counterpart_property_type"] = counterpartResource.Properties[propertyPath].Type
+		details["checkedPropertyType"] = checkedResource.Properties[propertyPath].Type
+		details["counterpartPropertyType"] = counterpartResource.Properties[propertyPath].Type
 	}
 
 	return ContractBreakingChange{
@@ -74,15 +81,15 @@ func NewPropertyBreakChange(
 	}
 }
 
-func NewProviderNotDeployedBreakingChange(
-	consumerResource *model.CounterpartResource,
+func NewProviderResourceNotDeployed(
+	consumerResource *model.PersistedResource,
 	deployedEnvironments []string,
 ) ContractBreakingChange {
 	var details map[string]string
 
 	if len(deployedEnvironments) > 0 {
 		details = map[string]string{
-			"deployed_environments": strings.Join(deployedEnvironments, ", "),
+			"deployedEnvironments": strings.Join(deployedEnvironments, ", "),
 		}
 	}
 

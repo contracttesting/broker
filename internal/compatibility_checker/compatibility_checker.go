@@ -19,10 +19,14 @@ func NewCompatibilityChecker(repository *repository.ContractRepository) *Compati
 
 func (c *CompatibilityChecker) Check(
 	ctx context.Context,
-	contract *model.Contract,
+	contract *model.PersistedContract,
 	environment *model.Environment,
-) *CompatibilityReport {
-	report := NewCompatibilityReport()
+) *ContractCompatibilityReport {
+	report := NewContractCompatibilityReport(
+		contract.ParticipantName,
+		contract.Version,
+		environment.Name,
+	)
 
 	for _, resource := range contract.Resources {
 		switch resource.Direction {

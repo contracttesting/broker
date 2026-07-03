@@ -46,12 +46,12 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondParticipantNotFound(ctx)
 	}
 
-	contract := model.NewUploadedContract(participant, version, string(requestBody.Contract))
+	contract := model.NewUploadedContract(participant.ID, participant.Name, version, string(requestBody.Contract))
 	if err := dslContract.HydrateContract(contract); err != nil {
 		return ctr.respondInvalidEndpoint(ctx, err)
 	}
 
-	if existing, found := ctr.contractRepository.LoadChecksumForVersion(ctx.Context(), contract.ParticipantID(), version); found {
+	if existing, found := ctr.contractRepository.LoadChecksumForVersion(ctx.Context(), contract.ParticipantID, version); found {
 		if existing == contract.Checksum() {
 			return ctr.respondSuccess(ctx)
 		}
@@ -70,7 +70,7 @@ func (ctr *PublishContractHandler) respondParticipantNotFound(ctx fiber.Ctx) err
 }
 
 func (ctr *PublishContractHandler) upsert(ctx fiber.Ctx, contract *model.UploadedContract) {
-	if ctr.contractRepository.HasContractsForParticipant(ctx.Context(), contract.ParticipantID()) {
+	if ctr.contractRepository.HasContractsForParticipant(ctx.Context(), contract.ParticipantID) {
 		ctr.contractRepository.Update(ctx.Context(), contract)
 
 		return
