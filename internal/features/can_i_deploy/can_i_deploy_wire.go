@@ -6,24 +6,34 @@ type CanIDeployRequestBody struct {
 	Environment string `json:"environment"`
 }
 
-type BreakingResource struct {
-	Direction          string  `json:"direction"`
-	Kind               string  `json:"kind"`
-	ConsumedProvider   *string `json:"consumed_provider"`
-	Endpoint           string  `json:"endpoint"`
-	Method             string  `json:"method"`
-	ResponseStatusCode *string `json:"response_status_code"`
+type CanIDeployResponseBody struct {
+	Message     string                      `json:"message"`
+	Deployable  bool                        `json:"deployable"`
+	Environment string                      `json:"environment"`
+	Results     map[string]CanIDeployResult `json:"results"`
 }
 
-type BreakingChange struct {
+type CanIDeployResult struct {
+	Deployable              bool                    `json:"deployable"`
+	IncompatibleCounterpart IncompatibleCounterpart `json:"incompatibleCounterpart"`
+	Breaks                  []ContractBreak         `json:"breaks"`
+}
+
+type IncompatibleCounterpart struct {
+	ParticipantName    string  `json:"participantName"`
+	ParticipantVersion *string `json:"participantVersion"`
+}
+
+type ContractBreak struct {
+	CheckedResource     *BreakResource    `json:"checkedResource"`
+	CounterpartResource *BreakResource    `json:"counterpartResource"`
 	Reason              string            `json:"reason"`
 	Details             map[string]string `json:"details"`
-	CheckedResource     BreakingResource  `json:"checked_resource"`
-	CounterpartResource BreakingResource  `json:"counterpart_resource"`
 }
 
-type CanIDeployResponseBody struct {
-	Message    string                      `json:"message"`
-	Deployable bool                        `json:"deployable"`
-	Breaks     map[string][]BreakingChange `json:"breaks"`
+type BreakResource struct {
+	Direction          string  `json:"direction"`
+	Endpoint           string  `json:"endpoint"`
+	Method             string  `json:"method"`
+	ResponseStatusCode *string `json:"responseStatusCode"`
 }

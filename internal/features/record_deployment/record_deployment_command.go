@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +40,7 @@ func NewRecordDeploymentCommand(client *RecordDeploymentClient) *cobra.Command {
 			return err
 		}
 
-		ui.Success(command.OutOrStdout(), "🎉", message)
+		fmt.Fprintf(command.OutOrStdout(), "🎉 %s\n", message)
 		return nil
 	}
 

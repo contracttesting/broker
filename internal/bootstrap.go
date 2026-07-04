@@ -2,6 +2,7 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/contracttesting/cli/internal/components"
@@ -11,7 +12,6 @@ import (
 	"github.com/contracttesting/cli/internal/features/publish_contract"
 	"github.com/contracttesting/cli/internal/features/record_deployment"
 	"github.com/contracttesting/cli/internal/features/rename_participant"
-	"github.com/contracttesting/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -51,8 +51,8 @@ func Run() {
 	rename_participant.Register(rootCommand, components)
 
 	if err := rootCommand.Execute(); err != nil {
-		if !errors.Is(err, ui.ErrSilent) {
-			ui.Failure(rootCommand.ErrOrStderr(), "❌", err.Error())
+		if !errors.Is(err, can_i_deploy.ErrSilent) {
+			fmt.Fprintf(rootCommand.ErrOrStderr(), "❌ %s\n", err.Error())
 		}
 
 		os.Exit(1)
