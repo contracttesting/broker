@@ -13,28 +13,15 @@ type CanIDeployResponseBody struct {
 	Results     map[string]CanIDeployResult `json:"results"`
 }
 
+// Endpoints nest as endpoint -> method -> interaction -> breaks, where interaction is
+// "request" or a response status code ("200").
 type CanIDeployResult struct {
-	Deployable              bool                    `json:"deployable"`
-	IncompatibleCounterpart IncompatibleCounterpart `json:"incompatibleCounterpart"`
-	Breaks                  []ContractBreak         `json:"breaks"`
-}
-
-type IncompatibleCounterpart struct {
-	ParticipantName    string  `json:"participantName"`
-	ParticipantVersion *string `json:"participantVersion"`
+	Deployable         bool                                             `json:"deployable"`
+	ParticipantVersion *string                                          `json:"participantVersion"`
+	Endpoints          map[string]map[string]map[string][]ContractBreak `json:"endpoints"`
 }
 
 type ContractBreak struct {
-	CheckedResource     *BreakResource    `json:"checkedResource"`
-	CounterpartResource *BreakResource    `json:"counterpartResource"`
-	Reason              string            `json:"reason"`
-	Details             map[string]string `json:"details"`
-}
-
-type BreakResource struct {
-	Direction          string  `json:"direction"`
-	Interaction        string  `json:"interaction"`
-	Endpoint           string  `json:"endpoint"`
-	Method             string  `json:"method"`
-	ResponseStatusCode *string `json:"responseStatusCode"`
+	Reason  string            `json:"reason"`
+	Details map[string]string `json:"details"`
 }
