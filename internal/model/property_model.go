@@ -1,7 +1,7 @@
 package model
 
 type Property struct {
-	ID       int64 `json:"-"` // DB id — never identity
+	ID       int64 `json:"-"`
 	Path     string
 	Type     string
 	Optional bool
