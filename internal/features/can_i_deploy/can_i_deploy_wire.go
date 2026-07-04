@@ -33,6 +33,7 @@ type ContractBreak struct {
 
 type BreakResource struct {
 	Direction          string  `json:"direction"`
+	Interaction        string  `json:"interaction"`
 	Endpoint           string  `json:"endpoint"`
 	Method             string  `json:"method"`
 	ResponseStatusCode *string `json:"responseStatusCode"`

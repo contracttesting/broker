@@ -72,8 +72,8 @@ func TestCanIDeployCommand(t *testing.T) {
 		      "incompatibleCounterpart": {"participantName": "payments", "participantVersion": "v2"},
 		      "breaks": [
 		        {
-		          "checkedResource": {"direction": "consumes", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
-		          "counterpartResource": {"direction": "provides", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
+		          "checkedResource": {"direction": "consumes", "interaction": "rest_response", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
+		          "counterpartResource": {"direction": "provides", "interaction": "rest_response", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
 		          "reason": "some_future_reason",
 		          "details": {"property": "amount"}
 		        }
@@ -125,7 +125,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		      "incompatibleCounterpart": {"participantName": "payments", "participantVersion": null},
 		      "breaks": [
 		        {
-		          "checkedResource": {"direction": "consumes", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
+		          "checkedResource": {"direction": "consumes", "interaction": "rest_response", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
 		          "reason": "provider_resource_not_found"
 		        }
 		      ]
@@ -148,7 +148,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, out.String(), "\npayments:\n")
 		assert.NotContains(t, out.String(), "(")
-		assert.Contains(t, out.String(), "  - GET /payments/* 200: no matching resource in provider")
+		assert.Contains(t, out.String(), "  - GET /payments/* response 200: no matching resource in provider")
 	})
 
 	t.Run("non-2xx response renders the broker message to stderr and exits non-zero", func(t *testing.T) {

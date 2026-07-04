@@ -133,7 +133,8 @@ func formatBreakLine(environment string, contractBreak ContractBreak) string {
 	}
 }
 
-// consumerResourcePrefix formats "{METHOD} {endpoint} {status}" from the consumer-side
+// consumerResourcePrefix formats "{METHOD} {endpoint} {interaction} {status}" (e.g.
+// "GET /payments/* response 200", "POST /payments request") from the consumer-side
 // resource, resolved by direction — never by checked/counterpart position.
 func consumerResourcePrefix(contractBreak ContractBreak) string {
 	resource := contractBreak.CheckedResource
@@ -142,6 +143,9 @@ func consumerResourcePrefix(contractBreak ContractBreak) string {
 	}
 
 	parts := []string{strings.ToUpper(resource.Method), resource.Endpoint}
+	if resource.Interaction != "" {
+		parts = append(parts, strings.TrimPrefix(resource.Interaction, "rest_"))
+	}
 	if resource.ResponseStatusCode != nil {
 		parts = append(parts, *resource.ResponseStatusCode)
 	}

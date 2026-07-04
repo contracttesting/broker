@@ -21,13 +21,13 @@ func TestCanIDeployResponseBodyUnmarshalsResults(t *testing.T) {
 	      "incompatibleCounterpart": {"participantName": "payments", "participantVersion": "v2"},
 	      "breaks": [
 	        {
-	          "checkedResource": {"direction": "consumes", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
-	          "counterpartResource": {"direction": "provides", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
+	          "checkedResource": {"direction": "consumes", "interaction": "rest_response", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
+	          "counterpartResource": {"direction": "provides", "interaction": "rest_response", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
 	          "reason": "property_type_mismatch",
 	          "details": {"property": "amount", "checkedPropertyType": "string", "counterpartPropertyType": "number"}
 	        },
 	        {
-	          "checkedResource": {"direction": "consumes", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
+	          "checkedResource": {"direction": "consumes", "interaction": "rest_response", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
 	          "reason": "provider_resource_not_deployed_in_environment",
 	          "details": {"deployedEnvironments": "staging, qa"}
 	        }
@@ -61,6 +61,7 @@ func TestCanIDeployResponseBodyUnmarshalsResults(t *testing.T) {
 	assert.Equal(t, "property_type_mismatch", mismatch.Reason)
 	require.NotNil(t, mismatch.CheckedResource)
 	assert.Equal(t, "consumes", mismatch.CheckedResource.Direction)
+	assert.Equal(t, "rest_response", mismatch.CheckedResource.Interaction)
 	assert.Equal(t, "/payments/*", mismatch.CheckedResource.Endpoint)
 	assert.Equal(t, "GET", mismatch.CheckedResource.Method)
 	require.NotNil(t, mismatch.CheckedResource.ResponseStatusCode)
