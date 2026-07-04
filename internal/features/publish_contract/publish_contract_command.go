@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/contracttesting/cli/internal/ui"
 	"github.com/contracttesting/cli/pkg/multiparser"
 	"github.com/spf13/cobra"
 )
@@ -58,7 +57,7 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 			return err
 		}
 
-		ui.Success(command.OutOrStdout(), "📜", message)
+		fmt.Fprintf(command.OutOrStdout(), "📜 %s\n", message)
 
 		return nil
 	}
