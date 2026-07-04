@@ -69,20 +69,24 @@ func TestCanIDeployCommand(t *testing.T) {
 		  "results": {
 		    "payments": {
 		      "deployable": false,
-		      "incompatibleCounterpart": {"participantName": "payments", "participantVersion": "v2"},
-		      "breaks": [
-		        {
-		          "checkedResource": {"direction": "consumes", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
-		          "counterpartResource": {"direction": "provides", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
-		          "reason": "some_future_reason",
-		          "details": {"property": "amount"}
+		      "participantVersion": "v2",
+		      "endpoints": {
+		        "/payments/*": {
+		          "get": {
+		            "request": [
+		              { "reason": "property_missing_in_provider", "details": { "property": "currency" } }
+		            ],
+		            "200": [
+		              { "reason": "some_future_reason", "details": { "property": "amount" } }
+		            ]
+		          }
 		        }
-		      ]
+		      }
 		    },
 		    "users": {
 		      "deployable": true,
-		      "incompatibleCounterpart": {"participantName": "users", "participantVersion": "v3"},
-		      "breaks": []
+		      "participantVersion": "v3",
+		      "endpoints": {}
 		    }
 		  }
 		}`
@@ -100,11 +104,15 @@ func TestCanIDeployCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Contains(t, out.String(), "❌ front cannot be deployed to production")
-		assert.NotContains(t, out.String(), "{")
-		assert.Contains(t, out.String(), "payments (v2):")
-		assert.Contains(t, out.String(), "  - some_future_reason (property: amount)")
-		assert.NotContains(t, out.String(), "users")
+		assert.Equal(t, `❌ front cannot be deployed to production
+
+payments (v2):
+  GET /payments/*
+    request:
+      - property "currency" is missing in provider
+    response 200:
+      - some_future_reason (property: amount)
+`, out.String())
 		assert.NotContains(t, errOut.String(), "Error:")
 	})
 
@@ -122,13 +130,16 @@ func TestCanIDeployCommand(t *testing.T) {
 		  "results": {
 		    "payments": {
 		      "deployable": false,
-		      "incompatibleCounterpart": {"participantName": "payments", "participantVersion": null},
-		      "breaks": [
-		        {
-		          "checkedResource": {"direction": "consumes", "endpoint": "/payments/*", "method": "GET", "responseStatusCode": "200"},
-		          "reason": "provider_resource_not_found"
+		      "participantVersion": null,
+		      "endpoints": {
+		        "/payments/*": {
+		          "get": {
+		            "200": [
+		              { "reason": "provider_resource_not_found" }
+		            ]
+		          }
 		        }
-		      ]
+		      }
 		    }
 		  }
 		}`
@@ -147,8 +158,8 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, out.String(), "\npayments:\n")
-		assert.NotContains(t, out.String(), "(")
-		assert.Contains(t, out.String(), "  - GET /payments/* 200: no matching resource in provider")
+		assert.NotContains(t, out.String(), "payments (")
+		assert.Contains(t, out.String(), "  GET /payments/*\n    response 200:\n      - no matching resource in provider")
 	})
 
 	t.Run("non-2xx response renders the broker message to stderr and exits non-zero", func(t *testing.T) {

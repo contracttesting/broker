@@ -88,17 +88,53 @@ func formatNotDeployableReport(participant, environment string, results map[stri
 		result := results[name]
 
 		report.WriteString("\n" + name)
-		if version := result.IncompatibleCounterpart.ParticipantVersion; version != nil {
-			fmt.Fprintf(&report, " (%s)", *version)
+		if result.ParticipantVersion != nil {
+			fmt.Fprintf(&report, " (%s)", *result.ParticipantVersion)
 		}
 		report.WriteString(":\n")
 
-		for _, contractBreak := range result.Breaks {
-			fmt.Fprintf(&report, "  - %s\n", formatBreakLine(environment, contractBreak))
+		endpoints := sortedKeys(result.Endpoints)
+		for _, endpoint := range endpoints {
+			methods := sortedKeys(result.Endpoints[endpoint])
+			for _, method := range methods {
+				fmt.Fprintf(&report, "  %s %s\n", strings.ToUpper(method), endpoint)
+
+				interactions := result.Endpoints[endpoint][method]
+				for _, interaction := range sortedInteractions(interactions) {
+					if interaction == "request" {
+						report.WriteString("    request:\n")
+					} else {
+						fmt.Fprintf(&report, "    response %s:\n", interaction)
+					}
+
+					for _, contractBreak := range interactions[interaction] {
+						fmt.Fprintf(&report, "      - %s\n", formatBreakLine(environment, contractBreak))
+					}
+				}
+			}
 		}
 	}
 
 	return report.String()
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// sortedInteractions orders a method's interaction keys as "request" first, then the
+// response status codes sorted.
+func sortedInteractions(interactions map[string][]ContractBreak) []string {
+	keys := sortedKeys(interactions)
+	sort.SliceStable(keys, func(i, j int) bool {
+		return keys[i] == "request" && keys[j] != "request"
+	})
+	return keys
 }
 
 func formatBreakLine(environment string, contractBreak ContractBreak) string {
@@ -112,41 +148,21 @@ func formatBreakLine(environment string, contractBreak ContractBreak) string {
 		}
 		return line
 	case "provider_resource_not_found":
-		return consumerResourcePrefix(contractBreak) + ": no matching resource in provider"
+		return "no matching resource in provider"
 	case "property_missing_in_provider":
-		return fmt.Sprintf("%s: property %q is missing in provider", consumerResourcePrefix(contractBreak), details["property"])
+		return fmt.Sprintf("property %q is missing in provider", details["property"])
 	case "property_missing_in_consumer":
-		return fmt.Sprintf("%s: property %q is missing in consumer", consumerResourcePrefix(contractBreak), details["property"])
+		return fmt.Sprintf("property %q is missing in consumer", details["property"])
 	case "property_optional_in_provider_required_in_consumer":
-		return fmt.Sprintf("%s: property %q is optional in provider but required in consumer", consumerResourcePrefix(contractBreak), details["property"])
+		return fmt.Sprintf("property %q is optional in provider but required in consumer", details["property"])
 	case "property_optional_in_consumer_required_in_provider":
-		return fmt.Sprintf("%s: property %q is optional in consumer but required in provider", consumerResourcePrefix(contractBreak), details["property"])
+		return fmt.Sprintf("property %q is optional in consumer but required in provider", details["property"])
 	case "property_type_mismatch":
-		consumerType, providerType := details["checkedPropertyType"], details["counterpartPropertyType"]
-		if contractBreak.CheckedResource != nil && contractBreak.CheckedResource.Direction != "consumes" {
-			consumerType, providerType = providerType, consumerType
-		}
-		return fmt.Sprintf("%s: property %q type mismatch — consumer has %s, provider has %s",
-			consumerResourcePrefix(contractBreak), details["property"], consumerType, providerType)
+		return fmt.Sprintf("property %q type mismatch — consumer has %s, provider has %s",
+			details["property"], details["consumerPropertyType"], details["providerPropertyType"])
 	default:
 		return fallbackBreakLine(contractBreak.Reason, details)
 	}
-}
-
-// consumerResourcePrefix formats "{METHOD} {endpoint} {status}" from the consumer-side
-// resource, resolved by direction — never by checked/counterpart position.
-func consumerResourcePrefix(contractBreak ContractBreak) string {
-	resource := contractBreak.CheckedResource
-	if resource == nil || resource.Direction != "consumes" {
-		resource = contractBreak.CounterpartResource
-	}
-
-	parts := []string{strings.ToUpper(resource.Method), resource.Endpoint}
-	if resource.ResponseStatusCode != nil {
-		parts = append(parts, *resource.ResponseStatusCode)
-	}
-
-	return strings.Join(parts, " ")
 }
 
 // fallbackBreakLine renders an unknown reason code verbatim with its details, so the
