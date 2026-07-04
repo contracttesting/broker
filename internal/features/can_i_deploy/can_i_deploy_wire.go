@@ -1,6 +1,8 @@
 package can_i_deploy
 
-import "github.com/contracttesting/broker/internal/compatibility_checker"
+import (
+	"github.com/contracttesting/broker/internal/compatibility_checker"
+)
 
 const ContractNotFound = "contract not found"
 const ParticipantNotFound = "participant not found"
@@ -12,9 +14,12 @@ type CanIDeployRequestBody struct {
 }
 
 type CanIDeployResponseBody struct {
-	Message    string                                            `json:"message"`
-	Deployable bool                                              `json:"deployable"`
-	Breaks     map[string][]compatibility_checker.BreakingChange `json:"breaks,omitempty"`
+	Message     string                                             `json:"message"`
+	Participant string                                             `json:"participant"`
+	Version     string                                             `json:"version"`
+	Environment string                                             `json:"environment"`
+	Deployable  bool                                               `json:"deployable"`
+	Results     map[string]compatibility_checker.IncompatibleItem `json:"results"`
 }
 
 type CanIDeployErrorResponseBody struct {

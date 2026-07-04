@@ -9,29 +9,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func consumerResource() *model.Resource {
-	return &model.Resource{
+func consumerResource() *model.PersistedResource {
+	return &model.PersistedResource{
 		Direction:          model.Consumes,
-		Kind:               model.RestResponse,
+		Interaction:        model.RestResponse,
 		ConsumedProvider:   null.StringFrom("api"),
 		Endpoint:           "/things",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
-		Participant:        &model.Participant{Name: "front"},
+		ParticipantName:    "front",
 		Properties: map[string]model.Property{
 			"$.id": {Path: "$.id", Type: "integer"},
 		},
 	}
 }
 
-func providerResource() *model.Resource {
-	return &model.Resource{
+func providerResource() *model.PersistedResource {
+	return &model.PersistedResource{
 		Direction:          model.Provides,
-		Kind:               model.RestResponse,
+		Interaction:        model.RestResponse,
 		Endpoint:           "/things",
 		Method:             "get",
 		ResponseStatusCode: null.StringFrom("200"),
-		Participant:        &model.Participant{Name: "api"},
+		ParticipantName:    "api",
 		Properties: map[string]model.Property{
 			"$.id": {Path: "$.id", Type: "string"},
 		},
@@ -39,13 +39,13 @@ func providerResource() *model.Resource {
 }
 
 func TestProviderResourceNotFound(t *testing.T) {
-	consumer := &model.Resource{
+	consumer := &model.PersistedResource{
 		Direction:        model.Consumes,
 		ConsumedProvider: null.StringFrom("accounts"),
-		Participant:      &model.Participant{Name: "front"},
+		ParticipantName:  "front",
 	}
 
-	change := compatibility_checker.NewBreakingChange(
+	change := compatibility_checker.NewContractBreakingChange(
 		consumer,
 		nil,
 		compatibility_checker.ReasonProviderResourceNotFound,
@@ -62,48 +62,48 @@ func TestProviderResourceNotFound(t *testing.T) {
 func TestPropertyBreakDetails(t *testing.T) {
 	consumerResponse := consumerResource()
 	providerResponse := providerResource()
-	consumerRequest := &model.Resource{
+	consumerRequest := &model.PersistedResource{
 		Direction:        model.Consumes,
-		Kind:             model.RestRequest,
+		Interaction:      model.RestRequest,
 		ConsumedProvider: null.StringFrom("api"),
 		Endpoint:         "/things",
 		Method:           "post",
-		Participant:      &model.Participant{Name: "front"},
+		ParticipantName:  "front",
 	}
-	providerRequest := &model.Resource{
-		Direction:   model.Provides,
-		Kind:        model.RestRequest,
-		Endpoint:    "/things",
-		Method:      "post",
-		Participant: &model.Participant{Name: "api"},
+	providerRequest := &model.PersistedResource{
+		Direction:       model.Provides,
+		Interaction:     model.RestRequest,
+		Endpoint:        "/things",
+		Method:          "post",
+		ParticipantName: "api",
 	}
 
 	typeMismatch := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonTypeMismatch, "$.id",
+		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 	missingInProvider := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonMissingInProvider, "$.name",
+		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyMissingInProvider, "$.name",
 	)
 	optionalInProvider := compatibility_checker.NewPropertyBreakChange(
-		consumerResponse, providerResponse, compatibility_checker.ReasonOptionalInProviderRequiredInConsumer, "$.id",
+		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, "$.id",
 	)
 	missingInConsumer := compatibility_checker.NewPropertyBreakChange(
-		consumerRequest, providerRequest, compatibility_checker.ReasonMissingInConsumer, "$.user",
+		consumerRequest, providerRequest, compatibility_checker.ReasonPropertyMissingInConsumer, "$.user",
 	)
 	optionalInConsumer := compatibility_checker.NewPropertyBreakChange(
-		consumerRequest, providerRequest, compatibility_checker.ReasonOptionalInConsumerRequiredInProvider, "$.flag",
+		consumerRequest, providerRequest, compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, "$.flag",
 	)
 
-	assert.Equal(t, compatibility_checker.ReasonTypeMismatch, typeMismatch.Reason)
-	assert.Equal(t, compatibility_checker.ReasonMissingInProvider, missingInProvider.Reason)
-	assert.Equal(t, compatibility_checker.ReasonOptionalInProviderRequiredInConsumer, optionalInProvider.Reason)
-	assert.Equal(t, compatibility_checker.ReasonMissingInConsumer, missingInConsumer.Reason)
-	assert.Equal(t, compatibility_checker.ReasonOptionalInConsumerRequiredInProvider, optionalInConsumer.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyTypeMismatch, typeMismatch.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyMissingInProvider, missingInProvider.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyOptionalInProviderRequiredInConsumer, optionalInProvider.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyMissingInConsumer, missingInConsumer.Reason)
+	assert.Equal(t, compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, optionalInConsumer.Reason)
 
 	assert.Equal(t, map[string]string{
-		"property":                  "$.id",
-		"checked_property_type":     "integer",
-		"counterpart_property_type": "string",
+		"property":                "$.id",
+		"checkedPropertyType":     "integer",
+		"counterpartPropertyType": "string",
 	}, typeMismatch.Details)
 
 	assert.Equal(t, map[string]string{"property": "$.name"}, missingInProvider.Details)
@@ -122,21 +122,21 @@ func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 	providerRes := providerResource()
 
 	consumerChecked := compatibility_checker.NewPropertyBreakChange(
-		consumerRes, providerRes, compatibility_checker.ReasonTypeMismatch, "$.id",
+		consumerRes, providerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 	providerChecked := compatibility_checker.NewPropertyBreakChange(
-		providerRes, consumerRes, compatibility_checker.ReasonTypeMismatch, "$.id",
+		providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 
 	assert.Equal(t, map[string]string{
-		"property":                  "$.id",
-		"checked_property_type":     "integer",
-		"counterpart_property_type": "string",
+		"property":                "$.id",
+		"checkedPropertyType":     "integer",
+		"counterpartPropertyType": "string",
 	}, consumerChecked.Details)
 	assert.Equal(t, map[string]string{
-		"property":                  "$.id",
-		"checked_property_type":     "string",
-		"counterpart_property_type": "integer",
+		"property":                "$.id",
+		"checkedPropertyType":     "string",
+		"counterpartPropertyType": "integer",
 	}, providerChecked.Details)
 
 	assert.Same(t, providerRes, providerChecked.CheckedResource)
@@ -149,21 +149,21 @@ func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 }
 
 func TestProviderNotDeployedDetails(t *testing.T) {
-	consumer := &model.Resource{
+	consumer := &model.PersistedResource{
 		Direction:        model.Consumes,
 		ConsumedProvider: null.StringFrom("accounts"),
-		Participant:      &model.Participant{Name: "front"},
+		ParticipantName:  "front",
 	}
 
-	deployed := compatibility_checker.NewProviderNotDeployedBreakingChange(
+	deployed := compatibility_checker.NewProviderResourceNotDeployed(
 		consumer, []string{"staging", "prod"},
 	)
-	nowhere := compatibility_checker.NewProviderNotDeployedBreakingChange(
+	nowhere := compatibility_checker.NewProviderResourceNotDeployed(
 		consumer, nil,
 	)
 
 	assert.Equal(t, compatibility_checker.ReasonProviderResourceNotDeployedInEnvironment, deployed.Reason)
-	assert.Equal(t, map[string]string{"deployed_environments": "staging, prod"}, deployed.Details)
+	assert.Equal(t, map[string]string{"deployedEnvironments": "staging, prod"}, deployed.Details)
 	assert.Equal(t, "front", deployed.ConsumerName())
 	assert.Equal(t, "accounts", deployed.ProviderName())
 
@@ -171,21 +171,51 @@ func TestProviderNotDeployedDetails(t *testing.T) {
 	assert.Nil(t, nowhere.Details)
 }
 
-func TestReportAppendKeysByConsumerName(t *testing.T) {
+func TestReportAppendMergesResultsPerCounterpart(t *testing.T) {
 	consumerRes := consumerResource()
 	providerRes := providerResource()
 
 	consumerChecked := compatibility_checker.NewPropertyBreakChange(
-		consumerRes, providerRes, compatibility_checker.ReasonTypeMismatch, "$.id",
+		consumerRes, providerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 	providerChecked := compatibility_checker.NewPropertyBreakChange(
-		providerRes, consumerRes, compatibility_checker.ReasonTypeMismatch, "$.id",
+		providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 
-	report := compatibility_checker.NewCompatibilityReport()
-	report.Append(consumerChecked)
-	report.Append(providerChecked)
+	report := compatibility_checker.NewContractCompatibilityReport("unknown", "unknown", "unknwonw")
 
-	assert.Len(t, report.Breaks, 1)
-	assert.Len(t, report.Breaks["front"], 2)
+	withoutIdentity := compatibility_checker.NewIncompatibleItem()
+	withoutIdentity.AppendContractBreakChange(consumerChecked)
+	report.AppendResult("api", withoutIdentity)
+
+	withIdentity := compatibility_checker.NewIncompatibleItem()
+	withIdentity.IncompatibleCounterpart = compatibility_checker.IncompatibleCounterpart{
+		ParticipantID:      7,
+		ParticipantVersion: null.StringFrom("v1"),
+	}
+	withIdentity.AppendContractBreakChange(providerChecked)
+	report.AppendResult("api", withIdentity)
+
+	auth := compatibility_checker.NewIncompatibleItem()
+	auth.IncompatibleCounterpart = compatibility_checker.IncompatibleCounterpart{
+		ParticipantID:      9,
+		ParticipantVersion: null.StringFrom("v2"),
+	}
+	report.AppendResult("auth", auth)
+
+	assert.Len(t, report.Results, 2)
+
+	apiResult := report.Results["api"]
+	assert.Len(t, apiResult.Breaks, 2)
+	assert.False(t, apiResult.Deployable)
+	assert.Equal(t, int64(7), apiResult.IncompatibleCounterpart.ParticipantID)
+	assert.Equal(t, "api", apiResult.IncompatibleCounterpart.ParticipantName)
+	assert.Equal(t, null.StringFrom("v1"), apiResult.IncompatibleCounterpart.ParticipantVersion)
+
+	authResult := report.Results["auth"]
+	assert.Empty(t, authResult.Breaks)
+	assert.True(t, authResult.Deployable)
+	assert.Equal(t, int64(9), authResult.IncompatibleCounterpart.ParticipantID)
+	assert.Equal(t, "auth", authResult.IncompatibleCounterpart.ParticipantName)
+	assert.Equal(t, null.StringFrom("v2"), authResult.IncompatibleCounterpart.ParticipantVersion)
 }

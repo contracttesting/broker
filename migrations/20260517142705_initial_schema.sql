@@ -27,7 +27,7 @@ CREATE TABLE resources (
   id                    BIGSERIAL PRIMARY KEY,
   participant_id        BIGINT NOT NULL REFERENCES participants(id),
   direction             text NOT NULL,
-  kind                  text NOT NULL,
+  interaction           text NOT NULL,
   consumed_provider     text,
   endpoint              text NOT NULL,
   method                text NOT NULL,

@@ -13,7 +13,7 @@ type Contract struct {
 	Schemas          SchemasMap          `json:"schemas,omitzero"`
 }
 
-func (c *Contract) HydrateContract(contract *model.Contract) error {
+func (c *Contract) HydrateContract(contract *model.UploadedContract) error {
 	for endpoint := range c.Provides.Rest {
 		if err := validateEndpoint(endpoint); err != nil {
 			return err
@@ -34,7 +34,7 @@ func (c *Contract) HydrateContract(contract *model.Contract) error {
 }
 
 func (c *Contract) hydrateResources(
-	contract *model.Contract,
+	contract *model.UploadedContract,
 	resourcePath ResourcePath,
 	unknown any,
 ) {

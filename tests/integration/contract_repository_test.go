@@ -41,17 +41,17 @@ func (s *IntegrationSuite) publishOrdersContract() {
 	s.Require().Equal(http.StatusOK, status)
 }
 
-func (s *IntegrationSuite) loadOrdersResource() model.Resource {
+func (s *IntegrationSuite) loadOrdersResource() model.PersistedResource {
 	repo := repository.NewContractRepository(s.Pool)
 
-	contract, found := repo.LoadContractByNameAndVersion(context.Background(), "orders-service", "1")
+	contract, found := repo.GetContractByNameAndVersion(context.Background(), "orders-service", "1")
 	s.Require().True(found)
 	s.Require().Len(contract.Resources, 1)
 
 	for _, resource := range contract.Resources {
 		return resource
 	}
-	return model.Resource{}
+	return model.PersistedResource{}
 }
 
 func (s *IntegrationSuite) TestLoadContract_AbsentOptionalFieldsMarshalAsNull() {
@@ -60,15 +60,11 @@ func (s *IntegrationSuite) TestLoadContract_AbsentOptionalFieldsMarshalAsNull() 
 	resource := s.loadOrdersResource()
 
 	s.False(resource.ConsumedProvider.Valid, "expected ConsumedProvider to be null for a provided resource")
-	s.False(resource.Version.Valid, "expected Version to be null when not deployed")
+	s.Empty(resource.ParticipantVersion, "expected ParticipantVersion to be empty when not deployed")
 
 	provider, err := json.Marshal(resource.ConsumedProvider)
 	s.Require().NoError(err)
 	s.Equal("null", string(provider))
-
-	version, err := json.Marshal(resource.Version)
-	s.Require().NoError(err)
-	s.Equal("null", string(version))
 }
 
 func (s *IntegrationSuite) TestLoadContract_LegacyEmptyStringFieldsSurfaceAsNull() {

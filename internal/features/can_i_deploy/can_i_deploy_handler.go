@@ -46,7 +46,7 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 		return h.respondParticipantNotFound(ctx)
 	}
 
-	contract, exists := h.contractRepository.LoadContractByNameAndVersion(
+	contract, exists := h.contractRepository.GetContractByNameAndVersion(
 		ctx.Context(),
 		participant.Name,
 		requestBody.Version,
@@ -61,26 +61,32 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 		return h.respondInvalidInput(ctx)
 	}
 
-	report := h.compatibilityChecker.Check(
+	compatibilityReport := h.compatibilityChecker.Check(
 		ctx.Context(),
 		contract,
 		environment,
 	)
 
-	for _, result := range report.Results {
+	deployable := true
+	for _, result := range compatibilityReport.Results {
+		deployable = deployable && result.Deployable
+
 		h.compatibilityMatrixRepository.Insert(ctx.Context(), &model.CompatibilityMatrix{
-			ParticipantID:            contract.ParticipantID(),
+			ParticipantID:            contract.ParticipantID,
 			Version:                  contract.Version,
-			CounterpartParticipantID: result.CounterpartParticipantID,
-			CounterpartVersion:       result.CounterpartVersion,
+			CounterpartParticipantID: result.IncompatibleCounterpart.ParticipantID,
+			CounterpartVersion:       result.IncompatibleCounterpart.ParticipantVersion.ValueOrZero(),
 			Deployable:               result.Deployable,
 		})
 	}
 
 	return ctx.Status(fiber.StatusOK).JSON(CanIDeployResponseBody{
-		Message:    "Contract checked successfully",
-		Deployable: len(report.Breaks) == 0,
-		Breaks:     report.Breaks,
+		Message:     "Contract checked successfully",
+		Participant: requestBody.Participant,
+		Version:     requestBody.Version,
+		Environment: requestBody.Environment,
+		Deployable:  deployable,
+		Results:     compatibilityReport.Results,
 	})
 }
 

@@ -61,18 +61,18 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(happyContractJSON), &dslContract))
 
-	contract := model.NewContract(model.NewParticipant("petstore-app"), "1", happyContractJSON)
+	contract := model.NewUploadedContract(0, "petstore-app", "1", happyContractJSON)
 	require.NoError(t, dslContract.HydrateContract(contract))
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
 
 	assert.Equal(t, model.Consumes, resource.Direction)
-	assert.Equal(t, model.RestResponse, resource.Kind)
+	assert.Equal(t, model.RestResponse, resource.Interaction)
 	assert.Equal(t, "pets-service", resource.ConsumedProvider.String)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
@@ -183,13 +183,13 @@ const refResolvesJSON = `{
   }
 }`
 
-func hydrate(t *testing.T, raw string) *model.Contract {
+func hydrate(t *testing.T, raw string) *model.UploadedContract {
 	t.Helper()
 
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
-	contract := model.NewContract(model.NewParticipant("petstore-app"), "1", raw)
+	contract := model.NewUploadedContract(0, "petstore-app", "1", raw)
 	require.NoError(t, dslContract.HydrateContract(contract))
 	return contract
 }
@@ -199,9 +199,9 @@ func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing
 
 	require.Len(t, contract.Resources, 2)
 
-	var request, response model.Resource
+	var request, response model.UploadedResource
 	for _, r := range contract.Resources {
-		switch r.Kind {
+		switch r.Interaction {
 		case model.RestRequest:
 			request = r
 		case model.RestResponse:
@@ -210,14 +210,14 @@ func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing
 	}
 
 	assert.Equal(t, model.Consumes, request.Direction)
-	assert.Equal(t, model.RestRequest, request.Kind)
+	assert.Equal(t, model.RestRequest, request.Interaction)
 	assert.Equal(t, "/pets", request.Endpoint)
 	assert.Equal(t, "post", request.Method)
 	assert.Empty(t, request.ResponseStatusCode)
 	assert.Contains(t, request.Properties, "$.id")
 
 	assert.Equal(t, model.Consumes, response.Direction)
-	assert.Equal(t, model.RestResponse, response.Kind)
+	assert.Equal(t, model.RestResponse, response.Interaction)
 	assert.Equal(t, "201", response.ResponseStatusCode.String)
 	assert.Contains(t, response.Properties, "$.name")
 }
@@ -227,13 +227,13 @@ func TestHydrateContract_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
 
 	assert.Equal(t, model.Provides, resource.Direction)
-	assert.Equal(t, model.RestResponse, resource.Kind)
+	assert.Equal(t, model.RestResponse, resource.Interaction)
 	assert.Empty(t, resource.ConsumedProvider)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
@@ -246,7 +246,7 @@ func TestHydrateContract_PrimitiveTopLevel_EmitsRootPrimitive(t *testing.T) {
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
@@ -261,7 +261,7 @@ func TestHydrateContract_ArrayOfObjects_WalksItemsViaSchemaPointer(t *testing.T)
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
@@ -279,7 +279,7 @@ func TestHydrateContract_RefResolves_SubstitutesReferencedSchema(t *testing.T) {
 
 	require.Len(t, contract.Resources, 1)
 
-	var resource model.Resource
+	var resource model.UploadedResource
 	for _, r := range contract.Resources {
 		resource = r
 	}
@@ -294,7 +294,7 @@ func TestHydrateContract_Unhappy_PanicsOnSchemaTooDeep(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(cyclicContractJSON), &dslContract))
 
-	contract := model.NewContract(model.NewParticipant("petstore-app"), "1", cyclicContractJSON)
+	contract := model.NewUploadedContract(0, "petstore-app", "1", cyclicContractJSON)
 
 	assert.PanicsWithValue(
 		t,

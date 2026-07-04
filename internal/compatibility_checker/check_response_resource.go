@@ -3,12 +3,12 @@ package compatibility_checker
 import "github.com/contracttesting/broker/internal/model"
 
 func checkResponseResource(
-	checked *model.Resource,
-	counterpart *model.Resource,
-	consumer *model.Resource,
-	provider *model.Resource,
-) []BreakingChange {
-	var breaks []BreakingChange
+	checked *model.PersistedResource,
+	counterpart *model.PersistedResource,
+	consumer *model.PersistedResource,
+	provider *model.PersistedResource,
+) []ContractBreakingChange {
+	var breaks []ContractBreakingChange
 
 	for consumerPropertyPath, consumerProperty := range consumer.Properties {
 		providerProperty, propertyExists := provider.Properties[consumerPropertyPath]
@@ -18,7 +18,7 @@ func checkResponseResource(
 			breaks = append(breaks, NewPropertyBreakChange(
 				checked,
 				counterpart,
-				ReasonMissingInProvider,
+				ReasonPropertyMissingInProvider,
 				consumerPropertyPath,
 			))
 
@@ -30,7 +30,7 @@ func checkResponseResource(
 			breaks = append(breaks, NewPropertyBreakChange(
 				checked,
 				counterpart,
-				ReasonTypeMismatch,
+				ReasonPropertyTypeMismatch,
 				consumerPropertyPath,
 			))
 
@@ -42,7 +42,7 @@ func checkResponseResource(
 			breaks = append(breaks, NewPropertyBreakChange(
 				checked,
 				counterpart,
-				ReasonOptionalInProviderRequiredInConsumer,
+				ReasonPropertyOptionalInProviderRequiredInConsumer,
 				consumerPropertyPath,
 			))
 		}

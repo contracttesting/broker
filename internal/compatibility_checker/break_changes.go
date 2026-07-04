@@ -9,30 +9,23 @@ import (
 type BreakingReason string
 
 const (
-	ReasonProviderResourceNotFound                 BreakingReason = "provider_resource_not_found"
-	ReasonMissingInProvider                        BreakingReason = "missing_in_provider"
-	ReasonMissingInConsumer                        BreakingReason = "missing_in_consumer"
-	ReasonTypeMismatch                             BreakingReason = "type_mismatch"
-	ReasonOptionalInProviderRequiredInConsumer     BreakingReason = "optional_in_provider_required_in_consumer"
-	ReasonOptionalInConsumerRequiredInProvider     BreakingReason = "optional_in_consumer_required_in_provider"
-	ReasonProviderResourceNotDeployedInEnvironment BreakingReason = "provider_resource_not_deployed_in_environment"
+	ReasonProviderResourceNotFound                     BreakingReason = "provider_resource_not_found"
+	ReasonPropertyMissingInProvider                    BreakingReason = "property_missing_in_provider"
+	ReasonPropertyMissingInConsumer                    BreakingReason = "property_missing_in_consumer"
+	ReasonPropertyTypeMismatch                         BreakingReason = "property_type_mismatch"
+	ReasonPropertyOptionalInProviderRequiredInConsumer BreakingReason = "property_optional_in_provider_required_in_consumer"
+	ReasonPropertyOptionalInConsumerRequiredInProvider BreakingReason = "property_optional_in_consumer_required_in_provider"
+	ReasonProviderResourceNotDeployedInEnvironment     BreakingReason = "provider_resource_not_deployed_in_environment"
 )
 
-const (
-	detailKeyProperty                = "property"
-	detailKeyCheckedPropertyType     = "checked_property_type"
-	detailKeyCounterpartPropertyType = "counterpart_property_type"
-	detailKeyDeployedEnvironments    = "deployed_environments"
-)
-
-type BreakingChange struct {
-	CheckedResource     *model.Resource   `json:"checked_resource,omitempty"`
-	CounterpartResource *model.Resource   `json:"counterpart_resource,omitempty"`
-	Reason              BreakingReason    `json:"reason"`
-	Details             map[string]string `json:"details,omitempty"`
+type ContractBreakingChange struct {
+	CheckedResource     *model.PersistedResource `json:"checkedResource,omitempty"`
+	CounterpartResource *model.PersistedResource `json:"counterpartResource,omitempty"`
+	Reason              BreakingReason           `json:"reason"`
+	Details             map[string]string        `json:"details,omitempty"`
 }
 
-func (b *BreakingChange) consumerResource() *model.Resource {
+func (b *ContractBreakingChange) ConsumerResource() *model.PersistedResource {
 	if b.CheckedResource.IsConsumer() {
 		return b.CheckedResource
 	}
@@ -40,61 +33,68 @@ func (b *BreakingChange) consumerResource() *model.Resource {
 	return b.CounterpartResource
 }
 
-func (b *BreakingChange) ConsumerName() string {
-	return b.consumerResource().ParticipantName()
+func (b *ContractBreakingChange) ConsumerName() string {
+	return b.ConsumerResource().ParticipantName
 }
 
-func (b *BreakingChange) ProviderName() string {
-	return b.consumerResource().ConsumedProvider.String
+func (b *ContractBreakingChange) ProviderName() string {
+	return b.ConsumerResource().ConsumedProvider.String
 }
 
-func NewBreakingChange(
-	checked *model.Resource,
-	counterpart *model.Resource,
+func NewContractBreakingChange(
+	checkedResource *model.PersistedResource,
+	counterpartResource *model.PersistedResource,
 	reason BreakingReason,
-) BreakingChange {
-	return BreakingChange{
-		CheckedResource:     checked,
-		CounterpartResource: counterpart,
+) ContractBreakingChange {
+	return ContractBreakingChange{
+		CheckedResource:     checkedResource,
+		CounterpartResource: counterpartResource,
 		Reason:              reason,
 	}
 }
 
-func NewPropertyBreakChange(
-	checked *model.Resource,
-	counterpart *model.Resource,
-	reason BreakingReason,
-	property string,
-) BreakingChange {
-	details := map[string]string{detailKeyProperty: property}
+func NewProviderResourceNotFound(checkedResource *model.PersistedResource) ContractBreakingChange {
+	return ContractBreakingChange{
+		CheckedResource: checkedResource,
+		Reason:          ReasonProviderResourceNotFound,
+	}
+}
 
-	if reason == ReasonTypeMismatch {
-		details[detailKeyCheckedPropertyType] = checked.Properties[property].Type
-		details[detailKeyCounterpartPropertyType] = counterpart.Properties[property].Type
+func NewPropertyBreakChange(
+	checkedResource *model.PersistedResource,
+	counterpartResource *model.PersistedResource,
+	reason BreakingReason,
+	propertyPath string,
+) ContractBreakingChange {
+	details := map[string]string{"property": propertyPath}
+
+	if reason == ReasonPropertyTypeMismatch {
+		details["checkedPropertyType"] = checkedResource.Properties[propertyPath].Type
+		details["counterpartPropertyType"] = counterpartResource.Properties[propertyPath].Type
 	}
 
-	return BreakingChange{
-		CheckedResource:     checked,
-		CounterpartResource: counterpart,
+	return ContractBreakingChange{
+		CheckedResource:     checkedResource,
+		CounterpartResource: counterpartResource,
 		Reason:              reason,
 		Details:             details,
 	}
 }
 
-func NewProviderNotDeployedBreakingChange(
-	consumer *model.Resource,
+func NewProviderResourceNotDeployed(
+	consumerResource *model.PersistedResource,
 	deployedEnvironments []string,
-) BreakingChange {
+) ContractBreakingChange {
 	var details map[string]string
 
 	if len(deployedEnvironments) > 0 {
 		details = map[string]string{
-			detailKeyDeployedEnvironments: strings.Join(deployedEnvironments, ", "),
+			"deployedEnvironments": strings.Join(deployedEnvironments, ", "),
 		}
 	}
 
-	return BreakingChange{
-		CheckedResource: consumer,
+	return ContractBreakingChange{
+		CheckedResource: consumerResource,
 		Reason:          ReasonProviderResourceNotDeployedInEnvironment,
 		Details:         details,
 	}

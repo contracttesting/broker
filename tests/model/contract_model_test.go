@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newContractWithOnePetsResource(participantName string) *model.Contract {
-	contract := model.NewContract(model.NewParticipant(participantName), "1", "raw")
-	contract.AddResource(model.NewProvidedRestResponse("/pets", "get", "200", map[string]model.Property{
+func newContractWithOnePetsResource(participantName string) *model.UploadedContract {
+	contract := model.NewUploadedContract(0, participantName, "1", "raw")
+	contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
 	}))
@@ -27,9 +27,31 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 	a := newContractWithOnePetsResource("pets-service")
 
 	b := newContractWithOnePetsResource("pets-service")
-	b.AddResource(model.NewProvidedRestResponse("/pets/*", "get", "200", map[string]model.Property{
+	b.AddResource(model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
 		"$": model.NewProperty("$", "object", false),
 	}))
 
 	assert.NotEqual(t, a.Checksum(), b.Checksum())
+}
+
+// Locks in the JSON-marshal invariant: identical content added in a different
+// order must yield the same checksum (encoding/json sorts map keys recursively).
+func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
+	first := model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
+		"$":    model.NewProperty("$", "object", false),
+		"$.id": model.NewProperty("$.id", "string", false),
+	})
+	second := model.NewRestResponseProvider("/pets/*", "get", "200", map[string]model.Property{
+		"$": model.NewProperty("$", "object", false),
+	})
+
+	a := model.NewUploadedContract(0, "pets-service", "1", "raw")
+	a.AddResource(first)
+	a.AddResource(second)
+
+	b := model.NewUploadedContract(0, "pets-service", "1", "raw")
+	b.AddResource(second)
+	b.AddResource(first)
+
+	assert.Equal(t, a.Checksum(), b.Checksum())
 }
