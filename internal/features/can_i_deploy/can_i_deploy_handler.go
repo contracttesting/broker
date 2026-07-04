@@ -86,7 +86,7 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 		Version:     requestBody.Version,
 		Environment: requestBody.Environment,
 		Deployable:  deployable,
-		Results:     compatibilityReport.Results,
+		Results:     compatibilityReport.Hierarchical,
 	})
 }
 
