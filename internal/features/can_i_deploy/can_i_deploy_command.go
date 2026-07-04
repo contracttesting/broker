@@ -133,8 +133,8 @@ func formatBreakLine(environment string, contractBreak ContractBreak) string {
 	}
 }
 
-// consumerResourcePrefix formats "{METHOD} {endpoint} {interaction} {status}" (e.g.
-// "GET /payments/* response 200", "POST /payments request") from the consumer-side
+// consumerResourcePrefix formats "{METHOD} {endpoint} ({interaction} {status})" (e.g.
+// "GET /payments/* (response 200)", "POST /payments (request)") from the consumer-side
 // resource, resolved by direction — never by checked/counterpart position.
 func consumerResourcePrefix(contractBreak ContractBreak) string {
 	resource := contractBreak.CheckedResource
@@ -142,15 +142,20 @@ func consumerResourcePrefix(contractBreak ContractBreak) string {
 		resource = contractBreak.CounterpartResource
 	}
 
-	parts := []string{strings.ToUpper(resource.Method), resource.Endpoint}
+	prefix := strings.ToUpper(resource.Method) + " " + resource.Endpoint
+
+	var interaction []string
 	if resource.Interaction != "" {
-		parts = append(parts, strings.TrimPrefix(resource.Interaction, "rest_"))
+		interaction = append(interaction, strings.TrimPrefix(resource.Interaction, "rest_"))
 	}
 	if resource.ResponseStatusCode != nil {
-		parts = append(parts, *resource.ResponseStatusCode)
+		interaction = append(interaction, *resource.ResponseStatusCode)
+	}
+	if len(interaction) > 0 {
+		prefix += " (" + strings.Join(interaction, " ") + ")"
 	}
 
-	return strings.Join(parts, " ")
+	return prefix
 }
 
 // fallbackBreakLine renders an unknown reason code verbatim with its details, so the

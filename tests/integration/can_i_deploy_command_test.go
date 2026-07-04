@@ -147,8 +147,8 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, out.String(), "\npayments:\n")
-		assert.NotContains(t, out.String(), "(")
-		assert.Contains(t, out.String(), "  - GET /payments/* response 200: no matching resource in provider")
+		assert.NotContains(t, out.String(), "payments (")
+		assert.Contains(t, out.String(), "  - GET /payments/* (response 200): no matching resource in provider")
 	})
 
 	t.Run("non-2xx response renders the broker message to stderr and exits non-zero", func(t *testing.T) {

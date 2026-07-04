@@ -14,13 +14,13 @@ func TestConsumerResourcePrefixResolvesByDirection(t *testing.T) {
 	t.Run("checked side is the consumer", func(t *testing.T) {
 		prefix := consumerResourcePrefix(ContractBreak{CheckedResource: consumer, CounterpartResource: provider})
 
-		assert.Equal(t, "GET /payments/* response 200", prefix)
+		assert.Equal(t, "GET /payments/* (response 200)", prefix)
 	})
 
 	t.Run("counterpart side is the consumer", func(t *testing.T) {
 		prefix := consumerResourcePrefix(ContractBreak{CheckedResource: provider, CounterpartResource: consumer})
 
-		assert.Equal(t, "GET /payments/* response 200", prefix)
+		assert.Equal(t, "GET /payments/* (response 200)", prefix)
 	})
 
 	t.Run("request interaction has no status suffix", func(t *testing.T) {
@@ -28,7 +28,7 @@ func TestConsumerResourcePrefixResolvesByDirection(t *testing.T) {
 
 		prefix := consumerResourcePrefix(ContractBreak{CheckedResource: request})
 
-		assert.Equal(t, "POST /payments request", prefix)
+		assert.Equal(t, "POST /payments (request)", prefix)
 	})
 }
 
@@ -43,7 +43,7 @@ func TestFormatBreakLine(t *testing.T) {
 			Reason:          "provider_resource_not_found",
 		})
 
-		assert.Equal(t, `GET /payments/* response 200: no matching resource in provider`, line)
+		assert.Equal(t, `GET /payments/* (response 200): no matching resource in provider`, line)
 	})
 
 	t.Run("provider_resource_not_deployed_in_environment", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestFormatBreakLine(t *testing.T) {
 			Details:             map[string]string{"property": "amount"},
 		})
 
-		assert.Equal(t, `GET /payments/* response 200: property "amount" is missing in provider`, line)
+		assert.Equal(t, `GET /payments/* (response 200): property "amount" is missing in provider`, line)
 	})
 
 	t.Run("property_missing_in_consumer", func(t *testing.T) {
@@ -84,7 +84,7 @@ func TestFormatBreakLine(t *testing.T) {
 			Details:             map[string]string{"property": "amount"},
 		})
 
-		assert.Equal(t, `GET /payments/* response 200: property "amount" is missing in consumer`, line)
+		assert.Equal(t, `GET /payments/* (response 200): property "amount" is missing in consumer`, line)
 	})
 
 	t.Run("property_optional_in_provider_required_in_consumer", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestFormatBreakLine(t *testing.T) {
 			Details:             map[string]string{"property": "amount"},
 		})
 
-		assert.Equal(t, `GET /payments/* response 200: property "amount" is optional in provider but required in consumer`, line)
+		assert.Equal(t, `GET /payments/* (response 200): property "amount" is optional in provider but required in consumer`, line)
 	})
 
 	t.Run("property_optional_in_consumer_required_in_provider", func(t *testing.T) {
@@ -106,7 +106,7 @@ func TestFormatBreakLine(t *testing.T) {
 			Details:             map[string]string{"property": "amount"},
 		})
 
-		assert.Equal(t, `GET /payments/* response 200: property "amount" is optional in consumer but required in provider`, line)
+		assert.Equal(t, `GET /payments/* (response 200): property "amount" is optional in consumer but required in provider`, line)
 	})
 
 	t.Run("property_type_mismatch maps types by role when the checked side is the provider", func(t *testing.T) {
@@ -121,7 +121,7 @@ func TestFormatBreakLine(t *testing.T) {
 			},
 		})
 
-		assert.Equal(t, `GET /payments/* response 200: property "amount" type mismatch — consumer has string, provider has number`, line)
+		assert.Equal(t, `GET /payments/* (response 200): property "amount" type mismatch — consumer has string, provider has number`, line)
 	})
 
 	t.Run("property_type_mismatch maps types by role when the checked side is the consumer", func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestFormatBreakLine(t *testing.T) {
 			},
 		})
 
-		assert.Equal(t, `GET /payments/* response 200: property "amount" type mismatch — consumer has string, provider has number`, line)
+		assert.Equal(t, `GET /payments/* (response 200): property "amount" type mismatch — consumer has string, provider has number`, line)
 	})
 
 	t.Run("unknown reason falls back to the verbatim reason with details", func(t *testing.T) {
