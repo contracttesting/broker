@@ -1,6 +1,7 @@
 package compatibility_checker_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/contracttesting/broker/internal/compatibility_checker"
@@ -101,9 +102,9 @@ func TestPropertyBreakDetails(t *testing.T) {
 	assert.Equal(t, compatibility_checker.ReasonPropertyOptionalInConsumerRequiredInProvider, optionalInConsumer.Reason)
 
 	assert.Equal(t, map[string]string{
-		"property":                "$.id",
-		"checkedPropertyType":     "integer",
-		"counterpartPropertyType": "string",
+		"property":             "$.id",
+		"consumerPropertyType": "integer",
+		"providerPropertyType": "string",
 	}, typeMismatch.Details)
 
 	assert.Equal(t, map[string]string{"property": "$.name"}, missingInProvider.Details)
@@ -117,7 +118,7 @@ func TestPropertyBreakDetails(t *testing.T) {
 	assert.Equal(t, "api", missingInConsumer.ProviderName())
 }
 
-func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
+func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
 	consumerRes := consumerResource()
 	providerRes := providerResource()
 
@@ -128,16 +129,13 @@ func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 		providerRes, consumerRes, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
 	)
 
-	assert.Equal(t, map[string]string{
-		"property":                "$.id",
-		"checkedPropertyType":     "integer",
-		"counterpartPropertyType": "string",
-	}, consumerChecked.Details)
-	assert.Equal(t, map[string]string{
-		"property":                "$.id",
-		"checkedPropertyType":     "string",
-		"counterpartPropertyType": "integer",
-	}, providerChecked.Details)
+	expected := map[string]string{
+		"property":             "$.id",
+		"consumerPropertyType": "integer",
+		"providerPropertyType": "string",
+	}
+	assert.Equal(t, expected, consumerChecked.Details)
+	assert.Equal(t, expected, providerChecked.Details)
 
 	assert.Same(t, providerRes, providerChecked.CheckedResource)
 	assert.Same(t, consumerRes, providerChecked.CounterpartResource)
@@ -146,6 +144,25 @@ func TestTypeMismatchTypesFollowCheckedSide(t *testing.T) {
 	assert.Equal(t, "api", consumerChecked.ProviderName())
 	assert.Equal(t, "front", providerChecked.ConsumerName())
 	assert.Equal(t, "api", providerChecked.ProviderName())
+}
+
+func TestBreakMarshalsOnlyReasonAndDetails(t *testing.T) {
+	change := compatibility_checker.NewPropertyBreakChange(
+		consumerResource(), providerResource(), compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
+	)
+
+	data, err := json.Marshal(change)
+	assert.NoError(t, err)
+
+	decoded := map[string]json.RawMessage{}
+	assert.NoError(t, json.Unmarshal(data, &decoded))
+
+	keys := make([]string, 0, len(decoded))
+	for key := range decoded {
+		keys = append(keys, key)
+	}
+
+	assert.ElementsMatch(t, []string{"reason", "details"}, keys)
 }
 
 func TestProviderNotDeployedDetails(t *testing.T) {
@@ -218,4 +235,92 @@ func TestReportAppendMergesResultsPerCounterpart(t *testing.T) {
 	assert.Equal(t, int64(9), authResult.IncompatibleCounterpart.ParticipantID)
 	assert.Equal(t, "auth", authResult.IncompatibleCounterpart.ParticipantName)
 	assert.Equal(t, null.StringFrom("v2"), authResult.IncompatibleCounterpart.ParticipantVersion)
+}
+
+func TestHierarchicalNodeWireKeys(t *testing.T) {
+	node := compatibility_checker.Hierarchical{
+		Deployable: true,
+		Version:    null.StringFrom("v1"),
+		Endpoints:  make(compatibility_checker.HierarchicalEndpoint),
+	}
+
+	data, err := json.Marshal(node)
+	assert.NoError(t, err)
+
+	decoded := map[string]json.RawMessage{}
+	assert.NoError(t, json.Unmarshal(data, &decoded))
+
+	keys := make([]string, 0, len(decoded))
+	for key := range decoded {
+		keys = append(keys, key)
+	}
+
+	assert.ElementsMatch(t, []string{"deployable", "participantVersion", "endpoints"}, keys)
+}
+
+func TestHierarchicalGroupsBreaksByInteraction(t *testing.T) {
+	consumerResponse := consumerResource()
+	providerResponse := providerResource()
+	consumerRequest := &model.PersistedResource{
+		Direction:          model.Consumes,
+		Interaction:        model.RestRequest,
+		ConsumedProvider:   null.StringFrom("api"),
+		Endpoint:           "/things",
+		Method:             "get",
+		ResponseStatusCode: null.StringFrom("200"),
+		ParticipantName:    "front",
+	}
+
+	requestBreak := compatibility_checker.NewPropertyBreakChange(
+		consumerRequest, providerResponse, compatibility_checker.ReasonPropertyMissingInProvider, "$.user",
+	)
+	responseBreak := compatibility_checker.NewPropertyBreakChange(
+		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
+	)
+
+	item := compatibility_checker.NewIncompatibleItem()
+	item.AppendContractBreakChange(requestBreak)
+	item.AppendContractBreakChange(responseBreak)
+
+	report := compatibility_checker.NewContractCompatibilityReport("front", "v1", "production")
+	report.AppendResult("api", item)
+
+	methods := report.Hierarchical["api"].Endpoints["/things"]["get"]
+	assert.Len(t, methods["request"], 1)
+	assert.Equal(t, compatibility_checker.ReasonPropertyMissingInProvider, methods["request"][0].Reason)
+	assert.Len(t, methods["200"], 1)
+	assert.Equal(t, compatibility_checker.ReasonPropertyTypeMismatch, methods["200"][0].Reason)
+}
+
+func TestHierarchicalAccumulatesAcrossAppends(t *testing.T) {
+	consumerResponse := consumerResource()
+	providerResponse := providerResource()
+
+	first := compatibility_checker.NewIncompatibleItem()
+	report := compatibility_checker.NewContractCompatibilityReport("front", "v1", "production")
+	report.AppendResult("api", first)
+
+	assert.True(t, report.Hierarchical["api"].Deployable)
+	assert.Equal(t, null.String{}, report.Hierarchical["api"].Version)
+
+	second := compatibility_checker.NewIncompatibleItem()
+	second.IncompatibleCounterpart = compatibility_checker.IncompatibleCounterpart{
+		ParticipantID:      7,
+		ParticipantVersion: null.StringFrom("3.1.0"),
+	}
+	second.AppendContractBreakChange(compatibility_checker.NewPropertyBreakChange(
+		consumerResponse, providerResponse, compatibility_checker.ReasonPropertyTypeMismatch, "$.id",
+	))
+	report.AppendResult("api", second)
+
+	node := report.Hierarchical["api"]
+	assert.False(t, node.Deployable)
+	assert.Equal(t, null.StringFrom("3.1.0"), node.Version)
+
+	notFound := compatibility_checker.NewIncompatibleItem()
+	notFound.AppendContractBreakChange(compatibility_checker.NewProviderResourceNotFound(consumerResponse))
+	report.AppendResult("ghost", notFound)
+
+	assert.False(t, report.Hierarchical["ghost"].Deployable)
+	assert.Equal(t, null.String{}, report.Hierarchical["ghost"].Version)
 }

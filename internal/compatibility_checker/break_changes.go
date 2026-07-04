@@ -19,8 +19,8 @@ const (
 )
 
 type ContractBreakingChange struct {
-	CheckedResource     *model.PersistedResource `json:"checkedResource,omitempty"`
-	CounterpartResource *model.PersistedResource `json:"counterpartResource,omitempty"`
+	CheckedResource     *model.PersistedResource `json:"-"`
+	CounterpartResource *model.PersistedResource `json:"-"`
 	Reason              BreakingReason           `json:"reason"`
 	Details             map[string]string        `json:"details,omitempty"`
 }
@@ -69,8 +69,13 @@ func NewPropertyBreakChange(
 	details := map[string]string{"property": propertyPath}
 
 	if reason == ReasonPropertyTypeMismatch {
-		details["checkedPropertyType"] = checkedResource.Properties[propertyPath].Type
-		details["counterpartPropertyType"] = counterpartResource.Properties[propertyPath].Type
+		consumerResource, providerResource := checkedResource, counterpartResource
+		if !checkedResource.IsConsumer() {
+			consumerResource, providerResource = counterpartResource, checkedResource
+		}
+
+		details["consumerPropertyType"] = consumerResource.Properties[propertyPath].Type
+		details["providerPropertyType"] = providerResource.Properties[propertyPath].Type
 	}
 
 	return ContractBreakingChange{
