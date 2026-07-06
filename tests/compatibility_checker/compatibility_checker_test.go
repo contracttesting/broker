@@ -20,7 +20,8 @@ func consumerResource() *model.PersistedResource {
 		ResponseStatusCode: null.StringFrom("200"),
 		ParticipantName:    "front",
 		Properties: map[string]model.Property{
-			"$.id": {Path: "$.id", Type: "integer"},
+			"$.id":   {Path: "$.id", Type: "integer"},
+			"$.name": {Path: "$.name", Type: "string"},
 		},
 	}
 }
@@ -70,6 +71,9 @@ func TestPropertyBreakDetails(t *testing.T) {
 		Endpoint:         "/things",
 		Method:           "post",
 		ParticipantName:  "front",
+		Properties: map[string]model.Property{
+			"$.flag": {Path: "$.flag", Type: "boolean", Optional: true},
+		},
 	}
 	providerRequest := &model.PersistedResource{
 		Direction:       model.Provides,
@@ -77,6 +81,10 @@ func TestPropertyBreakDetails(t *testing.T) {
 		Endpoint:        "/things",
 		Method:          "post",
 		ParticipantName: "api",
+		Properties: map[string]model.Property{
+			"$.user": {Path: "$.user", Type: "string"},
+			"$.flag": {Path: "$.flag", Type: "boolean"},
+		},
 	}
 
 	typeMismatch := compatibility_checker.NewPropertyBreakChange(
@@ -103,19 +111,53 @@ func TestPropertyBreakDetails(t *testing.T) {
 
 	assert.Equal(t, map[string]string{
 		"property":             "$.id",
+		"consumerName":         "front",
+		"providerName":         "api",
 		"consumerPropertyType": "integer",
 		"providerPropertyType": "string",
 	}, typeMismatch.Details)
 
-	assert.Equal(t, map[string]string{"property": "$.name"}, missingInProvider.Details)
-	assert.Equal(t, map[string]string{"property": "$.id"}, optionalInProvider.Details)
-	assert.Equal(t, map[string]string{"property": "$.user"}, missingInConsumer.Details)
-	assert.Equal(t, map[string]string{"property": "$.flag"}, optionalInConsumer.Details)
+	assert.Equal(t, map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missingInProvider.Details)
+	assert.Equal(t, map[string]string{"property": "$.id", "consumerName": "front", "providerName": "api", "propertyType": "integer"}, optionalInProvider.Details)
+	assert.Equal(t, map[string]string{"property": "$.user", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missingInConsumer.Details)
+	assert.Equal(t, map[string]string{"property": "$.flag", "consumerName": "front", "providerName": "api", "propertyType": "boolean"}, optionalInConsumer.Details)
 
 	assert.Equal(t, "front", typeMismatch.ConsumerName())
 	assert.Equal(t, "api", typeMismatch.ProviderName())
 	assert.Equal(t, "front", missingInConsumer.ConsumerName())
 	assert.Equal(t, "api", missingInConsumer.ProviderName())
+}
+
+func TestPropertyTypeRendersArrayItemType(t *testing.T) {
+	consumer := consumerResource()
+	consumer.Properties = map[string]model.Property{
+		"$.list":      {Path: "$.list", Type: "array"},
+		"$.list[]":    {Path: "$.list[]", Type: "object"},
+		"$.list[].id": {Path: "$.list[].id", Type: "string"},
+		"$.tags":      {Path: "$.tags", Type: "array"},
+		"$.tags[]":    {Path: "$.tags[]", Type: "array"},
+		"$.tags[][]":  {Path: "$.tags[][]", Type: "integer"},
+		"$.other":     {Path: "$.other", Type: "array"},
+		"$.other[]":   {Path: "$.other[]", Type: "string"},
+	}
+	provider := providerResource()
+	provider.Properties = map[string]model.Property{
+		"$.other": {Path: "$.other", Type: "array"},
+	}
+
+	missingList := compatibility_checker.NewPropertyBreakChange(
+		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.list",
+	)
+	missingTags := compatibility_checker.NewPropertyBreakChange(
+		consumer, provider, compatibility_checker.ReasonPropertyMissingInProvider, "$.tags",
+	)
+	mismatch := compatibility_checker.NewPropertyBreakChange(
+		consumer, provider, compatibility_checker.ReasonPropertyTypeMismatch, "$.other",
+	)
+
+	assert.Equal(t, "array<object>", missingList.Details["propertyType"])
+	assert.Equal(t, "array<array<integer>>", missingTags.Details["propertyType"])
+	assert.Equal(t, "array<string>", mismatch.Details["consumerPropertyType"])
 }
 
 func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
@@ -131,6 +173,8 @@ func TestTypeMismatchTypesResolvedByRole(t *testing.T) {
 
 	expected := map[string]string{
 		"property":             "$.id",
+		"consumerName":         "front",
+		"providerName":         "api",
 		"consumerPropertyType": "integer",
 		"providerPropertyType": "string",
 	}

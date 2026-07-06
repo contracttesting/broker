@@ -66,16 +66,26 @@ func NewPropertyBreakChange(
 	reason BreakingReason,
 	propertyPath string,
 ) ContractBreakingChange {
-	details := map[string]string{"property": propertyPath}
+	consumerResource, providerResource := checkedResource, counterpartResource
+	if !checkedResource.IsConsumer() {
+		consumerResource, providerResource = counterpartResource, checkedResource
+	}
+
+	details := map[string]string{
+		"property":     propertyPath,
+		"consumerName": consumerResource.ParticipantName,
+		"providerName": consumerResource.ConsumedProvider.String,
+	}
 
 	if reason == ReasonPropertyTypeMismatch {
-		consumerResource, providerResource := checkedResource, counterpartResource
-		if !checkedResource.IsConsumer() {
-			consumerResource, providerResource = counterpartResource, checkedResource
+		details["consumerPropertyType"] = typeToken(consumerResource, propertyPath)
+		details["providerPropertyType"] = typeToken(providerResource, propertyPath)
+	} else {
+		typed := consumerResource
+		if _, exists := consumerResource.Properties[propertyPath]; !exists {
+			typed = providerResource
 		}
-
-		details["consumerPropertyType"] = consumerResource.Properties[propertyPath].Type
-		details["providerPropertyType"] = providerResource.Properties[propertyPath].Type
+		details["propertyType"] = typeToken(typed, propertyPath)
 	}
 
 	return ContractBreakingChange{
@@ -84,6 +94,16 @@ func NewPropertyBreakChange(
 		Reason:              reason,
 		Details:             details,
 	}
+}
+
+// typeToken renders a property's type, resolving array item types from the
+// flat property map: $.list (array) + $.list[] (string) → "array<string>".
+func typeToken(resource *model.PersistedResource, propertyPath string) string {
+	if resource.Properties[propertyPath].Type == "array" {
+		return "array<" + typeToken(resource, propertyPath+"[]") + ">"
+	}
+
+	return resource.Properties[propertyPath].Type
 }
 
 func NewProviderResourceNotDeployed(
