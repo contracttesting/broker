@@ -22,6 +22,10 @@ func (dc *DepthCounter) Enter() {
 	}
 }
 
+func (dc *DepthCounter) Exit() {
+	dc.counter = dc.counter - 1
+}
+
 func NewDepthCounter(schemaName string) *DepthCounter {
 	return &DepthCounter{
 		counter:    0,

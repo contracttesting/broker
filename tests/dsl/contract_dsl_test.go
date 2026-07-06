@@ -290,6 +290,67 @@ func TestHydrateContract_RefResolves_SubstitutesReferencedSchema(t *testing.T) {
 	assert.Equal(t, "string", resource.Properties["$.id"].Type)
 }
 
+const wideShallowContractJSON = `{
+  "provides": {
+    "rest": {
+      "/users": {
+        "get": {
+          "responses": { "200": "UsersList" }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "UsersList": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": { "$ref": "User" }
+        }
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "userId":        { "type": "string" },
+        "another":       { "type": "object" },
+        "somethingElse": { "type": "string" },
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId":        { "type": "string" },
+              "another":       { "type": "object" },
+              "somethingElse": { "type": "string" },
+              "list": {
+                "type": "array",
+                "items": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`
+
+func TestHydrateContract_WideShallowSchema_DoesNotPanicOnDepth(t *testing.T) {
+	contract := hydrate(t, wideShallowContractJSON)
+
+	require.Len(t, contract.Resources, 1)
+
+	var resource model.UploadedResource
+	for _, r := range contract.Resources {
+		resource = r
+	}
+
+	require.Contains(t, resource.Properties, "$.users[].list[].list[]")
+	assert.Equal(t, "array", resource.Properties["$.users[].list[].list"].Type)
+	assert.Equal(t, "string", resource.Properties["$.users[].list[].userId"].Type)
+}
+
 func TestHydrateContract_Unhappy_PanicsOnSchemaTooDeep(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(cyclicContractJSON), &dslContract))
