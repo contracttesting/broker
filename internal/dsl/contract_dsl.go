@@ -28,6 +28,10 @@ func (c *Contract) HydrateContract(contract *model.UploadedContract) error {
 		}
 	}
 
+	if err := validateSchemas(c.Schemas); err != nil {
+		return err
+	}
+
 	c.hydrateResources(contract, NewResourcePath(""), *c)
 
 	return nil
@@ -203,6 +207,28 @@ func buildSchema(
 ) map[string]model.Property {
 	switch unknown := unknown.(type) {
 	case Schema:
+		if unknown.IsAnyOf() {
+			properties[propertyPath.String()] = model.NewProperty(
+				propertyPath.String(),
+				"anyOf",
+				unknown.Optional,
+			)
+
+			for index, variant := range unknown.AnyOf {
+				depthCounter.Enter()
+				properties = buildSchema(
+					depthCounter,
+					schemas,
+					properties,
+					propertyPath.AppendVariant(index),
+					variant,
+				)
+				depthCounter.Exit()
+			}
+
+			return properties
+		}
+
 		if unknown.IsObject() {
 			properties[propertyPath.String()] = model.NewProperty(
 				propertyPath.String(),

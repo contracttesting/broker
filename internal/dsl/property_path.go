@@ -1,6 +1,9 @@
 package dsl
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 type PropertyPath string
 
@@ -23,4 +26,8 @@ func (f *PropertyPath) Append(chunk string) PropertyPath {
 
 func (f *PropertyPath) AppendArray() PropertyPath {
 	return PropertyPath(f.String() + "[]")
+}
+
+func (f *PropertyPath) AppendVariant(index int) PropertyPath {
+	return PropertyPath(f.String() + "#" + strconv.Itoa(index))
 }

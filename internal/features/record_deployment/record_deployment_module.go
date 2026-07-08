@@ -10,6 +10,7 @@ func Register(components *components.Components) {
 	contractRepository := repository.NewContractRepository(components.Pool)
 	environmentRepository := repository.NewEnvironmentRepository(components.Pool)
 	deploymentRepository := repository.NewDeploymentRepository(components.Pool)
-	handler := NewRecordDeploymentHandler(deploymentRepository, participantRepository, contractRepository, environmentRepository)
+	compatibilityCheckRepository := repository.NewCompatibilityCheckRepository(components.Pool)
+	handler := NewRecordDeploymentHandler(deploymentRepository, participantRepository, contractRepository, environmentRepository, compatibilityCheckRepository)
 	components.Server.Post("/api/deployments", handler.Handle)
 }

@@ -1,0 +1,20 @@
+consumes:
+  pets-service:
+    rest:
+      "/pets":
+        get:
+          responses:
+            '200': Pets
+
+schemas:
+  # Cannot read any provider variant: Pet returns age as integer, Dog has no age.
+  Pet:
+    type: object
+    properties:
+      age:
+        type: string
+
+  Pets:
+    type: array
+    items:
+      "$ref": Pet

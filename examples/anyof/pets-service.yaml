@@ -1,0 +1,32 @@
+provides:
+  rest:
+    "/pets":
+      get:
+        responses:
+          '200': Pets
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      uuid:
+        type: string
+      name:
+        type: string
+      age:
+        type: integer
+
+  Dog:
+    type: object
+    properties:
+      uuid:
+        type: string
+      name:
+        type: string
+
+  Pets:
+    type: array
+    items:
+      anyOf:
+        - "$ref": Pet
+        - "$ref": Dog

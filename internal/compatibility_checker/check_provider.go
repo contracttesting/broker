@@ -24,7 +24,7 @@ func (c *CompatibilityChecker) checkProvider(
 		result.IncompatibleCounterpart.ParticipantVersion = consumerResource.ParticipantVersion
 		result.IncompatibleCounterpart.ParticipantName = consumerResource.ParticipantName
 
-		for _, breakingChange := range checkResources(&providerResource, &consumerResource) {
+		for _, breakingChange := range CheckResources(&providerResource, &consumerResource) {
 			result.AppendContractBreakChange(breakingChange)
 		}
 

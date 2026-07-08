@@ -46,6 +46,9 @@ func (s *IntegrationSuite) TestRenameParticipant_SuccessPreservesIdentityAndRefe
 	status, _ = s.post("/api/environments", renameProductionEnvBody)
 	s.Require().Equal(http.StatusOK, status)
 
+	status, _ = s.post("/api/can-i-deploy", `{"participant":"pets-service","version":"v1","environment":"production"}`)
+	s.Require().Equal(http.StatusOK, status)
+
 	status, _ = s.post("/api/deployments", renameV1DeploymentBody)
 	s.Require().Equal(http.StatusOK, status)
 

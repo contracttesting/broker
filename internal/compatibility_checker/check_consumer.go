@@ -15,7 +15,7 @@ func (c *CompatibilityChecker) checkConsumer(
 	environment *model.Environment,
 	report *ContractCompatibilityReport,
 ) {
-	providerResource, err := c.repository.GetProviderResourceByConsumerResource(ctx, consumerResource.ProviderHash)
+	providerResource, err := c.repository.GetProviderResourceByConsumerResource(ctx, consumerResource.ProviderHash, environment.ID)
 
 	incompatibleItem := NewIncompatibleItem()
 
@@ -48,7 +48,7 @@ func (c *CompatibilityChecker) checkConsumer(
 	incompatibleItem.IncompatibleCounterpart.ParticipantVersion = providerResource.ParticipantVersion
 	incompatibleItem.IncompatibleCounterpart.ParticipantName = providerResource.ParticipantName
 
-	for _, breakingChange := range checkResources(&consumerResource, &providerResource) {
+	for _, breakingChange := range CheckResources(&consumerResource, &providerResource) {
 		incompatibleItem.AppendContractBreakChange(breakingChange)
 	}
 

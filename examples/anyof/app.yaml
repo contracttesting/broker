@@ -1,0 +1,22 @@
+consumes:
+  pets-service:
+    rest:
+      "/pets":
+        get:
+          responses:
+            '200': Pets
+
+schemas:
+  # Reads only fields every provider variant returns: accepts both Pet and Dog.
+  Pet:
+    type: object
+    properties:
+      uuid:
+        type: string
+      name:
+        type: string
+
+  Pets:
+    type: array
+    items:
+      "$ref": Pet

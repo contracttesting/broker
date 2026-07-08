@@ -8,6 +8,7 @@ type Schema struct {
 	Properties  map[string]Schema `json:"properties,omitzero"`
 	Items       *Schema           `json:"items,omitzero"`
 	Ref         string            `json:"$ref,omitzero"`
+	AnyOf       []Schema          `json:"anyOf,omitzero"`
 	Optional    bool              `json:"optional,omitzero"`
 }
 
@@ -45,4 +46,12 @@ func (s *Schema) IsRef() bool {
 	}
 
 	return s.Ref != ""
+}
+
+func (s *Schema) IsAnyOf() bool {
+	if s.Type != "" || s.Ref != "" || s.Properties != nil || s.Items != nil {
+		return false
+	}
+
+	return len(s.AnyOf) > 0
 }

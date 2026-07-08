@@ -122,6 +122,7 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ProviderContract+`}`)
 	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+frontV1ConsumerContract+`}`)
@@ -146,10 +147,15 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	s.Require().NotNil(v1Api.Endpoints)
 	s.Empty(v1Api.Endpoints)
 
-	s.Equal(1, s.countRows("compatibility_matrix"))
+	// one check for api's own pre-deployment run, one for front's
+	s.Equal(2, s.countRows("compatibility_checks"))
+	s.Equal(1, s.countRows("compatibility_check_results"))
 	var v1Deployable bool
 	s.Require().NoError(s.Pool.QueryRow(context.Background(),
-		`SELECT deployable FROM compatibility_matrix WHERE version = 'v1'`).Scan(&v1Deployable))
+		`SELECT c.deployable
+		   FROM compatibility_checks c
+		   JOIN participants p ON p.id = c.participant_id
+		  WHERE p.name = 'front' AND c.version = 'v1'`).Scan(&v1Deployable))
 	s.True(v1Deployable)
 
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
@@ -197,11 +203,23 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	s.Require().True(ok)
 	s.Equal(map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missing.Details)
 
-	s.Equal(2, s.countRows("compatibility_matrix"))
+	s.Equal(3, s.countRows("compatibility_checks"))
 	var v2Deployable bool
 	s.Require().NoError(s.Pool.QueryRow(context.Background(),
-		`SELECT deployable FROM compatibility_matrix WHERE version = 'v2'`).Scan(&v2Deployable))
+		`SELECT deployable FROM compatibility_checks WHERE version = 'v2'`).Scan(&v2Deployable))
 	s.False(v2Deployable)
+
+	var v2CounterpartVersion string
+	var v2ResultDeployable bool
+	var v2Reason string
+	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+		`SELECT r.counterpart_version, r.deployable, r.reason
+		   FROM compatibility_check_results r
+		   JOIN compatibility_checks c ON c.id = r.check_id
+		  WHERE c.version = 'v2'`).Scan(&v2CounterpartVersion, &v2ResultDeployable, &v2Reason))
+	s.Equal("v1", v2CounterpartVersion)
+	s.False(v2ResultDeployable)
+	s.Contains([]string{"property_type_mismatch", "property_missing_in_provider"}, v2Reason)
 }
 
 const providerCheckedConsumerContract = `
@@ -239,7 +257,9 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"participant":"production"}`)
 	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+providerCheckedConsumerContract+`}`)
-	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
+	// front's provider is not published yet: force the deployment through its red verdict
+	mustPost("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production","force":true}`)
 	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ProviderContract+`}`)
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
@@ -323,12 +343,14 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 		s.Empty(b.Details)
 	}
 
-	s.Equal(3, s.countRows("compatibility_matrix"))
-	var nonDeployable int
+	// never-created counterpart participants cannot be referenced by result rows;
+	// the failing verdict lives on the check row alone
+	s.Equal(1, s.countRows("compatibility_checks"))
+	s.Equal(0, s.countRows("compatibility_check_results"))
+	var deployable bool
 	s.Require().NoError(s.Pool.QueryRow(context.Background(),
-		`SELECT count(*) FROM compatibility_matrix WHERE version = 'v1' AND NOT deployable`).
-		Scan(&nonDeployable))
-	s.Equal(3, nonDeployable)
+		`SELECT deployable FROM compatibility_checks WHERE version = 'v1'`).Scan(&deployable))
+	s.False(deployable)
 }
 
 const usersV1ProviderContract = `
@@ -375,10 +397,13 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	mustPost("/api/environments", `{"participant":"production"}`)
 
 	mustPost("/api/contracts", `{"participant":"users","version":"v1","contract":`+usersV1ProviderContract+`}`)
+	mustPost("/api/can-i-deploy", `{"participant":"users","version":"v1","environment":"production"}`)
 	mustPost("/api/deployments", `{"participant":"users","version":"v1","environment":"production"}`)
 	mustPost("/api/contracts", `{"participant":"auth","version":"v1","contract":`+authV1ProviderContract+`}`)
+	mustPost("/api/can-i-deploy", `{"participant":"auth","version":"v1","environment":"production"}`)
 	mustPost("/api/deployments", `{"participant":"auth","version":"v1","environment":"production"}`)
 	mustPost("/api/contracts", `{"participant":"catalog","version":"v1","contract":`+catalogV1ProviderContract+`}`)
+	mustPost("/api/can-i-deploy", `{"participant":"catalog","version":"v1","environment":"production"}`)
 	mustPost("/api/deployments", `{"participant":"catalog","version":"v1","environment":"production"}`)
 
 	mustPost("/api/contracts", `{"participant":"app","version":"v1","contract":`+appV1MixedDependenciesContract+`}`)
@@ -418,30 +443,49 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		"providerPropertyType": "string",
 	}, b.Details)
 
-	s.Equal(3, s.countRows("compatibility_matrix"))
+	// one check per provider pre-deployment run plus app's own
+	s.Equal(4, s.countRows("compatibility_checks"))
+	s.Equal(3, s.countRows("compatibility_check_results"))
+
+	var checkDeployable bool
+	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+		`SELECT c.deployable
+		   FROM compatibility_checks c
+		   JOIN participants p ON p.id = c.participant_id
+		  WHERE p.name = 'app' AND c.version = 'v1'`).Scan(&checkDeployable))
+	s.False(checkDeployable)
 
 	rows, err := s.Pool.Query(context.Background(),
-		`SELECT p.name, cm.deployable, cm.counterpart_version
-		   FROM compatibility_matrix cm
-		   JOIN participants p ON p.id = cm.counterpart_participant_id
-		  WHERE cm.version = 'v1'`)
+		`SELECT p.name, r.deployable, r.counterpart_version, r.reason
+		   FROM compatibility_check_results r
+		   JOIN compatibility_checks c ON c.id = r.check_id
+		   JOIN participants checked ON checked.id = c.participant_id
+		   JOIN participants p ON p.id = r.counterpart_participant_id
+		  WHERE checked.name = 'app' AND c.version = 'v1'`)
 	s.Require().NoError(err)
 	defer rows.Close()
 
 	deployableByProvider := map[string]bool{}
 	versionByProvider := map[string]string{}
+	reasonByProvider := map[string]*string{}
 	for rows.Next() {
 		var name string
 		var deployable bool
 		var counterpartVersion string
-		s.Require().NoError(rows.Scan(&name, &deployable, &counterpartVersion))
+		var reason *string
+		s.Require().NoError(rows.Scan(&name, &deployable, &counterpartVersion, &reason))
 		deployableByProvider[name] = deployable
 		versionByProvider[name] = counterpartVersion
+		reasonByProvider[name] = reason
 	}
 	s.Require().NoError(rows.Err())
 
 	s.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, deployableByProvider)
 	s.Equal(map[string]string{"users": "v1", "auth": "v1", "catalog": "v1"}, versionByProvider)
+	s.Nil(reasonByProvider["users"])
+	s.Nil(reasonByProvider["auth"])
+	s.Require().NotNil(reasonByProvider["catalog"])
+	s.Equal("property_type_mismatch", *reasonByProvider["catalog"])
 }
 
 const providerThingContract = `
@@ -468,6 +512,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 	mustPost("/api/environments", `{"participant":"staging"}`)
 
 	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+providerThingContract+`}`)
+	mustPost("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"staging"}`)
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"staging"}`)
 
 	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+consumerThingContract+`}`)
@@ -494,16 +539,20 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 	s.Equal(map[string]string{"deployedEnvironments": "staging"}, b.Details)
 
 	// the provider participant is known even though it is not deployed in the target
-	// environment: the matrix row keeps its identity with a NULL counterpart version
+	// environment: the result row keeps its identity with a NULL counterpart version
 	var counterpartName string
 	var counterpartVersion *string
+	var resultDeployable bool
+	var reason string
 	s.Require().NoError(s.Pool.QueryRow(context.Background(),
-		`SELECT p.name, cm.counterpart_version
-		   FROM compatibility_matrix cm
-		   JOIN participants p ON p.id = cm.counterpart_participant_id`).
-		Scan(&counterpartName, &counterpartVersion))
+		`SELECT p.name, r.counterpart_version, r.deployable, r.reason
+		   FROM compatibility_check_results r
+		   JOIN participants p ON p.id = r.counterpart_participant_id`).
+		Scan(&counterpartName, &counterpartVersion, &resultDeployable, &reason))
 	s.Equal("api", counterpartName)
 	s.Nil(counterpartVersion)
+	s.False(resultDeployable)
+	s.Equal("provider_resource_not_deployed_in_environment", reason)
 }
 
 const dualRoleUsersV1Contract = `
@@ -808,33 +857,34 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 		"providerPropertyType": "integer",
 	}, consumerBreaks[0].Details)
 
-	type matrixRow struct {
+	type checkResultRow struct {
 		Counterpart string
 		Version     string
 		Deployable  bool
 	}
 
 	rows, err := s.Pool.Query(context.Background(),
-		`SELECT counterpart.name, cm.counterpart_version, cm.deployable
-		   FROM compatibility_matrix cm
-		   JOIN participants checked ON checked.id = cm.participant_id
-		   JOIN participants counterpart ON counterpart.id = cm.counterpart_participant_id
-		  WHERE checked.name = 'pets' AND cm.version = 'v2'`)
+		`SELECT counterpart.name, r.counterpart_version, r.deployable
+		   FROM compatibility_check_results r
+		   JOIN compatibility_checks c ON c.id = r.check_id
+		   JOIN participants checked ON checked.id = c.participant_id
+		   JOIN participants counterpart ON counterpart.id = r.counterpart_participant_id
+		  WHERE checked.name = 'pets' AND c.version = 'v2'`)
 	s.Require().NoError(err)
 	defer rows.Close()
 
-	var matrixRows []matrixRow
+	var checkResultRows []checkResultRow
 	for rows.Next() {
-		var row matrixRow
+		var row checkResultRow
 		s.Require().NoError(rows.Scan(&row.Counterpart, &row.Version, &row.Deployable))
-		matrixRows = append(matrixRows, row)
+		checkResultRows = append(checkResultRows, row)
 	}
 	s.Require().NoError(rows.Err())
 
-	s.ElementsMatch([]matrixRow{
+	s.ElementsMatch([]checkResultRow{
 		{Counterpart: "users", Version: "v1", Deployable: false},
 		{Counterpart: "app", Version: "v1", Deployable: false},
-	}, matrixRows)
+	}, checkResultRows)
 }
 
 const arrayProviderContract = `
@@ -879,6 +929,7 @@ func (s *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty
 	mustPost("/api/environments", `{"participant":"production"}`)
 
 	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+arrayProviderContract+`}`)
+	mustPost("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+arrayConsumerContract+`}`)
 
@@ -918,6 +969,32 @@ func (s *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty
 	s.Require().True(ok)
 	s.Equal("property_missing_in_provider", items.Reason)
 	s.Equal(map[string]string{"property": "$.tags[]", "consumerName": "front", "providerName": "api", "propertyType": "string"}, items.Details)
+}
+
+func (s *IntegrationSuite) TestCanIDeploy_NoCounterpartsPersistsCheckWithZeroResults() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+providerThingContract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got canIDeployResponse
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	s.True(got.Deployable)
+	s.Empty(got.Results)
+
+	s.Equal(1, s.countRows("compatibility_checks"))
+	s.Equal(0, s.countRows("compatibility_check_results"))
+	var deployable bool
+	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+		`SELECT deployable FROM compatibility_checks`).Scan(&deployable))
+	s.True(deployable)
 }
 
 func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
