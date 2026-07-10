@@ -87,7 +87,7 @@ func (s *IntegrationSuite) TestHappyPath_PublishContract() {
 
 	var version string
 	err := s.Pool.QueryRow(context.Background(),
-		"SELECT version FROM contracts LIMIT 1",
+		"SELECT version FROM contract_versions LIMIT 1",
 	).Scan(&version)
 	s.Require().NoError(err)
 	s.Equal("1", version)
@@ -121,6 +121,52 @@ func (s *IntegrationSuite) TestPublish_SameVersionDifferentContent_Returns409() 
 	s.Equal(1, s.countRows("contracts"))
 }
 
+func (s *IntegrationSuite) TestPublish_NewVersionChangedContent_StoresSnapshotAndVersion() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, _ = s.post("/api/contracts", `{"participant":"pets-service","version":"sha1","contract":`+contractBody+`}`)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", `{"participant":"pets-service","version":"sha2","contract":`+contractBodyAlt+`}`)
+	s.Equal(http.StatusOK, status)
+	s.JSONEq(`{"message":"contract publish successful"}`, body)
+
+	s.Equal(2, s.countRows("contracts"))
+	s.Equal(2, s.countRows("contract_versions"))
+
+	var distinctSnapshots int
+	err := s.Pool.QueryRow(context.Background(),
+		"SELECT count(DISTINCT contract_id) FROM contract_versions",
+	).Scan(&distinctSnapshots)
+	s.Require().NoError(err)
+	s.Equal(2, distinctSnapshots)
+
+	s.Greater(s.countRows("property_versions"), 2)
+}
+
+func (s *IntegrationSuite) TestPublish_NewVersionUnchangedContent_InsertsAliasOnly() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, _ = s.post("/api/contracts", `{"participant":"pets-service","version":"sha1","contract":`+contractBody+`}`)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", `{"participant":"pets-service","version":"sha2","contract":`+contractBody+`}`)
+	s.Equal(http.StatusOK, status)
+	s.JSONEq(`{"message":"contract publish successful"}`, body)
+
+	s.Equal(1, s.countRows("contracts"))
+	s.Equal(2, s.countRows("contract_versions"))
+
+	var distinctSnapshots int
+	err := s.Pool.QueryRow(context.Background(),
+		"SELECT count(DISTINCT contract_id) FROM contract_versions",
+	).Scan(&distinctSnapshots)
+	s.Require().NoError(err)
+	s.Equal(1, distinctSnapshots)
+}
+
 func (s *IntegrationSuite) TestPublishContract_MissingContract() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
@@ -140,7 +186,7 @@ func (s *IntegrationSuite) TestPublishContract_CommitHashVersion() {
 
 	var version string
 	err := s.Pool.QueryRow(context.Background(),
-		"SELECT version FROM contracts LIMIT 1",
+		"SELECT version FROM contract_versions LIMIT 1",
 	).Scan(&version)
 	s.Require().NoError(err)
 	s.Equal("a1b2c3d4e5f6", version)

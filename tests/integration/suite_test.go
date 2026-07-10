@@ -80,6 +80,7 @@ func (s *IntegrationSuite) SetupTest() {
 			resource_versions,
 			properties,
 			resources,
+			contract_versions,
 			contracts,
 			participants,
 			environments
