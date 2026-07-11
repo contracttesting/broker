@@ -94,7 +94,8 @@ CREATE TABLE deployments (
   environment_id  BIGINT NOT NULL REFERENCES environments(id),
   rollback        boolean NOT NULL,
   forced          boolean NOT NULL DEFAULT false,
-  deployed_at     timestamptz NOT NULL DEFAULT now()
+  deployed_at     timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (participant_id, version) REFERENCES contract_versions(participant_id, version)
 );
 
 CREATE INDEX ON deployments (participant_id, environment_id, deployed_at DESC);
@@ -118,3 +119,5 @@ CREATE TABLE compatibility_check_results (
   deployable                 boolean NOT NULL,
   reason                     text
 );
+
+CREATE INDEX ON compatibility_check_results (check_id);

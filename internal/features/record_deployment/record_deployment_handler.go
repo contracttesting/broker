@@ -2,9 +2,9 @@ package record_deployment
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	"github.com/contracttesting/broker/internal/compatibility_checker"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
@@ -17,6 +17,7 @@ type RecordDeploymentHandler struct {
 	contractRepository           *repository.ContractRepository
 	environmentRepository        *repository.EnvironmentRepository
 	compatibilityCheckRepository *repository.CompatibilityCheckRepository
+	compatibilityChecker         *compatibility_checker.CompatibilityChecker
 }
 
 func NewRecordDeploymentHandler(
@@ -25,6 +26,7 @@ func NewRecordDeploymentHandler(
 	contractRepository *repository.ContractRepository,
 	environmentRepository *repository.EnvironmentRepository,
 	compatibilityCheckRepository *repository.CompatibilityCheckRepository,
+	compatibilityChecker *compatibility_checker.CompatibilityChecker,
 ) *RecordDeploymentHandler {
 	return &RecordDeploymentHandler{
 		deploymentRepository:         deploymentRepository,
@@ -32,6 +34,7 @@ func NewRecordDeploymentHandler(
 		contractRepository:           contractRepository,
 		environmentRepository:        environmentRepository,
 		compatibilityCheckRepository: compatibilityCheckRepository,
+		compatibilityChecker:         compatibilityChecker,
 	}
 }
 
@@ -124,10 +127,10 @@ type resolvedCounterpart struct {
 	version       null.String
 }
 
-// resolveCounterparts mirrors the compatibility checker's counterpart
-// resolution against the deployments currently in the target environment:
-// each consumed provider (NULL version when not deployed) and each deployed
-// consumer of a provided resource, one entry per counterpart participant.
+// resolveCounterparts re-runs the compatibility checker's own counterpart
+// resolution against the deployments currently in the target environment, so
+// drift detection compares the persisted check with exactly the counterpart
+// set a fresh check would see.
 func (h *RecordDeploymentHandler) resolveCounterparts(
 	ctx context.Context,
 	participantName string,
@@ -136,55 +139,26 @@ func (h *RecordDeploymentHandler) resolveCounterparts(
 ) map[string]resolvedCounterpart {
 	resolved := make(map[string]resolvedCounterpart)
 
-	appendResolved := func(name string, counterpart resolvedCounterpart) {
-		if existing, seen := resolved[name]; seen && (existing.version.Valid || !counterpart.version.Valid) {
-			return
-		}
-
-		resolved[name] = counterpart
-	}
-
 	contract, exists := h.contractRepository.GetContractByNameAndVersion(ctx, participantName, version)
 	if !exists {
 		return resolved
 	}
 
-	for _, resource := range contract.Resources {
-		switch resource.Direction {
-		case model.Consumes:
-			name := resource.ConsumedProvider.String
+	for name, result := range h.compatibilityChecker.Check(ctx, contract, environment).Results {
+		counterpart := resolvedCounterpart{
+			participantID: result.IncompatibleCounterpart.ParticipantID,
+			version:       result.IncompatibleCounterpart.ParticipantVersion,
+		}
 
-			provider, err := h.contractRepository.GetProviderResourceByConsumerResource(ctx, resource.ProviderHash, environment.ID)
-			if errors.Is(err, repository.ErrProviderResourceNotFound) {
-				counterpart := resolvedCounterpart{}
-				if providerParticipant, found := h.participantRepository.FindByName(ctx, name); found {
-					counterpart.participantID = providerParticipant.ID
-				}
-
-				appendResolved(name, counterpart)
-
-				continue
-			}
-			if err != nil {
-				panic(fmt.Errorf("error resolving consumed provider: %w", err))
-			}
-
-			counterpart := resolvedCounterpart{participantID: provider.ParticipantID}
-			if deployedVersion, deployed := provider.DeployedVersionIn(environment.Name); deployed {
-				counterpart.version = null.StringFrom(deployedVersion)
-			}
-
-			appendResolved(name, counterpart)
-
-		case model.Provides:
-			consumers := h.contractRepository.GetConsumersResourcesByProviderHashAndEnvironmentID(ctx, resource.ProviderHash, environment.ID)
-			for _, consumer := range consumers {
-				appendResolved(consumer.ParticipantName, resolvedCounterpart{
-					participantID: consumer.ParticipantID,
-					version:       consumer.ParticipantVersion,
-				})
+		if counterpart.participantID == 0 {
+			// the counterpart never published the consumed resource; its
+			// participant row may still exist and keep the verdict addressable
+			if participant, found := h.participantRepository.FindByName(ctx, name); found {
+				counterpart.participantID = participant.ID
 			}
 		}
+
+		resolved[name] = counterpart
 	}
 
 	return resolved
