@@ -22,18 +22,34 @@ const (
 	`
 
 	hasContractForVersionQuery = `
-		SELECT EXISTS(SELECT 1 FROM contracts WHERE participant_id = $1 AND version = $2)
+		SELECT EXISTS(SELECT 1 FROM contract_versions WHERE participant_id = $1 AND version = $2)
 	`
 
 	loadChecksumForVersionQuery = `
-		SELECT checksum FROM contracts WHERE participant_id = $1 AND version = $2
+		SELECT c.checksum
+		FROM contract_versions cv
+		JOIN contracts c ON c.id = cv.contract_id
+		WHERE cv.participant_id = $1 AND cv.version = $2
+	`
+
+	insertContractVersionQuery = `
+		INSERT INTO contract_versions
+			(participant_id, version, contract_id)
+		VALUES
+			($1, $2, $3)
+	`
+
+	aliasVersionToSnapshotQuery = `
+		INSERT INTO contract_versions
+			(participant_id, version, contract_id)
+		SELECT $1, $2, id FROM contracts WHERE participant_id = $1 AND checksum = $3
 	`
 
 	insertContractQuery = `
 		INSERT INTO contracts
-			(participant_id, version, checksum, raw_payload)
+			(participant_id, checksum, raw_payload)
 		VALUES
-			($1, $2, $3, $4)
+			($1, $2, $3)
 		RETURNING id
 	`
 
@@ -92,7 +108,7 @@ const (
 	getLatestContractByName = `
 		SELECT
 			c.id,
-			c.version,
+			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
 			c.raw_payload,
 			c.created_at,
 			pa.id,
@@ -139,7 +155,7 @@ const (
 	getContractByNameAndVersion = `
 		SELECT
 			c.id,
-			c.version,
+			cv.version,
 			c.raw_payload,
 			c.created_at,
 			pa.id,
@@ -159,9 +175,10 @@ const (
 			pv.type,
 			pv.optional,
 			pv.change_type
-		FROM contracts c
-		JOIN participants pa ON pa.id = c.participant_id
-		JOIN resources r ON r.participant_id = c.participant_id
+		FROM contract_versions cv
+		JOIN contracts c ON c.id = cv.contract_id
+		JOIN participants pa ON pa.id = cv.participant_id
+		JOIN resources r ON r.participant_id = cv.participant_id
 		JOIN LATERAL (
 			SELECT change_type
 			FROM resource_versions
@@ -178,7 +195,7 @@ const (
 			LIMIT 1
 		) pv ON true
 		WHERE pa.name = $1
-		  AND c.version = $2
+		  AND cv.version = $2
 		  AND rv.change_type = 'added'
 		ORDER BY r.id
 	`
@@ -215,10 +232,16 @@ const (
 			LIMIT 1
 		) dep ON true
 		JOIN LATERAL (
+			SELECT contract_id
+			FROM contract_versions
+			WHERE participant_id = r.participant_id
+			  AND version = dep.version
+		) anchor ON true
+		JOIN LATERAL (
 			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id
-			  AND contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+			  AND contract_id <= anchor.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
@@ -231,6 +254,8 @@ const (
 				property_versions
 			WHERE
 				property_id = p.id
+			AND
+				contract_id <= anchor.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) pv ON true
@@ -240,6 +265,8 @@ const (
 			r.provider_hash = $2
 		AND
 			rv.change_type = 'added'
+		AND
+			(p.id IS NULL OR (pv.change_type IS NOT NULL AND pv.change_type <> 'removed'))
 	`
 
 	loadProviderResourceWithDeploymentsQuery = `
@@ -267,10 +294,26 @@ const (
 		JOIN
 			participants pa ON pa.id = r.participant_id
 		JOIN LATERAL (
+			SELECT COALESCE(
+				(SELECT cv.contract_id
+				 FROM contract_versions cv
+				 WHERE cv.participant_id = r.participant_id
+				   AND cv.version = (
+					SELECT version
+					FROM deployments
+					WHERE participant_id = r.participant_id
+					  AND environment_id = $3
+					ORDER BY deployed_at DESC
+					LIMIT 1
+				 )),
+				(SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+			) AS contract_id
+		) anchor ON true
+		JOIN LATERAL (
 			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id
-			  AND contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+			  AND contract_id <= anchor.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
@@ -283,6 +326,8 @@ const (
 				property_versions
 			WHERE
 				property_id = p.id
+			AND
+				contract_id <= anchor.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) pv ON true
@@ -300,6 +345,8 @@ const (
 			r.provider_hash = $2
 		AND
 			rv.change_type = 'added'
+		AND
+			(p.id IS NULL OR (pv.change_type IS NOT NULL AND pv.change_type <> 'removed'))
 	`
 )
 
@@ -356,6 +403,7 @@ func (r *ContractRepository) Create(
 	defer tx.Rollback(ctx)
 
 	r.insertContract(ctx, tx, contract)
+	r.insertContractVersion(ctx, tx, contract)
 
 	for _, resource := range contract.Resources {
 		resourceID := r.insertResource(ctx, tx, contract.ParticipantID, &resource)
@@ -389,15 +437,9 @@ func (r *ContractRepository) Update(
 	}
 
 	diffResourceProperties := contract_differ.DiffResourceProperties(loadedProperties(current), uploadedProperties(next))
-	if len(diffResourceProperties.Resources) == 0 {
-		if err := tx.Commit(ctx); err != nil {
-			panic(fmt.Errorf("error committing transaction: %w", err))
-		}
-
-		return
-	}
 
 	r.insertContract(ctx, tx, next)
+	r.insertContractVersion(ctx, tx, next)
 
 	for key, resourceChange := range diffResourceProperties.Resources {
 		switch resourceChange.Kind {
@@ -469,6 +511,36 @@ func uploadedProperties(contract *model.UploadedContract) map[string]contract_di
 	return out
 }
 
+func (r *ContractRepository) AliasVersionToSnapshot(
+	ctx context.Context,
+	participantID int64,
+	version string,
+	checksum string,
+) bool {
+	tag, err := r.pool.Exec(ctx, aliasVersionToSnapshotQuery, participantID, version, checksum)
+	if err != nil {
+		panic(fmt.Errorf("error aliasing version to snapshot: %w", err))
+	}
+
+	return tag.RowsAffected() > 0
+}
+
+func (r *ContractRepository) insertContractVersion(
+	ctx context.Context,
+	tx pgx.Tx,
+	contract *model.UploadedContract,
+) {
+	if _, err := tx.Exec(
+		ctx,
+		insertContractVersionQuery,
+		contract.ParticipantID,
+		contract.Version,
+		contract.ID,
+	); err != nil {
+		panic(fmt.Errorf("error inserting contract version: %w", err))
+	}
+}
+
 func (r *ContractRepository) insertContract(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -478,7 +550,6 @@ func (r *ContractRepository) insertContract(
 		ctx,
 		insertContractQuery,
 		contract.ParticipantID,
-		contract.Version,
 		contract.Checksum(),
 		contract.RawContract,
 	).Scan(&contract.ID); err != nil {
@@ -731,12 +802,14 @@ type CurrentConsumerInEnv struct {
 func (r *ContractRepository) GetProviderResourceByConsumerResource(
 	ctx context.Context,
 	providerHash string,
+	environmentID int64,
 ) (model.PersistedResource, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		loadProviderResourceWithDeploymentsQuery,
 		string(model.Provides),
 		providerHash,
+		environmentID,
 	)
 
 	if err != nil {

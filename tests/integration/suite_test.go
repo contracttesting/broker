@@ -72,13 +72,15 @@ func (s *IntegrationSuite) TearDownSuite() {
 
 func (s *IntegrationSuite) SetupTest() {
 	_, err := s.Pool.Exec(context.Background(),
-		`TRUNCATE 
-			compatibility_matrix,
+		`TRUNCATE
+			compatibility_check_results,
+			compatibility_checks,
 			deployments,
 			property_versions,
 			resource_versions,
 			properties,
 			resources,
+			contract_versions,
 			contracts,
 			participants,
 			environments

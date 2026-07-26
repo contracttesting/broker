@@ -58,6 +58,10 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondVersionConflict(ctx)
 	}
 
+	if ctr.contractRepository.AliasVersionToSnapshot(ctx.Context(), contract.ParticipantID, version, contract.Checksum()) {
+		return ctr.respondSuccess(ctx)
+	}
+
 	ctr.upsert(ctx, contract)
 
 	return ctr.respondSuccess(ctx)
