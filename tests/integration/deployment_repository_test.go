@@ -27,6 +27,9 @@ func (s *IntegrationSuite) insertDeploymentAt(participantID int64, version strin
 func (s *IntegrationSuite) TestCurrentVersionInEnv_RollbackPicksLatestRowEvenIfOlderVersion() {
 	s.seedApiParticipantContractAndProductionEnv()
 
+	status, _ := s.post("/api/contracts", `{"participant":"api","version":"v2","contract":`+apiV1ContractBody+`}`)
+	s.Require().Equal(http.StatusOK, status)
+
 	participantID := s.lookupParticipantID("api")
 	productionID := s.lookupEnvironmentID("production")
 
@@ -56,6 +59,9 @@ func (s *IntegrationSuite) TestCurrentVersionInEnv_ScopedPerEnvironment() {
 	s.seedApiParticipantContractAndProductionEnv()
 
 	status, _ := s.post("/api/environments", stagingEnvBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, _ = s.post("/api/contracts", `{"participant":"api","version":"v2","contract":`+apiV1ContractBody+`}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	participantID := s.lookupParticipantID("api")

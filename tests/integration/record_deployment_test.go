@@ -68,6 +68,10 @@ func (s *IntegrationSuite) seedApiParticipantContractAndProductionEnv() {
 
 	status, _ = s.post("/api/environments", productionEnvBodyForDeploy)
 	s.Require().Equal(http.StatusOK, status)
+
+	// record-deployment requires a prior can-i-deploy verdict
+	status, _ = s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	s.Require().Equal(http.StatusOK, status)
 }
 
 func (s *IntegrationSuite) TestRecordDeployment_Success() {
@@ -134,6 +138,12 @@ func (s *IntegrationSuite) TestRecordDeployment_RollbackWritesNewRow() {
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/environments", productionEnvBodyForDeploy)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, _ = s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, _ = s.post("/api/can-i-deploy", `{"participant":"api","version":"v2","environment":"production"}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/deployments", apiV1DeploymentBody)

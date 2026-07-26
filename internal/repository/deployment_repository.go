@@ -25,12 +25,13 @@ const (
 			LIMIT 1
 		)
 		INSERT INTO deployments
-			(participant_id, version, environment_id, rollback)
+			(participant_id, version, environment_id, rollback, forced)
 		SELECT
 			$1,
 			$2,
 			$3,
-			EXISTS (SELECT 1 FROM prior WHERE version = $2)
+			EXISTS (SELECT 1 FROM prior WHERE version = $2),
+			$4
 		WHERE COALESCE((SELECT version FROM latest), '') <> $2
 		RETURNING id, rollback, deployed_at
 	`
@@ -72,6 +73,7 @@ func (r *DeploymentRepository) Insert(ctx context.Context, d *model.Deployment) 
 		d.Participant.ID,
 		d.Version,
 		d.Environment.ID,
+		d.Forced,
 	).Scan(&d.ID, &d.Rollback, &d.DeployedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return

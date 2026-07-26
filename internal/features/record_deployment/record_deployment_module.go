@@ -1,6 +1,7 @@
 package record_deployment
 
 import (
+	"github.com/contracttesting/broker/internal/compatibility_checker"
 	"github.com/contracttesting/broker/internal/components"
 	"github.com/contracttesting/broker/internal/repository"
 )
@@ -10,6 +11,8 @@ func Register(components *components.Components) {
 	contractRepository := repository.NewContractRepository(components.Pool)
 	environmentRepository := repository.NewEnvironmentRepository(components.Pool)
 	deploymentRepository := repository.NewDeploymentRepository(components.Pool)
-	handler := NewRecordDeploymentHandler(deploymentRepository, participantRepository, contractRepository, environmentRepository)
+	compatibilityCheckRepository := repository.NewCompatibilityCheckRepository(components.Pool)
+	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(contractRepository)
+	handler := NewRecordDeploymentHandler(deploymentRepository, participantRepository, contractRepository, environmentRepository, compatibilityCheckRepository, compatibilityChecker)
 	components.Server.Post("/api/deployments", handler.Handle)
 }
