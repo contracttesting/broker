@@ -13,15 +13,22 @@ CREATE TABLE environments (
 CREATE TABLE contracts (
   id              BIGSERIAL PRIMARY KEY,
   participant_id  BIGINT NOT NULL REFERENCES participants(id),
-  version         text NOT NULL,
   checksum        text NOT NULL,
   raw_payload     text NOT NULL,
   created_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (participant_id, version),
   UNIQUE (participant_id, checksum)
 );
 
-CREATE INDEX ON contracts (participant_id, version DESC);
+CREATE TABLE contract_versions (
+  id              BIGSERIAL PRIMARY KEY,
+  participant_id  BIGINT NOT NULL REFERENCES participants(id),
+  version         text NOT NULL,
+  contract_id     BIGINT NOT NULL REFERENCES contracts(id),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (participant_id, version)
+);
+
+CREATE INDEX ON contract_versions (contract_id);
 
 CREATE TABLE resources (
   id                    BIGSERIAL PRIMARY KEY,
@@ -86,24 +93,31 @@ CREATE TABLE deployments (
   version         text NOT NULL,
   environment_id  BIGINT NOT NULL REFERENCES environments(id),
   rollback        boolean NOT NULL,
-  deployed_at     timestamptz NOT NULL DEFAULT now()
+  forced          boolean NOT NULL DEFAULT false,
+  deployed_at     timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (participant_id, version) REFERENCES contract_versions(participant_id, version)
 );
 
 CREATE INDEX ON deployments (participant_id, environment_id, deployed_at DESC);
 
-CREATE TABLE compatibility_matrix (
-  id                         BIGSERIAL PRIMARY KEY,
-  participant_id             BIGINT NOT NULL REFERENCES participants(id),
-  version                    text NOT NULL,
-  counterpart_participant_id BIGINT REFERENCES participants(id),
-  counterpart_version        text,
-  deployable                 boolean NOT NULL,
-  created_at                 timestamptz NOT NULL DEFAULT now(),
-  CHECK (
-    (counterpart_participant_id IS NULL AND counterpart_version IS NULL)
-      OR
-    (counterpart_participant_id IS NOT NULL)
-  )
+CREATE TABLE compatibility_checks (
+  id              BIGSERIAL PRIMARY KEY,
+  participant_id  BIGINT NOT NULL REFERENCES participants(id),
+  version         text NOT NULL,
+  environment_id  BIGINT NOT NULL REFERENCES environments(id),
+  deployable      boolean NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX ON compatibility_matrix (participant_id, version, created_at DESC);
+CREATE INDEX ON compatibility_checks (participant_id, version, environment_id, created_at DESC);
+
+CREATE TABLE compatibility_check_results (
+  id                         BIGSERIAL PRIMARY KEY,
+  check_id                   BIGINT NOT NULL REFERENCES compatibility_checks(id),
+  counterpart_participant_id BIGINT NOT NULL REFERENCES participants(id),
+  counterpart_version        text,
+  deployable                 boolean NOT NULL,
+  reason                     text
+);
+
+CREATE INDEX ON compatibility_check_results (check_id);
