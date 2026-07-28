@@ -215,10 +215,18 @@ const (
 			LIMIT 1
 		) dep ON true
 		JOIN LATERAL (
+			SELECT COALESCE(
+				(SELECT id FROM contracts
+				  WHERE participant_id = r.participant_id
+				    AND version = dep.version),
+				(SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+			) AS contract_id
+		) anchor ON true
+		JOIN LATERAL (
 			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id
-			  AND contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+			  AND contract_id <= anchor.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
@@ -232,7 +240,7 @@ const (
 			WHERE
 				property_id = p.id
 			AND
-				contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+				contract_id <= anchor.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) pv ON true
@@ -271,10 +279,25 @@ const (
 		JOIN
 			participants pa ON pa.id = r.participant_id
 		JOIN LATERAL (
+			SELECT COALESCE(
+				(SELECT id FROM contracts
+				  WHERE participant_id = r.participant_id
+				    AND version = (
+					SELECT version
+					FROM deployments
+					WHERE participant_id = r.participant_id
+					  AND environment_id = $3
+					ORDER BY deployed_at DESC
+					LIMIT 1
+				 )),
+				(SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+			) AS contract_id
+		) anchor ON true
+		JOIN LATERAL (
 			SELECT change_type
 			FROM resource_versions
 			WHERE resource_id = r.id
-			  AND contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+			  AND contract_id <= anchor.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) rv ON true
@@ -288,7 +311,7 @@ const (
 			WHERE
 				property_id = p.id
 			AND
-				contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
+				contract_id <= anchor.contract_id
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) pv ON true
@@ -739,12 +762,14 @@ type CurrentConsumerInEnv struct {
 func (r *ContractRepository) GetProviderResourceByConsumerResource(
 	ctx context.Context,
 	providerHash string,
+	environmentID int64,
 ) (model.PersistedResource, error) {
 	rows, err := r.pool.Query(
 		ctx,
 		loadProviderResourceWithDeploymentsQuery,
 		string(model.Provides),
 		providerHash,
+		environmentID,
 	)
 
 	if err != nil {
