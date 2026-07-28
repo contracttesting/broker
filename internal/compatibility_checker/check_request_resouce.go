@@ -13,13 +13,15 @@ func checkRequestResource(
 	for providerPropertyPath, providerProperty := range provider.Properties {
 		consumerProperty, propertyExists := consumer.Properties[providerPropertyPath]
 		// If the property is not present in the consumer and is not optional, it is a breaking change.
-		if !propertyExists && !providerProperty.Optional {
-			breaks = append(breaks, NewPropertyBreakChange(
-				checked,
-				counterpart,
-				ReasonPropertyMissingInConsumer,
-				providerPropertyPath,
-			))
+		if !propertyExists {
+			if !providerProperty.Optional {
+				breaks = append(breaks, NewPropertyBreakChange(
+					checked,
+					counterpart,
+					ReasonPropertyMissingInConsumer,
+					providerPropertyPath,
+				))
+			}
 
 			continue
 		}

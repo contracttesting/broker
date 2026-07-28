@@ -187,13 +187,15 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	s.Require().True(ok)
 	s.Equal(map[string]string{
 		"property":             "$.id",
+		"consumerName":         "front",
+		"providerName":         "api",
 		"consumerPropertyType": "integer",
 		"providerPropertyType": "string",
 	}, typeMismatch.Details)
 
 	missing, ok := byReason["property_missing_in_provider"]
 	s.Require().True(ok)
-	s.Equal(map[string]string{"property": "$.name"}, missing.Details)
+	s.Equal(map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missing.Details)
 
 	s.Equal(2, s.countRows("compatibility_matrix"))
 	var v2Deployable bool
@@ -263,6 +265,8 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer
 	// types resolved by role even though the provider is the checked side
 	s.Equal(map[string]string{
 		"property":             "$.id",
+		"consumerName":         "front",
+		"providerName":         "api",
 		"consumerPropertyType": "integer",
 		"providerPropertyType": "string",
 	}, b.Details)
@@ -408,6 +412,8 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	s.Equal("property_type_mismatch", b.Reason)
 	s.Equal(map[string]string{
 		"property":             "$.id",
+		"consumerName":         "app",
+		"providerName":         "catalog",
 		"consumerPropertyType": "integer",
 		"providerPropertyType": "string",
 	}, b.Details)
@@ -778,12 +784,12 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	requestBreaks := appResult.Endpoints["/pets"]["post"]["request"]
 	s.Require().Len(requestBreaks, 1)
 	s.Equal("property_missing_in_consumer", requestBreaks[0].Reason)
-	s.Equal(map[string]string{"property": "$.breed"}, requestBreaks[0].Details)
+	s.Equal(map[string]string{"property": "$.breed", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, requestBreaks[0].Details)
 
 	responseBreaks := appResult.Endpoints["/pets/*"]["get"]["200"]
 	s.Require().Len(responseBreaks, 1)
 	s.Equal("property_missing_in_provider", responseBreaks[0].Reason)
-	s.Equal(map[string]string{"property": "$.name"}, responseBreaks[0].Details)
+	s.Equal(map[string]string{"property": "$.name", "consumerName": "app", "providerName": "pets", "propertyType": "string"}, responseBreaks[0].Details)
 
 	usersResult, ok := got.Results["users"]
 	s.Require().True(ok)
@@ -796,6 +802,8 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	s.Equal("property_type_mismatch", consumerBreaks[0].Reason)
 	s.Equal(map[string]string{
 		"property":             "$.userId",
+		"consumerName":         "pets",
+		"providerName":         "users",
 		"consumerPropertyType": "string",
 		"providerPropertyType": "integer",
 	}, consumerBreaks[0].Details)
@@ -827,6 +835,89 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 		{Counterpart: "users", Version: "v1", Deployable: false},
 		{Counterpart: "app", Version: "v1", Deployable: false},
 	}, matrixRows)
+}
+
+const arrayProviderContract = `
+{
+  "provides": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } },
+  "schemas": { "Thing": { "type": "object", "properties": { "id": { "type": "string" } } } }
+}`
+
+const arrayConsumerContract = `
+{
+  "consumes": { "api": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } } },
+  "schemas": {
+    "Thing": {
+      "type": "object",
+      "properties": {
+        "id":   { "type": "string" },
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "name": { "type": "string" } }
+          }
+        },
+        "tags": {
+          "type": "array",
+          "optional": true,
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}`
+
+func (s *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
+
+	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+arrayProviderContract+`}`)
+	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
+	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+arrayConsumerContract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got canIDeployResponse
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+	s.False(got.Deployable)
+
+	breaks := got.Results["api"].Endpoints["/things"]["get"]["200"]
+	s.Require().Len(breaks, 4)
+
+	byProperty := map[string]breakJSON{}
+	for _, b := range breaks {
+		byProperty[b.Details["property"]] = b
+	}
+
+	// a missing required array reports itself and every property inside it
+	list, ok := byProperty["$.list"]
+	s.Require().True(ok)
+	s.Equal("property_missing_in_provider", list.Reason)
+	s.Equal(map[string]string{"property": "$.list", "consumerName": "front", "providerName": "api", "propertyType": "array<object>"}, list.Details)
+
+	listItems, ok := byProperty["$.list[]"]
+	s.Require().True(ok)
+	s.Equal("property_missing_in_provider", listItems.Reason)
+	s.Equal(map[string]string{"property": "$.list[]", "consumerName": "front", "providerName": "api", "propertyType": "object"}, listItems.Details)
+
+	listItemName, ok := byProperty["$.list[].name"]
+	s.Require().True(ok)
+	s.Equal("property_missing_in_provider", listItemName.Reason)
+	s.Equal(map[string]string{"property": "$.list[].name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, listItemName.Details)
+
+	// an optional missing array emits no break itself, but its required items still report
+	items, ok := byProperty["$.tags[]"]
+	s.Require().True(ok)
+	s.Equal("property_missing_in_provider", items.Reason)
+	s.Equal(map[string]string{"property": "$.tags[]", "consumerName": "front", "providerName": "api", "propertyType": "string"}, items.Details)
 }
 
 func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {

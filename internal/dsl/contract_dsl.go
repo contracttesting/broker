@@ -219,6 +219,7 @@ func buildSchema(
 					propertyPath.Append(name),
 					schemaProperties,
 				)
+				depthCounter.Exit()
 			}
 
 			return properties
@@ -239,6 +240,7 @@ func buildSchema(
 				propertyPath.AppendArray(),
 				unknown.Items,
 			)
+			depthCounter.Exit()
 
 			return properties
 		}
@@ -262,13 +264,13 @@ func buildSchema(
 				propertyPath,
 				schemas[unknown.Ref],
 			)
+			depthCounter.Exit()
 
 			return properties
 		}
 
 		return properties
 	case *Schema:
-		depthCounter.Enter()
 		return buildSchema(
 			depthCounter,
 			schemas,
