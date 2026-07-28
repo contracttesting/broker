@@ -13,15 +13,22 @@ CREATE TABLE environments (
 CREATE TABLE contracts (
   id              BIGSERIAL PRIMARY KEY,
   participant_id  BIGINT NOT NULL REFERENCES participants(id),
-  version         text NOT NULL,
   checksum        text NOT NULL,
   raw_payload     text NOT NULL,
   created_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (participant_id, version),
   UNIQUE (participant_id, checksum)
 );
 
-CREATE INDEX ON contracts (participant_id, version DESC);
+CREATE TABLE contract_versions (
+  id              BIGSERIAL PRIMARY KEY,
+  participant_id  BIGINT NOT NULL REFERENCES participants(id),
+  version         text NOT NULL,
+  contract_id     BIGINT NOT NULL REFERENCES contracts(id),
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (participant_id, version)
+);
+
+CREATE INDEX ON contract_versions (contract_id);
 
 CREATE TABLE resources (
   id                    BIGSERIAL PRIMARY KEY,
