@@ -18,8 +18,11 @@ const migrationTimestampLayout = "20060102150405"
 
 var migrationFilenamePattern = regexp.MustCompile(`^(\d{14})_([a-z0-9]+(?:_[a-z0-9]+)*)\.sql$`)
 
-const ensureMigrationsTableSQL = `
+const ensureMigrationsSchemaSQL = `
 CREATE SCHEMA IF NOT EXISTS %s;
+`
+
+const ensureMigrationsTableSQL = `
 CREATE TABLE IF NOT EXISTS %s (
     id SERIAL PRIMARY KEY,
     migration VARCHAR(255) NOT NULL UNIQUE,
@@ -94,12 +97,15 @@ func (m *Migrator) Migrate() error {
 }
 
 func (m *Migrator) ensureMigrationsTable() error {
-	schema := strings.SplitN(m.migrationsTable, ".", 2)[0]
-	sql := fmt.Sprintf(
-		ensureMigrationsTableSQL,
-		schema,
-		m.migrationsTable,
-	)
+	var sql string
+
+	// only a qualified name identifies a schema to create; an unqualified one resolves
+	// through search_path and must not be mistaken for a schema of its own
+	if schema, _, qualified := strings.Cut(m.migrationsTable, "."); qualified {
+		sql = fmt.Sprintf(ensureMigrationsSchemaSQL, schema)
+	}
+
+	sql += fmt.Sprintf(ensureMigrationsTableSQL, m.migrationsTable)
 
 	if _, err := m.pool.Exec(context.Background(), sql); err != nil {
 		return err

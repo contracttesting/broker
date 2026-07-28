@@ -44,7 +44,7 @@ func runMigrations(pool *pgxpool.Pool) {
 	m := migrator.New(
 		pool,
 		migrationsDir,
-		"schema_migrations",
+		"public.schema_migrations",
 	)
 
 	if err := m.Migrate(); err != nil {
