@@ -231,6 +231,8 @@ const (
 				property_versions
 			WHERE
 				property_id = p.id
+			AND
+				contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) pv ON true
@@ -240,6 +242,8 @@ const (
 			r.provider_hash = $2
 		AND
 			rv.change_type = 'added'
+		AND
+			(p.id IS NULL OR (pv.change_type IS NOT NULL AND pv.change_type <> 'removed'))
 	`
 
 	loadProviderResourceWithDeploymentsQuery = `
@@ -283,6 +287,8 @@ const (
 				property_versions
 			WHERE
 				property_id = p.id
+			AND
+				contract_id <= (SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
 			ORDER BY contract_id DESC
 			LIMIT 1
 		) pv ON true
@@ -300,6 +306,8 @@ const (
 			r.provider_hash = $2
 		AND
 			rv.change_type = 'added'
+		AND
+			(p.id IS NULL OR (pv.change_type IS NOT NULL AND pv.change_type <> 'removed'))
 	`
 )
 

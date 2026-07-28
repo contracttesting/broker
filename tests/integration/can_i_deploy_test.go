@@ -954,3 +954,115 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
 	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
 	s.Empty(b.Details)
 }
+
+const removedRequestProviderV1Contract = `
+{
+  "provides": { "rest": { "/orders": { "post": { "request": "Order" } } } },
+  "schemas": {
+    "Order": {
+      "type": "object",
+      "properties": {
+        "id":     { "type": "string" },
+        "coupon": { "type": "string" }
+      }
+    }
+  }
+}`
+
+const removedRequestProviderV2Contract = `
+{
+  "provides": { "rest": { "/orders": { "post": { "request": "Order" } } } },
+  "schemas": {
+    "Order": { "type": "object", "properties": { "id": { "type": "string" } } }
+  }
+}`
+
+const removedRequestConsumerContract = `
+{
+  "consumes": { "api": { "rest": { "/orders": { "post": { "request": "Order" } } } } },
+  "schemas": {
+    "Order": { "type": "object", "properties": { "id": { "type": "string" } } }
+  }
+}`
+
+func (s *IntegrationSuite) TestCanIDeploy_RemovedProviderPropertyIsNotChecked() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
+
+	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+removedRequestProviderV1Contract+`}`)
+	mustPost("/api/contracts", `{"participant":"api","version":"v2","contract":`+removedRequestProviderV2Contract+`}`)
+	mustPost("/api/deployments", `{"participant":"api","version":"v2","environment":"production"}`)
+	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+removedRequestConsumerContract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got canIDeployResponse
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+
+	// $.coupon was removed in api v2, so it is no longer part of the provider resource
+	s.True(got.Deployable)
+	s.Require().Len(got.Results, 1)
+	api := got.Results["api"]
+	s.True(api.Deployable)
+	s.Empty(api.Endpoints)
+	s.NotContains(body, "$.coupon")
+}
+
+const removedResponseConsumerV1Contract = `
+{
+  "consumes": { "api": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } } },
+  "schemas": {
+    "Thing": {
+      "type": "object",
+      "properties": {
+        "id":     { "type": "string" },
+        "legacy": { "type": "string" }
+      }
+    }
+  }
+}`
+
+const removedResponseConsumerV2Contract = `
+{
+  "consumes": { "api": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } } },
+  "schemas": {
+    "Thing": { "type": "object", "properties": { "id": { "type": "string" } } }
+  }
+}`
+
+func (s *IntegrationSuite) TestCanIDeploy_RemovedConsumerPropertyIsNotChecked() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
+
+	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+removedResponseConsumerV1Contract+`}`)
+	mustPost("/api/contracts", `{"participant":"front","version":"v2","contract":`+removedResponseConsumerV2Contract+`}`)
+	mustPost("/api/deployments", `{"participant":"front","version":"v2","environment":"production"}`)
+	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ProviderContract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got canIDeployResponse
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+
+	// $.legacy was removed in front v2, so the deployed consumer no longer requires it
+	s.True(got.Deployable)
+	s.Require().Len(got.Results, 1)
+	front := got.Results["front"]
+	s.True(front.Deployable)
+	s.Empty(front.Endpoints)
+	s.NotContains(body, "$.legacy")
+}
