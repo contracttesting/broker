@@ -955,6 +955,75 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
 	s.Empty(b.Details)
 }
 
+const apiV2IncompatibleProviderContract = `
+{
+  "provides": { "rest": { "/things": { "get": { "responses": { "200": "Thing" } } } } },
+  "schemas": { "Thing": { "type": "object", "properties": { "id": { "type": "integer" } } } }
+}`
+
+func (s *IntegrationSuite) TestCanIDeploy_ChecksProviderAtItsDeployedVersion() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
+
+	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ProviderContract+`}`)
+	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
+	// published but never deployed — must not influence the verdict
+	mustPost("/api/contracts", `{"participant":"api","version":"v2","contract":`+apiV2IncompatibleProviderContract+`}`)
+	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+frontV1ConsumerContract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got canIDeployResponse
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+
+	s.True(got.Deployable)
+	s.Require().Len(got.Results, 1)
+	api := got.Results["api"]
+	s.True(api.Deployable)
+	s.Empty(api.Endpoints)
+	// the version compared against is the one reported
+	s.Require().NotNil(api.ParticipantVersion)
+	s.Equal("v1", *api.ParticipantVersion)
+}
+
+func (s *IntegrationSuite) TestCanIDeploy_ChecksConsumerAtItsDeployedVersion() {
+	mustPost := func(path, body string) {
+		status, _ := s.post(path, body)
+		s.Require().Equalf(http.StatusOK, status, "POST %s", path)
+	}
+
+	mustPost("/api/participants", `{"participant":"api"}`)
+	mustPost("/api/participants", `{"participant":"front"}`)
+	mustPost("/api/environments", `{"participant":"production"}`)
+
+	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+frontV1ConsumerContract+`}`)
+	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
+	// published but never deployed — must not influence the verdict
+	mustPost("/api/contracts", `{"participant":"front","version":"v2","contract":`+frontV2ConsumerContract+`}`)
+	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+apiV1ProviderContract+`}`)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusOK, status)
+
+	var got canIDeployResponse
+	s.Require().NoError(json.Unmarshal([]byte(body), &got))
+
+	s.True(got.Deployable)
+	s.Require().Len(got.Results, 1)
+	front := got.Results["front"]
+	s.True(front.Deployable)
+	s.Empty(front.Endpoints)
+	s.Require().NotNil(front.ParticipantVersion)
+	s.Equal("v1", *front.ParticipantVersion)
+}
+
 const removedRequestProviderV1Contract = `
 {
   "provides": { "rest": { "/orders": { "post": { "request": "Order" } } } },
