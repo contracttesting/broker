@@ -83,6 +83,15 @@ func (s *MigratorSuite) countMigrations() int {
 	return count
 }
 
+func (s *MigratorSuite) schemaExists(name string) bool {
+	var exists bool
+	query := `SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = $1)`
+	if err := s.pool.QueryRow(context.Background(), query, name).Scan(&exists); err != nil {
+		s.T().Fatalf("Failed to check schema existence: %v", err)
+	}
+	return exists
+}
+
 func (s *MigratorSuite) tableExists(name string) bool {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1)`
@@ -136,6 +145,33 @@ func (s *MigratorSuite) TestEnsuresMigrationsTable() {
 
 	s.True(s.tableExists("schema_migrations"))
 	s.Equal(0, s.countMigrations())
+}
+
+func (s *MigratorSuite) TestUnqualifiedTableNameCreatesNoSchema() {
+	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
+
+	m := migrator.New(s.pool, s.dir, "schema_migrations")
+	s.NoError(m.Migrate())
+
+	// the table resolves through search_path into public, and the table name is not
+	// mistaken for a schema to create
+	s.True(s.tableExists("schema_migrations"))
+	s.False(s.schemaExists("schema_migrations"))
+	s.Equal(1, s.countMigrations())
+}
+
+func (s *MigratorSuite) TestQualifiedTableNameCreatesItsSchema() {
+	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
+
+	m := migrator.New(s.pool, s.dir, "meta.schema_migrations")
+	s.NoError(m.Migrate())
+
+	s.True(s.schemaExists("meta"))
+
+	var count int
+	s.Require().NoError(s.pool.QueryRow(context.Background(),
+		"SELECT COUNT(*) FROM meta.schema_migrations").Scan(&count))
+	s.Equal(1, count)
 }
 
 func (s *MigratorSuite) TestSkipsNonSqlAndDirectories() {
