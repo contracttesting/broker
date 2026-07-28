@@ -22,19 +22,29 @@ const (
 	`
 
 	hasContractForVersionQuery = `
-		SELECT EXISTS(SELECT 1 FROM contracts WHERE participant_id = $1 AND version = $2)
+		SELECT EXISTS(SELECT 1 FROM contract_versions WHERE participant_id = $1 AND version = $2)
 	`
 
 	loadChecksumForVersionQuery = `
-		SELECT checksum FROM contracts WHERE participant_id = $1 AND version = $2
+		SELECT c.checksum
+		FROM contract_versions cv
+		JOIN contracts c ON c.id = cv.contract_id
+		WHERE cv.participant_id = $1 AND cv.version = $2
 	`
 
 	insertContractQuery = `
 		INSERT INTO contracts
-			(participant_id, version, checksum, raw_payload)
+			(participant_id, checksum, raw_payload)
 		VALUES
-			($1, $2, $3, $4)
+			($1, $2, $3)
 		RETURNING id
+	`
+
+	insertContractVersionQuery = `
+		INSERT INTO contract_versions
+			(participant_id, version, contract_id)
+		VALUES
+			($1, $2, $3)
 	`
 
 	insertResourceQuery = `
@@ -92,7 +102,7 @@ const (
 	getLatestContractByName = `
 		SELECT
 			c.id,
-			c.version,
+			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
 			c.raw_payload,
 			c.created_at,
 			pa.id,
@@ -139,7 +149,7 @@ const (
 	getContractByNameAndVersion = `
 		SELECT
 			c.id,
-			c.version,
+			cv.version,
 			c.raw_payload,
 			c.created_at,
 			pa.id,
@@ -159,9 +169,10 @@ const (
 			pv.type,
 			pv.optional,
 			pv.change_type
-		FROM contracts c
-		JOIN participants pa ON pa.id = c.participant_id
-		JOIN resources r ON r.participant_id = c.participant_id
+		FROM contract_versions cv
+		JOIN contracts c ON c.id = cv.contract_id
+		JOIN participants pa ON pa.id = cv.participant_id
+		JOIN resources r ON r.participant_id = cv.participant_id
 		JOIN LATERAL (
 			SELECT change_type
 			FROM resource_versions
@@ -178,7 +189,7 @@ const (
 			LIMIT 1
 		) pv ON true
 		WHERE pa.name = $1
-		  AND c.version = $2
+		  AND cv.version = $2
 		  AND rv.change_type = 'added'
 		ORDER BY r.id
 	`
@@ -216,9 +227,9 @@ const (
 		) dep ON true
 		JOIN LATERAL (
 			SELECT COALESCE(
-				(SELECT id FROM contracts
-				  WHERE participant_id = r.participant_id
-				    AND version = dep.version),
+				(SELECT cv.contract_id FROM contract_versions cv
+				  WHERE cv.participant_id = r.participant_id
+				    AND cv.version = dep.version),
 				(SELECT MAX(id) FROM contracts WHERE participant_id = r.participant_id)
 			) AS contract_id
 		) anchor ON true
@@ -280,9 +291,9 @@ const (
 			participants pa ON pa.id = r.participant_id
 		JOIN LATERAL (
 			SELECT COALESCE(
-				(SELECT id FROM contracts
-				  WHERE participant_id = r.participant_id
-				    AND version = (
+				(SELECT cv.contract_id FROM contract_versions cv
+				  WHERE cv.participant_id = r.participant_id
+				    AND cv.version = (
 					SELECT version
 					FROM deployments
 					WHERE participant_id = r.participant_id
@@ -387,6 +398,7 @@ func (r *ContractRepository) Create(
 	defer tx.Rollback(ctx)
 
 	r.insertContract(ctx, tx, contract)
+	r.insertContractVersion(ctx, tx, contract)
 
 	for _, resource := range contract.Resources {
 		resourceID := r.insertResource(ctx, tx, contract.ParticipantID, &resource)
@@ -429,6 +441,7 @@ func (r *ContractRepository) Update(
 	}
 
 	r.insertContract(ctx, tx, next)
+	r.insertContractVersion(ctx, tx, next)
 
 	for key, resourceChange := range diffResourceProperties.Resources {
 		switch resourceChange.Kind {
@@ -500,6 +513,22 @@ func uploadedProperties(contract *model.UploadedContract) map[string]contract_di
 	return out
 }
 
+func (r *ContractRepository) insertContractVersion(
+	ctx context.Context,
+	tx pgx.Tx,
+	contract *model.UploadedContract,
+) {
+	if _, err := tx.Exec(
+		ctx,
+		insertContractVersionQuery,
+		contract.ParticipantID,
+		contract.Version,
+		contract.ID,
+	); err != nil {
+		panic(fmt.Errorf("error inserting contract version: %w", err))
+	}
+}
+
 func (r *ContractRepository) insertContract(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -509,7 +538,6 @@ func (r *ContractRepository) insertContract(
 		ctx,
 		insertContractQuery,
 		contract.ParticipantID,
-		contract.Version,
 		contract.Checksum(),
 		contract.RawContract,
 	).Scan(&contract.ID); err != nil {

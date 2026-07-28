@@ -82,12 +82,13 @@ func (s *IntegrationSuite) TestHappyPath_PublishContract() {
 	s.JSONEq(`{"message":"contract publish successful"}`, body)
 
 	s.Equal(1, s.countRows("contracts"))
+	s.Equal(1, s.countRows("contract_versions"))
 	s.Equal(1, s.countRows("resources"))
 	s.GreaterOrEqual(s.countRows("properties"), 1)
 
 	var version string
 	err := s.Pool.QueryRow(context.Background(),
-		"SELECT version FROM contracts LIMIT 1",
+		"SELECT version FROM contract_versions LIMIT 1",
 	).Scan(&version)
 	s.Require().NoError(err)
 	s.Equal("1", version)
@@ -140,7 +141,7 @@ func (s *IntegrationSuite) TestPublishContract_CommitHashVersion() {
 
 	var version string
 	err := s.Pool.QueryRow(context.Background(),
-		"SELECT version FROM contracts LIMIT 1",
+		"SELECT version FROM contract_versions LIMIT 1",
 	).Scan(&version)
 	s.Require().NoError(err)
 	s.Equal("a1b2c3d4e5f6", version)
