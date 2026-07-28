@@ -47,6 +47,12 @@ const (
 			($1, $2, $3)
 	`
 
+	aliasVersionToSnapshotQuery = `
+		INSERT INTO contract_versions
+			(participant_id, version, contract_id)
+		SELECT $1, $2, id FROM contracts WHERE participant_id = $1 AND checksum = $3
+	`
+
 	insertResourceQuery = `
 		INSERT INTO resources
 			(
@@ -432,13 +438,6 @@ func (r *ContractRepository) Update(
 	}
 
 	diffResourceProperties := contract_differ.DiffResourceProperties(loadedProperties(current), uploadedProperties(next))
-	if len(diffResourceProperties.Resources) == 0 {
-		if err := tx.Commit(ctx); err != nil {
-			panic(fmt.Errorf("error committing transaction: %w", err))
-		}
-
-		return
-	}
 
 	r.insertContract(ctx, tx, next)
 	r.insertContractVersion(ctx, tx, next)
@@ -511,6 +510,22 @@ func uploadedProperties(contract *model.UploadedContract) map[string]contract_di
 		out[key] = resource.Properties
 	}
 	return out
+}
+
+// AliasVersionToSnapshot points a new version at an existing snapshot with the same
+// content, reporting whether one matched.
+func (r *ContractRepository) AliasVersionToSnapshot(
+	ctx context.Context,
+	participantID int64,
+	version string,
+	checksum string,
+) bool {
+	tag, err := r.pool.Exec(ctx, aliasVersionToSnapshotQuery, participantID, version, checksum)
+	if err != nil {
+		panic(fmt.Errorf("error aliasing version to snapshot: %w", err))
+	}
+
+	return tag.RowsAffected() > 0
 }
 
 func (r *ContractRepository) insertContractVersion(
