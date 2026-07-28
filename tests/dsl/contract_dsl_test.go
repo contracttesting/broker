@@ -351,6 +351,67 @@ func TestHydrateContract_WideShallowSchema_DoesNotPanicOnDepth(t *testing.T) {
 	assert.Equal(t, "string", resource.Properties["$.users[].list[].userId"].Type)
 }
 
+const deeplyNestedContractJSON = `{
+  "provides": {
+    "rest": {
+      "/pets": {
+        "get": {
+          "responses": { "200": "Pet" }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Pet": {
+      "type": "object",
+      "properties": { "l1": {
+        "type": "object",
+        "properties": { "l2": {
+          "type": "object",
+          "properties": { "l3": {
+            "type": "object",
+            "properties": { "l4": {
+              "type": "object",
+              "properties": { "l5": {
+                "type": "object",
+                "properties": { "l6": {
+                  "type": "object",
+                  "properties": { "l7": {
+                    "type": "object",
+                    "properties": { "l8": {
+                      "type": "object",
+                      "properties": { "l9": {
+                        "type": "object",
+                        "properties": { "l10": {
+                          "type": "object",
+                          "properties": { "l11": { "type": "string" } }
+                        } }
+                      } }
+                    } }
+                  } }
+                } }
+              } }
+            } }
+          } }
+        } }
+      } }
+    }
+  }
+}`
+
+func TestHydrateContract_Unhappy_PanicsOnDeeplyNestedSchema(t *testing.T) {
+	var dslContract dsl.Contract
+	require.NoError(t, json.Unmarshal([]byte(deeplyNestedContractJSON), &dslContract))
+
+	contract := model.NewUploadedContract(0, "petstore-app", "1", deeplyNestedContractJSON)
+
+	assert.PanicsWithValue(
+		t,
+		"schema Pet is too deep with more than 10 levels",
+		func() { _ = dslContract.HydrateContract(contract) },
+	)
+}
+
 func TestHydrateContract_Unhappy_PanicsOnSchemaTooDeep(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(cyclicContractJSON), &dslContract))
