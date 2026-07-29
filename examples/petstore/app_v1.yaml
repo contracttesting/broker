@@ -23,10 +23,7 @@ schemas:
     type: object
     properties:
       petId:
-        anyOf:
-          - type: number
-          - type: string
-          - type: integer
+        type: integer
       name:
         type: string
 
