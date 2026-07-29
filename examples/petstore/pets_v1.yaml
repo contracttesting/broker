@@ -73,9 +73,7 @@ schemas:
     type: object
     properties:
       petId:
-        anyOf:
-          - type: number
-          - type: string
+        type: integer
       userId:
         type: integer
       name:

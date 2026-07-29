@@ -43,7 +43,7 @@ func (ctr *CreateEnvironmentHandler) respondInvalidInput(ctx fiber.Ctx) error {
 }
 
 func (ctr *CreateEnvironmentHandler) respondAlreadyExists(ctx fiber.Ctx) error {
-	return ctx.Status(fiber.StatusBadRequest).JSON(CreateEnvironmentResponseBody{
+	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
 		Message: EnvironmentAlreadyExists,
 	})
 }
