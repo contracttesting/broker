@@ -1,0 +1,6 @@
+/cli
+/ctio
+*.test
+*.out
+vendor/
+.DS_Store

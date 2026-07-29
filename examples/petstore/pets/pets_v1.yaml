@@ -1,0 +1,108 @@
+consumes:
+  users:
+    rest:
+      "/users":
+        get:
+          responses:
+            "200": Users
+        post:
+          request: CreateUserRequest
+          responses:
+            "200": User
+      "/users/*":
+        put:
+          request: UpdateUserRequest
+          responses:
+            "200": User
+        delete:
+          responses:
+            "200": Message
+
+provides:
+  rest:
+    "/pets":
+      get:
+        responses:
+          "200": Pets
+      post:
+        request: CreatePetRequest
+        responses:
+          "200": Pet
+    "/pets/*":
+      put:
+        request: UpdatePetRequest
+        responses:
+          "200": Pet
+      delete:
+        responses:
+          "200": Message
+
+schemas:
+  # consumed from users: pets reads a subset of what users returns
+  User:
+    type: object
+    properties:
+      userId:
+        type: integer
+      email:
+        type: string
+
+  Users:
+    type: array
+    items:
+      "$ref": User
+
+  CreateUserRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+
+  UpdateUserRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      status:
+        type: string
+
+  # provided to consumers
+  Pet:
+    type: object
+    properties:
+      petId:
+        anyOf:
+          - type: number
+          - type: string
+      userId:
+        type: integer
+      name:
+        type: string
+
+  Pets:
+    type: array
+    items:
+      "$ref": Pet
+
+  CreatePetRequest:
+    type: object
+    properties:
+      name:
+        type: string
+      userId:
+        type: integer
+
+  UpdatePetRequest:
+    type: object
+    properties:
+      name:
+        type: string
+
+  # shared: provided on DELETE /pets/* and consumed from DELETE /users/*
+  Message:
+    type: object
+    properties:
+      message:
+        type: string
