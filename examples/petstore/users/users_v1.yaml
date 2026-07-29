@@ -1,0 +1,56 @@
+provides:
+  rest:
+    "/users":
+      get:
+        responses:
+          "200": Users
+      post:
+        request: CreateUserRequest
+        responses:
+          "200": User
+    "/users/*":
+      put:
+        request: UpdateUserRequest
+        responses:
+          "200": User
+      delete:
+        responses:
+          "200": Message
+
+schemas:
+  User:
+    type: object
+    properties:
+      userId:
+        type: integer
+      email:
+        type: string
+      status:
+        type: string
+
+  Users:
+    type: array
+    items:
+      "$ref": User
+
+  CreateUserRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+
+  UpdateUserRequest:
+    type: object
+    properties:
+      email:
+        type: string
+      status:
+        type: string
+
+  Message:
+    type: object
+    properties:
+      message:
+        type: string

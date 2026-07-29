@@ -4,6 +4,12 @@
 *.out
 vendor/
 
+# Built binaries
+/broker/broker
+/broker/main
+/cli/cli
+/cli/ctio
+
 # IDE / editor
 .idea/
 .vscode/
