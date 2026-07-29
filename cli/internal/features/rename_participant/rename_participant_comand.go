@@ -32,7 +32,7 @@ func NewRenameParticipantCommand(client *RenameParticipantClient) *cobra.Command
 			return err
 		}
 
-		fmt.Fprintf(command.OutOrStdout(), "✏️ %s\n", message)
+		fmt.Fprintf(command.OutOrStdout(), "✏️ %s %s to %s\n", oldName, message, newName)
 		return nil
 	}
 

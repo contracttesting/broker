@@ -57,7 +57,7 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 			return err
 		}
 
-		fmt.Fprintf(command.OutOrStdout(), "📜 %s\n", message)
+		fmt.Fprintf(command.OutOrStdout(), "📜 %s %s\n", participant, message)
 
 		return nil
 	}
