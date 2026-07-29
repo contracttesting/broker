@@ -40,7 +40,7 @@ func NewRecordDeploymentCommand(client *RecordDeploymentClient) *cobra.Command {
 			return err
 		}
 
-		fmt.Fprintf(command.OutOrStdout(), "🎉 %s\n", message)
+		fmt.Fprintf(command.OutOrStdout(), "🎉 %s %s to %s\n", participant, message, environment)
 		return nil
 	}
 

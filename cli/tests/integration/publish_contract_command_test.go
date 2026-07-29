@@ -56,7 +56,7 @@ func TestPublishContractCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, `{"participant":"pets-service","version":"v1","contract":{"provides":{"rest":{}}}}`, string(capturedBody))
-		assert.Contains(t, out.String(), "contract publish successful")
+		assert.Contains(t, out.String(), participant+" contract publish successful")
 		assert.Empty(t, errOut.String())
 	})
 

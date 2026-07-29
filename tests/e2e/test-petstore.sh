@@ -22,15 +22,15 @@ ctio create-participant users
 ctio create-participant pets
 ctio create-participant app
 
-ctio publish ./examples/petstore/users/users_v1.yaml --participant users --version v1
-ctio publish ./examples/petstore/pets/pets_v1.yaml --participant pets --version v1
-ctio publish ./examples/petstore/app/app_v1.yaml --participant app --version v1
+ctio publish ./examples/petstore/users_v1.yaml --participant users --version v1
+ctio publish ./examples/petstore/pets_v1.yaml --participant pets --version v1
+ctio publish ./examples/petstore/app_v1.yaml --participant app --version v1
 
 ctio can-i-deploy users --version v1 --environment production
 ctio record-deployment users --version v1 --environment production
 
-# ctio can-i-deploy pets --version v1 --environment production
+ctio can-i-deploy pets --version v1 --environment production
 ctio record-deployment pets --version v1 --environment production
 
-# ctio can-i-deploy app --version v1 --environment production
-# ctio record-deployment app --version v1 --environment production
+ctio can-i-deploy app --version v1 --environment production
+ctio record-deployment app --version v1 --environment production
