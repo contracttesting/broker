@@ -14,12 +14,12 @@ func (s *IntegrationSuite) TestHappyPath_CreateEnvironment() {
 	s.Equal(1, s.countRows("environments"))
 }
 
-func (s *IntegrationSuite) TestUnhappyPath_DuplicateEnvironmentName() {
+func (s *IntegrationSuite) TestIdempotent_DuplicateEnvironmentName() {
 	status, _ := s.post("/api/environments", productionEnvironmentBody)
 	s.Equal(http.StatusOK, status)
 
 	status, body := s.post("/api/environments", productionEnvironmentBody)
-	s.Equal(http.StatusBadRequest, status)
+	s.Equal(http.StatusOK, status)
 	s.JSONEq(`{"message":"environment already exists"}`, body)
 
 	s.Equal(1, s.countRows("environments"))
