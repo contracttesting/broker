@@ -2,19 +2,7 @@
 
 # paths below are relative to the repository root, so run from anywhere
 cd "$(dirname "$0")/../.." || exit 1
-
-sudo psql -q -U alefcastelo -d contracttesting -v ON_ERROR_STOP=1 <<'SQL'
-DO $$
-DECLARE tables text;
-BEGIN
-  SELECT string_agg(format('public.%I', tablename), ', ')
-    INTO tables
-    FROM pg_tables
-   WHERE schemaname = 'public' AND tablename <> 'schema_migrations';
-  EXECUTE format('TRUNCATE %s RESTART IDENTITY CASCADE', tables);
-END $$;
-SQL
-sudo go build -C ./cli -o /usr/local/bin/ctio ./cmd/
+go build -C ./cli -o "$HOME/.local/bin/ctio" ./cmd/ || exit 1
 
 ctio create-environment production
 
