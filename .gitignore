@@ -1,24 +1,6 @@
-# Go build artifacts
-*.exe
+/broker
+/main
 *.test
 *.out
-vendor/
-
-# Built binaries
-/broker/broker
-/broker/main
-/cli/cli
-/cli/ctio
-
-# IDE / editor
-.idea/
-.vscode/
-*.swp
-
-# OS noise
-.DS_Store
-Thumbs.db
-
-# Local env / secrets
 .env
-.env.*
+.DS_Store
