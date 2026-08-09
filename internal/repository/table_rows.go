@@ -59,14 +59,15 @@ func (c *tableRow) toPersistedContractModel() *model.PersistedContract {
 
 func (c *tableRow) toResourceModel() model.PersistedResource {
 	resource := model.PersistedResource{
-		Direction:          model.Direction(c.ResourceDirection),
-		Interaction:        model.Interaction(c.ResourceInteraction),
-		Endpoint:           c.ResourceEndpoint,
-		Method:             c.ResourceMethod,
-		Properties:         make(map[string]model.Property),
-		DeployedVersions:   make(map[string]string),
+		Direction:        model.Direction(c.ResourceDirection),
+		Interaction:      model.Interaction(c.ResourceInteraction),
+		Endpoint:         c.ResourceEndpoint,
+		Method:           c.ResourceMethod,
+		Properties:       make(map[string]model.Property),
+		DeployedVersions: make(map[string]string),
 		ParticipantName:  c.ParticipantName,
 		ParticipantID:    c.ParticipantID,
+		ContractID:       c.ContractID,
 		ProviderHash:     c.ResourceProviderHash,
 	}
 

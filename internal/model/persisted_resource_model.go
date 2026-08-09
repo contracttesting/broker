@@ -9,6 +9,7 @@ import (
 type PersistedResource struct {
 	ParticipantID      int64               `json:"-"`
 	ParticipantName    string              `json:"-"`
+	ContractID         int64               `json:"-"`
 	Direction          Direction           `json:"direction"`
 	Interaction        Interaction         `json:"interaction"`
 	ConsumedProvider   null.String         `json:"consumedProvider"`
