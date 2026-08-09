@@ -218,7 +218,8 @@ const (
 			pv.type,
 			pv.optional,
 			pv.change_type,
-			dep.version
+			dep.version,
+			anchor.contract_id
 		FROM
 			resources r
 		JOIN
@@ -290,7 +291,8 @@ const (
 			pv.optional,
 			pv.change_type,
 			e.name,
-			dep.version
+			dep.version,
+			anchor.contract_id
 		FROM
 			resources r
 		JOIN
@@ -846,6 +848,7 @@ func (r *ContractRepository) GetProviderResourceByConsumerResource(
 			&row.PropertyVersionChangeType,
 			&row.DeploymentEnvironment,
 			&row.DeploymentVersion,
+			&row.ContractID,
 		); err != nil {
 			panic(fmt.Errorf("error scanning provider resource of consumer: %w", err))
 		}
@@ -911,6 +914,7 @@ func (r *ContractRepository) GetConsumersResourcesByProviderHashAndEnvironmentID
 			&row.PropertyVersionOptional,
 			&row.PropertyVersionChangeType,
 			&row.ResourceVersion,
+			&row.ContractID,
 		); err != nil {
 			panic(fmt.Errorf("error scanning consumer: %w", err))
 		}

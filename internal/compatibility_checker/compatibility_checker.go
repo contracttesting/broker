@@ -7,13 +7,22 @@ import (
 	"github.com/contracttesting/broker/internal/repository"
 )
 
-type CompatibilityChecker struct {
-	repository *repository.ContractRepository
+type VerdictReader interface {
+	GetVerdict(ctx context.Context, one, two int64) (*model.CompatibilityVerdict, bool)
 }
 
-func NewCompatibilityChecker(repository *repository.ContractRepository) *CompatibilityChecker {
+type CompatibilityChecker struct {
+	repository *repository.ContractRepository
+	verdicts   VerdictReader
+}
+
+func NewCompatibilityChecker(
+	repository *repository.ContractRepository,
+	verdicts VerdictReader,
+) *CompatibilityChecker {
 	return &CompatibilityChecker{
 		repository: repository,
+		verdicts:   verdicts,
 	}
 }
 
@@ -28,14 +37,70 @@ func (c *CompatibilityChecker) Check(
 		environment.Name,
 	)
 
+	pairs := &checkedPairs{
+		verdicts:   c.verdicts,
+		contractID: contract.ID,
+		states:     make(map[[2]int64]*pairState),
+	}
+
 	for _, resource := range contract.Resources {
 		switch resource.Direction {
 		case model.Consumes:
-			c.checkConsumer(ctx, resource, environment, report)
+			c.checkConsumer(ctx, resource, environment, pairs, report)
 		case model.Provides:
-			c.checkProvider(ctx, resource, environment, report)
+			c.checkProvider(ctx, resource, environment, pairs, report)
 		}
 	}
 
 	return report
+}
+
+// checkedPairs is the per-call memoization state: one entry per canonical snapshot pair,
+// resolved on the pair's first occurrence. Snapshots are immutable, so nothing outlives the
+// call and there is nothing to invalidate.
+type checkedPairs struct {
+	verdicts   VerdictReader
+	contractID int64
+	states     map[[2]int64]*pairState
+}
+
+type pairState struct {
+	verdict  *model.CompatibilityVerdict
+	injected bool
+}
+
+func (p *checkedPairs) resolve(ctx context.Context, counterpartContractID int64) *pairState {
+	one, two := repository.OrderPair(p.contractID, counterpartContractID)
+
+	state, seen := p.states[[2]int64{one, two}]
+	if seen {
+		return state
+	}
+
+	state = &pairState{}
+	if verdict, found := p.verdicts.GetVerdict(ctx, one, two); found {
+		state.verdict = verdict
+	}
+
+	p.states[[2]int64{one, two}] = state
+
+	return state
+}
+
+func (s *pairState) hit() bool {
+	return s.verdict != nil
+}
+
+// replay injects the stored breaks once per pair: a verdict already aggregates every resource
+// of the pair, so the remaining resources contribute nothing.
+func (s *pairState) replay(item *IncompatibleItem) {
+	if s.injected {
+		return
+	}
+
+	s.injected = true
+
+	for _, verdictBreak := range s.verdict.Breaks {
+		item.AppendCachedBreakChange(verdictBreak)
+	}
 }

@@ -13,6 +13,7 @@ func (c *CompatibilityChecker) checkConsumer(
 	ctx context.Context,
 	consumerResource model.PersistedResource,
 	environment *model.Environment,
+	pairs *checkedPairs,
 	report *ContractCompatibilityReport,
 ) {
 	providerResource, err := c.repository.GetProviderResourceByConsumerResource(
@@ -49,11 +50,19 @@ func (c *CompatibilityChecker) checkConsumer(
 
 	providerResource.ParticipantVersion = null.StringFrom(version)
 	incompatibleItem.IncompatibleCounterpart.ParticipantID = providerResource.ParticipantID
+	incompatibleItem.IncompatibleCounterpart.ContractID = providerResource.ContractID
 	incompatibleItem.IncompatibleCounterpart.ParticipantVersion = providerResource.ParticipantVersion
 	incompatibleItem.IncompatibleCounterpart.ParticipantName = providerResource.ParticipantName
 
-	for _, breakingChange := range checkResources(&consumerResource, &providerResource) {
-		incompatibleItem.AppendContractBreakChange(breakingChange)
+	pair := pairs.resolve(ctx, providerResource.ContractID)
+
+	if pair.hit() {
+		incompatibleItem.VerdictCached = true
+		pair.replay(incompatibleItem)
+	} else {
+		for _, breakingChange := range checkResources(&consumerResource, &providerResource) {
+			incompatibleItem.AppendContractBreakChange(breakingChange)
+		}
 	}
 
 	report.AppendResult(consumerResource.ConsumedProvider.String, incompatibleItem)

@@ -8,15 +8,18 @@ import (
 
 func Register(components *components.Components) {
 	contractRepository := repository.NewContractRepository(components.Pool)
-	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(contractRepository)
 	participantRepository := repository.NewParticipantRepository(components.Pool)
-	compatibilityMatrixRepository := repository.NewCompatibilityMatrixRepository(components.Pool)
+	compatibilityRepository := repository.NewCompatibilityRepository(components.Pool)
+	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(
+		contractRepository,
+		compatibilityRepository,
+	)
 	environmentRepository := repository.NewEnvironmentRepository(components.Pool)
 
 	handler := NewCanIDeployHandler(
 		contractRepository,
 		environmentRepository,
-		compatibilityMatrixRepository,
+		compatibilityRepository,
 		compatibilityChecker,
 		participantRepository,
 	)

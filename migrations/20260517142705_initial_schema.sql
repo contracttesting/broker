@@ -98,19 +98,39 @@ CREATE TABLE deployments (
 
 CREATE INDEX ON deployments (participant_id, environment_id, deployed_at DESC);
 
-CREATE TABLE compatibility_matrix (
-  id                         BIGSERIAL PRIMARY KEY,
-  participant_id             BIGINT NOT NULL REFERENCES participants(id),
-  version                    text NOT NULL,
-  counterpart_participant_id BIGINT REFERENCES participants(id),
-  counterpart_version        text,
-  deployable                 boolean NOT NULL,
-  created_at                 timestamptz NOT NULL DEFAULT now(),
-  CHECK (
-    (counterpart_participant_id IS NULL AND counterpart_version IS NULL)
-      OR
-    (counterpart_participant_id IS NOT NULL)
-  )
+CREATE TABLE compatibility_verdicts (
+  contract_id_one bigint      NOT NULL REFERENCES contracts(id),
+  contract_id_two bigint      NOT NULL REFERENCES contracts(id),
+  breaks          jsonb       NOT NULL DEFAULT '[]',
+  deployable      boolean     GENERATED ALWAYS AS (jsonb_array_length(breaks) = 0) STORED,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (contract_id_one, contract_id_two),
+  CHECK (contract_id_one <= contract_id_two)
 );
 
-CREATE INDEX ON compatibility_matrix (participant_id, version, created_at DESC);
+CREATE TABLE compatibility_checks (
+  id             BIGSERIAL   PRIMARY KEY,
+  participant_id bigint      NOT NULL REFERENCES participants(id),
+  contract_id    bigint      NOT NULL REFERENCES contracts(id),
+  version        text        NOT NULL,
+  environment_id bigint      NOT NULL REFERENCES environments(id),
+  deployable     boolean     NOT NULL,
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ON compatibility_checks (participant_id, version, created_at DESC);
+
+CREATE TABLE compatibility_check_results (
+  id                         BIGSERIAL PRIMARY KEY,
+  check_id                   bigint  NOT NULL REFERENCES compatibility_checks(id),
+  counterpart_name           text    NOT NULL,
+  counterpart_participant_id bigint  REFERENCES participants(id),
+  counterpart_version        text,
+  verdict_contract_id_one    bigint,
+  verdict_contract_id_two    bigint,
+  deployable                 boolean NOT NULL,
+  FOREIGN KEY (verdict_contract_id_one, verdict_contract_id_two)
+    REFERENCES compatibility_verdicts (contract_id_one, contract_id_two)
+);
+
+CREATE INDEX ON compatibility_check_results (check_id);

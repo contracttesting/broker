@@ -29,6 +29,14 @@ type canIDeployResponse struct {
 	Results     map[string]resultJSON `json:"results"`
 }
 
+type verdictBreakJSON struct {
+	Endpoint    string            `json:"endpoint"`
+	Method      string            `json:"method"`
+	Interaction string            `json:"interaction"`
+	Reason      string            `json:"reason"`
+	Details     map[string]string `json:"details"`
+}
+
 // breaksByReason indexes an interaction's breaks by their reason (the scenarios below have
 // at most one break per reason within a single interaction).
 func breaksByReason(breaks []breakJSON) map[string]breakJSON {
@@ -146,11 +154,25 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	s.Require().NotNil(v1Api.Endpoints)
 	s.Empty(v1Api.Endpoints)
 
-	s.Equal(1, s.countRows("compatibility_matrix"))
-	var v1Deployable bool
+	s.Equal(1, s.countRows("compatibility_checks"))
+	s.Equal(1, s.countRows("compatibility_check_results"))
+	s.Equal(1, s.countRows("compatibility_verdicts"))
+
+	var v1Deployable, v1ResultDeployable, v1VerdictDeployable bool
+	var v1Breaks string
 	s.Require().NoError(s.Pool.QueryRow(context.Background(),
-		`SELECT deployable FROM compatibility_matrix WHERE version = 'v1'`).Scan(&v1Deployable))
+		`SELECT ch.deployable, r.deployable, v.deployable, v.breaks::text
+		   FROM compatibility_checks ch
+		   JOIN compatibility_check_results r ON r.check_id = ch.id
+		   JOIN compatibility_verdicts v
+		     ON v.contract_id_one = r.verdict_contract_id_one
+		    AND v.contract_id_two = r.verdict_contract_id_two
+		  WHERE ch.version = 'v1'`).
+		Scan(&v1Deployable, &v1ResultDeployable, &v1VerdictDeployable, &v1Breaks))
 	s.True(v1Deployable)
+	s.True(v1ResultDeployable)
+	s.True(v1VerdictDeployable)
+	s.Equal("[]", v1Breaks)
 
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
 	mustPost("/api/contracts", `{"participant":"front","version":"v2","contract":`+frontV2ConsumerContract+`}`)
@@ -197,11 +219,38 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 	s.Require().True(ok)
 	s.Equal(map[string]string{"property": "$.name", "consumerName": "front", "providerName": "api", "propertyType": "string"}, missing.Details)
 
-	s.Equal(2, s.countRows("compatibility_matrix"))
-	var v2Deployable bool
+	s.Equal(2, s.countRows("compatibility_checks"))
+	s.Equal(2, s.countRows("compatibility_check_results"))
+	s.Equal(2, s.countRows("compatibility_verdicts"))
+
+	var v2Deployable, v2VerdictDeployable bool
+	var v2Breaks []byte
 	s.Require().NoError(s.Pool.QueryRow(context.Background(),
-		`SELECT deployable FROM compatibility_matrix WHERE version = 'v2'`).Scan(&v2Deployable))
+		`SELECT ch.deployable, v.deployable, v.breaks
+		   FROM compatibility_checks ch
+		   JOIN compatibility_check_results r ON r.check_id = ch.id
+		   JOIN compatibility_verdicts v
+		     ON v.contract_id_one = r.verdict_contract_id_one
+		    AND v.contract_id_two = r.verdict_contract_id_two
+		  WHERE ch.version = 'v2'`).
+		Scan(&v2Deployable, &v2VerdictDeployable, &v2Breaks))
 	s.False(v2Deployable)
+	s.False(v2VerdictDeployable)
+
+	var storedBreaks []verdictBreakJSON
+	s.Require().NoError(json.Unmarshal(v2Breaks, &storedBreaks))
+	s.Require().Len(storedBreaks, 2)
+
+	storedByReason := map[string]verdictBreakJSON{}
+	for _, stored := range storedBreaks {
+		s.Equal("/things", stored.Endpoint)
+		s.Equal("get", stored.Method)
+		s.Equal("200", stored.Interaction)
+		storedByReason[stored.Reason] = stored
+	}
+
+	s.Equal(typeMismatch.Details, storedByReason["property_type_mismatch"].Details)
+	s.Equal(missing.Details, storedByReason["property_missing_in_provider"].Details)
 }
 
 const providerCheckedConsumerContract = `
@@ -323,12 +372,41 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 		s.Empty(b.Details)
 	}
 
-	s.Equal(3, s.countRows("compatibility_matrix"))
-	var nonDeployable int
+	s.Equal(1, s.countRows("compatibility_checks"))
+	s.Equal(3, s.countRows("compatibility_check_results"))
+	s.Equal(0, s.countRows("compatibility_verdicts"))
+
+	var checkDeployable bool
 	s.Require().NoError(s.Pool.QueryRow(context.Background(),
-		`SELECT count(*) FROM compatibility_matrix WHERE version = 'v1' AND NOT deployable`).
-		Scan(&nonDeployable))
-	s.Equal(3, nonDeployable)
+		`SELECT deployable FROM compatibility_checks WHERE version = 'v1'`).Scan(&checkDeployable))
+	s.False(checkDeployable)
+
+	rows, err := s.Pool.Query(context.Background(),
+		`SELECT r.counterpart_name, r.counterpart_participant_id, r.counterpart_version,
+		        r.verdict_contract_id_one, r.verdict_contract_id_two, r.deployable
+		   FROM compatibility_check_results r
+		   JOIN compatibility_checks ch ON ch.id = r.check_id
+		  WHERE ch.version = 'v1'`)
+	s.Require().NoError(err)
+	defer rows.Close()
+
+	var counterpartNames []string
+	for rows.Next() {
+		var name string
+		var participantID, verdictOne, verdictTwo *int64
+		var version *string
+		var resultDeployable bool
+		s.Require().NoError(rows.Scan(&name, &participantID, &version, &verdictOne, &verdictTwo, &resultDeployable))
+		s.Nilf(participantID, "counterpart %s", name)
+		s.Nilf(version, "counterpart %s", name)
+		s.Nilf(verdictOne, "counterpart %s", name)
+		s.Nilf(verdictTwo, "counterpart %s", name)
+		s.Falsef(resultDeployable, "counterpart %s", name)
+		counterpartNames = append(counterpartNames, name)
+	}
+	s.Require().NoError(rows.Err())
+
+	s.ElementsMatch([]string{"users", "auth", "catalog"}, counterpartNames)
 }
 
 const usersV1ProviderContract = `
@@ -418,30 +496,43 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 		"providerPropertyType": "string",
 	}, b.Details)
 
-	s.Equal(3, s.countRows("compatibility_matrix"))
+	s.Equal(1, s.countRows("compatibility_checks"))
+	s.Equal(3, s.countRows("compatibility_check_results"))
+	s.Equal(3, s.countRows("compatibility_verdicts"))
 
 	rows, err := s.Pool.Query(context.Background(),
-		`SELECT p.name, cm.deployable, cm.counterpart_version
-		   FROM compatibility_matrix cm
-		   JOIN participants p ON p.id = cm.counterpart_participant_id
-		  WHERE cm.version = 'v1'`)
+		`SELECT p.name, r.deployable, r.counterpart_version, v.deployable, v.breaks::text
+		   FROM compatibility_check_results r
+		   JOIN compatibility_checks ch ON ch.id = r.check_id
+		   JOIN participants p ON p.id = r.counterpart_participant_id
+		   JOIN compatibility_verdicts v
+		     ON v.contract_id_one = r.verdict_contract_id_one
+		    AND v.contract_id_two = r.verdict_contract_id_two
+		  WHERE ch.version = 'v1'`)
 	s.Require().NoError(err)
 	defer rows.Close()
 
 	deployableByProvider := map[string]bool{}
 	versionByProvider := map[string]string{}
+	verdictDeployableByProvider := map[string]bool{}
+	verdictBreaksByProvider := map[string]string{}
 	for rows.Next() {
 		var name string
-		var deployable bool
-		var counterpartVersion string
-		s.Require().NoError(rows.Scan(&name, &deployable, &counterpartVersion))
+		var deployable, verdictDeployable bool
+		var counterpartVersion, verdictBreaks string
+		s.Require().NoError(rows.Scan(&name, &deployable, &counterpartVersion, &verdictDeployable, &verdictBreaks))
 		deployableByProvider[name] = deployable
 		versionByProvider[name] = counterpartVersion
+		verdictDeployableByProvider[name] = verdictDeployable
+		verdictBreaksByProvider[name] = verdictBreaks
 	}
 	s.Require().NoError(rows.Err())
 
 	s.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, deployableByProvider)
 	s.Equal(map[string]string{"users": "v1", "auth": "v1", "catalog": "v1"}, versionByProvider)
+	s.Equal(map[string]bool{"users": true, "auth": true, "catalog": false}, verdictDeployableByProvider)
+	s.Equal("[]", verdictBreaksByProvider["users"])
+	s.Equal("[]", verdictBreaksByProvider["auth"])
 }
 
 const providerThingContract = `
@@ -493,17 +584,28 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 	s.Equal("provider_resource_not_deployed_in_environment", b.Reason)
 	s.Equal(map[string]string{"deployedEnvironments": "staging"}, b.Details)
 
+	s.Equal(1, s.countRows("compatibility_checks"))
+	s.Equal(1, s.countRows("compatibility_check_results"))
+	s.Equal(0, s.countRows("compatibility_verdicts"))
+
 	// the provider participant is known even though it is not deployed in the target
-	// environment: the matrix row keeps its identity with a NULL counterpart version
-	var counterpartName string
+	// environment: the result keeps its identity with a NULL version and no verdict
+	var counterpartName, participantName string
 	var counterpartVersion *string
+	var verdictOne, verdictTwo *int64
+	var resultDeployable bool
 	s.Require().NoError(s.Pool.QueryRow(context.Background(),
-		`SELECT p.name, cm.counterpart_version
-		   FROM compatibility_matrix cm
-		   JOIN participants p ON p.id = cm.counterpart_participant_id`).
-		Scan(&counterpartName, &counterpartVersion))
+		`SELECT r.counterpart_name, p.name, r.counterpart_version,
+		        r.verdict_contract_id_one, r.verdict_contract_id_two, r.deployable
+		   FROM compatibility_check_results r
+		   JOIN participants p ON p.id = r.counterpart_participant_id`).
+		Scan(&counterpartName, &participantName, &counterpartVersion, &verdictOne, &verdictTwo, &resultDeployable))
 	s.Equal("api", counterpartName)
+	s.Equal("api", participantName)
 	s.Nil(counterpartVersion)
+	s.Nil(verdictOne)
+	s.Nil(verdictTwo)
+	s.False(resultDeployable)
 }
 
 const dualRoleUsersV1Contract = `
@@ -808,33 +910,45 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 		"providerPropertyType": "integer",
 	}, consumerBreaks[0].Details)
 
-	type matrixRow struct {
-		Counterpart string
-		Version     string
-		Deployable  bool
+	type checkResultRow struct {
+		Counterpart       string
+		Version           string
+		Deployable        bool
+		VerdictDeployable bool
 	}
 
 	rows, err := s.Pool.Query(context.Background(),
-		`SELECT counterpart.name, cm.counterpart_version, cm.deployable
-		   FROM compatibility_matrix cm
-		   JOIN participants checked ON checked.id = cm.participant_id
-		   JOIN participants counterpart ON counterpart.id = cm.counterpart_participant_id
-		  WHERE checked.name = 'pets' AND cm.version = 'v2'`)
+		`SELECT r.counterpart_name, r.counterpart_version, r.deployable, v.deployable
+		   FROM compatibility_check_results r
+		   JOIN compatibility_checks ch ON ch.id = r.check_id
+		   JOIN participants checked ON checked.id = ch.participant_id
+		   JOIN compatibility_verdicts v
+		     ON v.contract_id_one = r.verdict_contract_id_one
+		    AND v.contract_id_two = r.verdict_contract_id_two
+		  WHERE checked.name = 'pets' AND ch.version = 'v2'`)
 	s.Require().NoError(err)
 	defer rows.Close()
 
-	var matrixRows []matrixRow
+	var checkResultRows []checkResultRow
 	for rows.Next() {
-		var row matrixRow
-		s.Require().NoError(rows.Scan(&row.Counterpart, &row.Version, &row.Deployable))
-		matrixRows = append(matrixRows, row)
+		var row checkResultRow
+		s.Require().NoError(rows.Scan(&row.Counterpart, &row.Version, &row.Deployable, &row.VerdictDeployable))
+		checkResultRows = append(checkResultRows, row)
 	}
 	s.Require().NoError(rows.Err())
 
-	s.ElementsMatch([]matrixRow{
-		{Counterpart: "users", Version: "v1", Deployable: false},
-		{Counterpart: "app", Version: "v1", Deployable: false},
-	}, matrixRows)
+	s.ElementsMatch([]checkResultRow{
+		{Counterpart: "users", Version: "v1", Deployable: false, VerdictDeployable: false},
+		{Counterpart: "app", Version: "v1", Deployable: false, VerdictDeployable: false},
+	}, checkResultRows)
+
+	var petsV2CheckDeployable bool
+	s.Require().NoError(s.Pool.QueryRow(context.Background(),
+		`SELECT ch.deployable
+		   FROM compatibility_checks ch
+		   JOIN participants checked ON checked.id = ch.participant_id
+		  WHERE checked.name = 'pets' AND ch.version = 'v2'`).Scan(&petsV2CheckDeployable))
+	s.False(petsV2CheckDeployable)
 }
 
 const arrayProviderContract = `

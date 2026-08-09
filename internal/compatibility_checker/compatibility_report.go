@@ -7,14 +7,39 @@ import (
 
 type IncompatibleCounterpart struct {
 	ParticipantID      int64       `json:"-"`
+	ContractID         int64       `json:"-"`
 	ParticipantName    string      `json:"participantName"`
 	ParticipantVersion null.String `json:"participantVersion"`
+}
+
+// InteractionKey is the wire spelling of the checked resource's interaction: "request"
+// for requests, the raw status code for responses.
+func (b *ContractBreakingChange) InteractionKey() string {
+	switch b.CheckedResource.Interaction {
+	case model.RestRequest:
+		return "request"
+	case model.RestResponse:
+		return b.CheckedResource.ResponseStatusCode.String
+	default:
+		return b.CheckedResource.Interaction.String()
+	}
+}
+
+// IsPropertyBreak reports whether the break comes from a property diff, as opposed to the
+// environment checks that depend on deployments and never become a stored verdict.
+func (b *ContractBreakingChange) IsPropertyBreak() bool {
+	return b.Reason != ReasonProviderResourceNotFound &&
+		b.Reason != ReasonProviderResourceNotDeployedInEnvironment
 }
 
 type IncompatibleItem struct {
 	Deployable              bool                     `json:"deployable"`
 	IncompatibleCounterpart IncompatibleCounterpart  `json:"incompatibleCounterpart"`
 	Breaks                  []ContractBreakingChange `json:"breaks"`
+	// CachedBreaks come from a stored verdict: they carry their own tree keys instead of a
+	// checked resource, and the pair they belong to is already persisted.
+	CachedBreaks  []model.VerdictBreak `json:"-"`
+	VerdictCached bool                 `json:"-"`
 }
 
 func NewIncompatibleItem() *IncompatibleItem {
@@ -25,6 +50,11 @@ func NewIncompatibleItem() *IncompatibleItem {
 
 func (r *IncompatibleItem) AppendContractBreakChange(b ContractBreakingChange) {
 	r.Breaks = append(r.Breaks, b)
+	r.Deployable = false
+}
+
+func (r *IncompatibleItem) AppendCachedBreakChange(b model.VerdictBreak) {
+	r.CachedBreaks = append(r.CachedBreaks, b)
 	r.Deployable = false
 }
 
@@ -75,33 +105,24 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 	}
 
 	for _, breakChange := range result.Breaks {
-		endpointKey := breakChange.CheckedResource.Endpoint
-		methodKey := breakChange.CheckedResource.Method
-
-		var interactionKey string
-		switch breakChange.CheckedResource.Interaction {
-		case model.RestRequest:
-			interactionKey = "request"
-		case model.RestResponse:
-			interactionKey = breakChange.CheckedResource.ResponseStatusCode.String
-		default:
-			interactionKey = breakChange.CheckedResource.Interaction.String()
-		}
-
-		if _, ok := hierarchical.Endpoints[endpointKey]; !ok {
-			hierarchical.Endpoints[endpointKey] = make(HierarchicalMethod)
-		}
-
-		if _, ok := hierarchical.Endpoints[endpointKey][methodKey]; !ok {
-			hierarchical.Endpoints[endpointKey][methodKey] = make(HierarchicalInteraction)
-		}
-
-		hierarchical.Endpoints[endpointKey][methodKey][interactionKey] = append(
-			hierarchical.Endpoints[endpointKey][methodKey][interactionKey],
+		hierarchical.appendBreak(
+			breakChange.CheckedResource.Endpoint,
+			breakChange.CheckedResource.Method,
+			breakChange.InteractionKey(),
 			breakChange,
 		)
+	}
 
-		hierarchical.Deployable = false
+	for _, cachedBreak := range result.CachedBreaks {
+		hierarchical.appendBreak(
+			cachedBreak.Endpoint,
+			cachedBreak.Method,
+			cachedBreak.Interaction,
+			ContractBreakingChange{
+				Reason:  BreakingReason(cachedBreak.Reason),
+				Details: cachedBreak.Details,
+			},
+		)
 	}
 
 	r.Hierarchical[dependency] = hierarchical
@@ -113,14 +134,37 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 	}
 
 	existing.Breaks = append(existing.Breaks, result.Breaks...)
+	existing.CachedBreaks = append(existing.CachedBreaks, result.CachedBreaks...)
+	existing.VerdictCached = existing.VerdictCached || result.VerdictCached
 
 	if existing.IncompatibleCounterpart.ParticipantID == 0 {
 		existing.IncompatibleCounterpart.ParticipantID = result.IncompatibleCounterpart.ParticipantID
+		existing.IncompatibleCounterpart.ContractID = result.IncompatibleCounterpart.ContractID
 		existing.IncompatibleCounterpart.ParticipantVersion = result.IncompatibleCounterpart.ParticipantVersion
 		existing.IncompatibleCounterpart.ParticipantName = dependency
 	}
 
-	existing.Deployable = len(existing.Breaks) == 0
+	existing.Deployable = len(existing.Breaks)+len(existing.CachedBreaks) == 0
 
 	r.Results[dependency] = existing
+}
+
+func (h *Hierarchical) appendBreak(
+	endpoint, method, interaction string,
+	breakChange ContractBreakingChange,
+) {
+	if _, ok := h.Endpoints[endpoint]; !ok {
+		h.Endpoints[endpoint] = make(HierarchicalMethod)
+	}
+
+	if _, ok := h.Endpoints[endpoint][method]; !ok {
+		h.Endpoints[endpoint][method] = make(HierarchicalInteraction)
+	}
+
+	h.Endpoints[endpoint][method][interaction] = append(
+		h.Endpoints[endpoint][method][interaction],
+		breakChange,
+	)
+
+	h.Deployable = false
 }
