@@ -7,7 +7,7 @@ type Schema struct {
 	Description string            `json:"description,omitzero"`
 	Properties  map[string]Schema `json:"properties,omitzero"`
 	Items       *Schema           `json:"items,omitzero"`
-	Ref         string            `json:"$ref,omitzero"`
+	Ref         string            `json:"ref,omitzero"`
 	Optional    bool              `json:"optional,omitzero"`
 }
 

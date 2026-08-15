@@ -51,7 +51,7 @@ const cyclicContractJSON = `{
     "Pet": {
       "type": "object",
       "properties": {
-        "self": { "$ref": "Pet" }
+        "self": { "ref": "Pet" }
       }
     }
   }
@@ -175,7 +175,7 @@ const refResolvesJSON = `{
     }
   },
   "schemas": {
-    "PetRef": { "$ref": "Pet" },
+    "PetRef": { "ref": "Pet" },
     "Pet": {
       "type": "object",
       "properties": { "id": { "type": "string" } }
@@ -306,7 +306,7 @@ const wideShallowContractJSON = `{
       "properties": {
         "users": {
           "type": "array",
-          "items": { "$ref": "User" }
+          "items": { "ref": "User" }
         }
       }
     },
