@@ -16,6 +16,7 @@ const (
 	ReasonPropertyOptionalInProviderRequiredInConsumer BreakingReason = "property_optional_in_provider_required_in_consumer"
 	ReasonPropertyOptionalInConsumerRequiredInProvider BreakingReason = "property_optional_in_consumer_required_in_provider"
 	ReasonProviderResourceNotDeployedInEnvironment     BreakingReason = "provider_resource_not_deployed_in_environment"
+	ReasonProviderResourceRemovedButStillConsumed      BreakingReason = "provider_resource_removed_but_still_consumed"
 )
 
 type ContractBreakingChange struct {
@@ -57,6 +58,17 @@ func NewProviderResourceNotFound(checkedResource *model.PersistedResource) Contr
 	return ContractBreakingChange{
 		CheckedResource: checkedResource,
 		Reason:          ReasonProviderResourceNotFound,
+	}
+}
+
+func NewProviderResourceRemovedButStillConsumed(
+	removedResource *model.PersistedResource,
+	consumerResource *model.PersistedResource,
+) ContractBreakingChange {
+	return ContractBreakingChange{
+		CheckedResource:     removedResource,
+		CounterpartResource: consumerResource,
+		Reason:              ReasonProviderResourceRemovedButStillConsumed,
 	}
 }
 

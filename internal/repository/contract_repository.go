@@ -123,6 +123,7 @@ const (
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
+			rv.change_type,
 			p.id,
 			p.path,
 			pv.type,
@@ -170,6 +171,7 @@ const (
 			r.provider_hash,
 			r.consumer_hash,
 			r.created_at,
+			rv.change_type,
 			p.id,
 			p.path,
 			pv.type,
@@ -196,7 +198,6 @@ const (
 		) pv ON true
 		WHERE pa.name = $1
 		  AND cv.version = $2
-		  AND rv.change_type = 'added'
 		ORDER BY r.id
 	`
 
@@ -764,6 +765,7 @@ func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
 			&row.ResourceProviderHash,
 			&row.ResourceConsumerHash,
 			&row.ResourceCreatedAt,
+			&row.ResourceVersionChangeType,
 			&row.PropertyID,
 			&row.PropertyPath,
 			&row.PropertyVersionType,
@@ -773,7 +775,11 @@ func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
 			panic(fmt.Errorf("error scanning contract tree row: %w", err))
 		}
 
-		if row.PropertyVersionChangeType == string(contract_differ.ChangeRemoved) {
+		// A removed resource has all its properties removed too, so it has to be taken
+		// before the property skip: only its existence matters, no property is attached.
+		removedResource := row.ResourceVersionChangeType == string(contract_differ.ChangeRemoved)
+
+		if !removedResource && row.PropertyVersionChangeType == string(contract_differ.ChangeRemoved) {
 			continue
 		}
 
@@ -787,6 +793,10 @@ func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
 
 		if _, seen := contract.Resources[primaryHash]; !seen {
 			contract.Resources[primaryHash] = resource
+		}
+
+		if removedResource {
+			continue
 		}
 
 		property := row.toPropertyModel()

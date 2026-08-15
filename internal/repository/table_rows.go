@@ -33,6 +33,7 @@ type tableRow struct {
 	ResourceConsumerHash       sql.NullString
 	ResourceCreatedAt          time.Time
 	ResourceVersion            string
+	ResourceVersionChangeType  string
 
 	// Property
 	PropertyID                int64
@@ -69,6 +70,7 @@ func (c *tableRow) toResourceModel() model.PersistedResource {
 		ParticipantID:    c.ParticipantID,
 		ContractID:       c.ContractID,
 		ProviderHash:     c.ResourceProviderHash,
+		Removed:          c.ResourceVersionChangeType == string(contract_differ.ChangeRemoved),
 	}
 
 	if c.ResourceVersion != "" {
