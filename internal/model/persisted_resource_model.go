@@ -21,6 +21,7 @@ type PersistedResource struct {
 	Properties         map[string]Property `json:"-"`
 	ParticipantVersion null.String         `json:"version"`
 	DeployedVersions   map[string]string   `json:"-"`
+	Removed            bool                `json:"-"`
 }
 
 func (r *PersistedResource) IsConsumer() bool {

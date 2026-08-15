@@ -44,6 +44,14 @@ func (c *CompatibilityChecker) Check(
 	}
 
 	for _, resource := range contract.Resources {
+		if resource.Removed {
+			if resource.Direction == model.Provides {
+				c.checkRemovedProvider(ctx, resource, environment, report)
+			}
+
+			continue
+		}
+
 		switch resource.Direction {
 		case model.Consumes:
 			c.checkConsumer(ctx, resource, environment, pairs, report)

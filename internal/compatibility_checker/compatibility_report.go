@@ -29,7 +29,8 @@ func (b *ContractBreakingChange) InteractionKey() string {
 // environment checks that depend on deployments and never become a stored verdict.
 func (b *ContractBreakingChange) IsPropertyBreak() bool {
 	return b.Reason != ReasonProviderResourceNotFound &&
-		b.Reason != ReasonProviderResourceNotDeployedInEnvironment
+		b.Reason != ReasonProviderResourceNotDeployedInEnvironment &&
+		b.Reason != ReasonProviderResourceRemovedButStillConsumed
 }
 
 type IncompatibleItem struct {
@@ -137,12 +138,21 @@ func (r *ContractCompatibilityReport) AppendResult(dependency string, result *In
 	existing.CachedBreaks = append(existing.CachedBreaks, result.CachedBreaks...)
 	existing.VerdictCached = existing.VerdictCached || result.VerdictCached
 
+	// Merged field by field: items of the same counterpart arrive in map order, and the ones
+	// that carry no contract must not stop a later one from filling it in.
 	if existing.IncompatibleCounterpart.ParticipantID == 0 {
 		existing.IncompatibleCounterpart.ParticipantID = result.IncompatibleCounterpart.ParticipantID
-		existing.IncompatibleCounterpart.ContractID = result.IncompatibleCounterpart.ContractID
-		existing.IncompatibleCounterpart.ParticipantVersion = result.IncompatibleCounterpart.ParticipantVersion
-		existing.IncompatibleCounterpart.ParticipantName = dependency
 	}
+
+	if existing.IncompatibleCounterpart.ContractID == 0 {
+		existing.IncompatibleCounterpart.ContractID = result.IncompatibleCounterpart.ContractID
+	}
+
+	if !existing.IncompatibleCounterpart.ParticipantVersion.Valid {
+		existing.IncompatibleCounterpart.ParticipantVersion = result.IncompatibleCounterpart.ParticipantVersion
+	}
+
+	existing.IncompatibleCounterpart.ParticipantName = dependency
 
 	existing.Deployable = len(existing.Breaks)+len(existing.CachedBreaks) == 0
 
