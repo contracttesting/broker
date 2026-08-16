@@ -60,7 +60,7 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 
 	// identical content already published under another version: the new version
 	// becomes an alias of that snapshot rather than a snapshot of its own
-	if ctr.contractRepository.AliasVersionToSnapshot(ctx.Context(), contract.ParticipantID, version, contract.Checksum()) {
+	if ctr.contractRepository.AliasVersionToSnapshot(ctx.Context(), contract) {
 		return ctr.respondSuccess(ctx)
 	}
 
