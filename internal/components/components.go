@@ -28,8 +28,11 @@ func createDatabasePool() *pgxpool.Pool {
 	return pool
 }
 
+// contracts of a few thousand resources do not fit fiber's 4 MiB default
+const publishBodyLimit = 8 * 1024 * 1024
+
 func createHttpServer() *fiber.App {
-	server := fiber.New()
+	server := fiber.New(fiber.Config{BodyLimit: publishBodyLimit})
 
 	return server
 }
