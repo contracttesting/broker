@@ -1,6 +1,8 @@
 package model
 
 import (
+	"strings"
+
 	"github.com/guregu/null"
 )
 
@@ -21,6 +23,26 @@ func (r *UploadedResource) IsConsumer() bool {
 
 func (r *UploadedResource) IsProvider() bool {
 	return r.Direction == Provides
+}
+
+// Describe names the resource the way publish errors quote it: the same parts that
+// make up its hash, in reading order.
+func (r *UploadedResource) Describe() string {
+	parts := []string{r.Direction.String()}
+
+	if r.IsConsumer() && r.ConsumedProvider.String != "" {
+		parts = append(parts, r.ConsumedProvider.String)
+	}
+
+	parts = append(parts, strings.ToUpper(r.Method), r.Endpoint)
+
+	if r.Interaction == RestResponse {
+		parts = append(parts, r.ResponseStatusCode.String)
+	} else {
+		parts = append(parts, "request")
+	}
+
+	return strings.Join(parts, " ")
 }
 
 func (r *UploadedResource) ProviderHash() string {

@@ -12,7 +12,7 @@ const participantName = "pets-service"
 
 func newContractWithOnePetsResource() *model.UploadedContract {
 	contract := model.NewUploadedContract(0, participantName, "1", "raw")
-	contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
+	_ = contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
 	}))
@@ -43,7 +43,7 @@ func TestDiff_ReportsAddedResource(t *testing.T) {
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
 	})
-	next.AddResource(added)
+	_ = next.AddResource(added)
 	key := added.PrimaryHash()
 
 	diff := contract_differ.DiffResourceProperties(props(prev), props(next))
@@ -67,7 +67,7 @@ func TestDiff_RemovedResource(t *testing.T) {
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
 	})
-	oldContract.AddResource(removed)
+	_ = oldContract.AddResource(removed)
 	key := removed.PrimaryHash()
 
 	newContract := newContractWithOnePetsResource()
@@ -84,7 +84,7 @@ func TestDiff_RemovedResource(t *testing.T) {
 func TestDiff_ModifiedResource_PropertyAdded(t *testing.T) {
 	oldContract := newContractWithOnePetsResource()
 	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
-	newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
+	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":      model.NewProperty("$", "object", false),
 		"$.id":   model.NewProperty("$.id", "string", false),
 		"$.name": model.NewProperty("$.name", "string", false),
@@ -102,7 +102,7 @@ func TestDiff_ModifiedResource_PropertyAdded(t *testing.T) {
 
 func TestDiff_ModifiedResource_PropertyRemoved(t *testing.T) {
 	oldContract := model.NewUploadedContract(0, participantName, "1", "raw")
-	oldContract.AddResource(
+	_ = oldContract.AddResource(
 		model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 			"$":      model.NewProperty("$", "object", false),
 			"$.id":   model.NewProperty("$.id", "string", false),
@@ -124,7 +124,7 @@ func TestDiff_ModifiedResource_PropertyRemoved(t *testing.T) {
 func TestDiff_ModifiedResource_PropertyTypeChanged(t *testing.T) {
 	oldContract := newContractWithOnePetsResource()
 	newContract := model.NewUploadedContract(0, participantName, "1", "raw")
-	newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
+	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "int", false),
 	}))
