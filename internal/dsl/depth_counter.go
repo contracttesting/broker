@@ -4,22 +4,36 @@ import "fmt"
 
 const MAX_DEPTH = 10
 
+// SchemaTooDeep is the error returned when a schema nests past MAX_DEPTH, which is
+// also how a cyclic chain of refs terminates. Hydration propagates it up as a publish
+// error.
+type SchemaTooDeep struct {
+	SchemaName string
+	MaxDepth   int
+}
+
+func (e SchemaTooDeep) Error() string {
+	return fmt.Sprintf(
+		"schema %s is too deep with more than %d levels",
+		e.SchemaName,
+		e.MaxDepth,
+	)
+}
+
 type DepthCounter struct {
 	counter    int
-	crashAt    int
+	limit      int
 	schemaName string
 }
 
-func (dc *DepthCounter) Enter() {
+func (dc *DepthCounter) Enter() error {
 	dc.counter = dc.counter + 1
 
-	if dc.counter >= dc.crashAt {
-		panic(fmt.Sprintf(
-			"schema %s is too deep with more than %d levels",
-			dc.schemaName,
-			dc.crashAt,
-		))
+	if dc.counter >= dc.limit {
+		return SchemaTooDeep{SchemaName: dc.schemaName, MaxDepth: dc.limit}
 	}
+
+	return nil
 }
 
 func (dc *DepthCounter) Exit() {
@@ -29,7 +43,7 @@ func (dc *DepthCounter) Exit() {
 func NewDepthCounter(schemaName string) *DepthCounter {
 	return &DepthCounter{
 		counter:    0,
-		crashAt:    MAX_DEPTH,
+		limit:      MAX_DEPTH,
 		schemaName: schemaName,
 	}
 }
