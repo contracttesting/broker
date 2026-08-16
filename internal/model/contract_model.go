@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 )
 
 type UploadedContract struct {
@@ -29,13 +30,24 @@ func NewUploadedContract(
 	}
 }
 
-func (contract *UploadedContract) AddResource(resource *UploadedResource) {
+// AddResource rejects a resource whose hash is already taken: two resources with the
+// same hash are the same resource, so a second one can only come from a contract
+// declaring it twice — silently overwriting picks a winner by map iteration order.
+func (contract *UploadedContract) AddResource(resource *UploadedResource) error {
 	if contract.Resources == nil {
 		contract.Resources = make(map[string]UploadedResource)
 	}
 
 	resource.ParticipantName = contract.ParticipantName
-	contract.Resources[resource.PrimaryHash()] = *resource
+	hash := resource.PrimaryHash()
+
+	if _, taken := contract.Resources[hash]; taken {
+		return fmt.Errorf("duplicate resource: %s", resource.Describe())
+	}
+
+	contract.Resources[hash] = *resource
+
+	return nil
 }
 
 func (contract *UploadedContract) Checksum() string {

@@ -28,170 +28,132 @@ func (c *Contract) HydrateContract(contract *model.UploadedContract) error {
 		}
 	}
 
-	c.hydrateResources(contract, NewResourcePath(""), *c)
-
-	return nil
+	return c.hydrateResources(contract, NewResourcePath(""), *c)
 }
 
 func (c *Contract) hydrateResources(
 	contract *model.UploadedContract,
 	resourcePath ResourcePath,
 	unknown any,
-) {
+) error {
 	switch unknown := unknown.(type) {
 	case Contract:
-		dsl := unknown
-
-		for serviceName, consumes := range dsl.ConsumesServices {
+		for serviceName, consumes := range unknown.ConsumesServices {
 			consumerResourcePath := resourcePath.Append("consumes", serviceName)
-			c.hydrateResources(
-				contract,
-				consumerResourcePath,
-				consumes,
-			)
+			if err := c.hydrateResources(contract, consumerResourcePath, consumes); err != nil {
+				return err
+			}
 		}
 
-		c.hydrateResources(
+		return c.hydrateResources(
 			contract,
 			resourcePath.Append("provides"),
-			dsl.Provides,
+			unknown.Provides,
 		)
 
 	case Consumes:
-		consumes := unknown
-		c.hydrateResources(
-			contract,
-			resourcePath,
-			consumes.Rest,
-		)
+		return c.hydrateResources(contract, resourcePath, unknown.Rest)
 
 	case Provides:
-		provides := unknown
-		c.hydrateResources(
-			contract,
-			resourcePath,
-			provides.Rest,
-		)
-		c.hydrateResources(
-			contract,
-			resourcePath,
-			provides.Message,
-		)
+		return c.hydrateResources(contract, resourcePath, unknown.Rest)
 
 	case Rest:
-		rest := unknown
-		for endpoint, methods := range rest {
+		for endpoint, methods := range unknown {
 			endpointPath := resourcePath.Append("rest", normalizeEndpoint(endpoint))
 
 			if methods.Get.IsNonZero() {
-				c.hydrateResources(
-					contract,
-					endpointPath,
-					methods.Get,
-				)
+				if err := c.hydrateResources(contract, endpointPath, methods.Get); err != nil {
+					return err
+				}
 			}
 
 			if methods.Post.IsNonZero() {
-				c.hydrateResources(
-					contract,
-					endpointPath,
-					methods.Post,
-				)
+				if err := c.hydrateResources(contract, endpointPath, methods.Post); err != nil {
+					return err
+				}
 			}
 
 			if methods.Put.IsNonZero() {
-				c.hydrateResources(
-					contract,
-					endpointPath,
-					methods.Put,
-				)
+				if err := c.hydrateResources(contract, endpointPath, methods.Put); err != nil {
+					return err
+				}
 			}
 
 			if methods.Delete.IsNonZero() {
-				c.hydrateResources(
-					contract,
-					endpointPath,
-					methods.Delete,
-				)
+				if err := c.hydrateResources(contract, endpointPath, methods.Delete); err != nil {
+					return err
+				}
 			}
 		}
 
 	case GetMethod:
-		getMethod := unknown
-		c.hydrateResources(
+		return c.hydrateResources(
 			contract,
 			resourcePath.Append("get", "responses"),
-			getMethod.Responses,
+			unknown.Responses,
 		)
 
 	case PostMethod:
-		postMethod := unknown
-		if postMethod.HasRequestBody() {
+		if unknown.HasRequestBody() {
 			requestResourcePath := resourcePath.Append("post", "request")
-
-			properties := buildSchema(
-				NewDepthCounter(postMethod.RequestBody),
-				c.Schemas,
-				make(map[string]model.Property),
-				NewPropertyPath("$"),
-				c.Schemas[postMethod.RequestBody],
-			)
-
-			contract.AddResource(requestResourcePath.ToResource(properties))
+			if err := c.addResource(contract, requestResourcePath, unknown.RequestBody); err != nil {
+				return err
+			}
 		}
 
-		c.hydrateResources(
+		return c.hydrateResources(
 			contract,
 			resourcePath.Append("post", "responses"),
-			postMethod.Responses,
+			unknown.Responses,
 		)
 
 	case PutMethod:
-		putMethod := unknown
-		if putMethod.HasRequestBody() {
+		if unknown.HasRequestBody() {
 			requestResourcePath := resourcePath.Append("put", "request")
-
-			properties := buildSchema(
-				NewDepthCounter(putMethod.RequestBody),
-				c.Schemas,
-				make(map[string]model.Property),
-				NewPropertyPath("$"),
-				c.Schemas[putMethod.RequestBody],
-			)
-
-			contract.AddResource(requestResourcePath.ToResource(properties))
+			if err := c.addResource(contract, requestResourcePath, unknown.RequestBody); err != nil {
+				return err
+			}
 		}
 
-		c.hydrateResources(
+		return c.hydrateResources(
 			contract,
 			resourcePath.Append("put", "responses"),
-			putMethod.Responses,
+			unknown.Responses,
 		)
 
 	case DeleteMethod:
-		deleteMethod := unknown
-		path := resourcePath.Append("delete", "responses")
-		c.hydrateResources(
+		return c.hydrateResources(
 			contract,
-			path,
-			deleteMethod.Responses,
+			resourcePath.Append("delete", "responses"),
+			unknown.Responses,
 		)
 
 	case Responses:
-		responses := unknown
-		for statusCode, schemaName := range responses {
+		for statusCode, schemaName := range unknown {
 			responseResourcePath := resourcePath.Append(strconv.Itoa(statusCode))
-			properties := buildSchema(
-				NewDepthCounter(schemaName),
-				c.Schemas,
-				make(map[string]model.Property),
-				NewPropertyPath("$"),
-				c.Schemas[schemaName],
-			)
-
-			contract.AddResource(responseResourcePath.ToResource(properties))
+			if err := c.addResource(contract, responseResourcePath, schemaName); err != nil {
+				return err
+			}
 		}
 	}
+
+	return nil
+}
+
+func (c *Contract) addResource(
+	contract *model.UploadedContract,
+	resourcePath ResourcePath,
+	schemaName string,
+) error {
+	properties := buildSchema(
+		NewDepthCounter(schemaName),
+		c.Schemas,
+		make(map[string]model.Property),
+		NewPropertyPath("$"),
+		c.Schemas[schemaName],
+	)
+
+	return contract.AddResource(resourcePath.ToResource(properties))
 }
 
 func buildSchema(
