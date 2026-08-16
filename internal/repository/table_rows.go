@@ -16,10 +16,10 @@ type tableRow struct {
 	ParticipantName string
 
 	// Contract
-	ContractID          int64
-	ContractVersion     string
-	ContractRawContract string
-	ContractCreatedAt   time.Time
+	ContractID        int64
+	ContractVersion   string
+	ContractContent   string
+	ContractCreatedAt time.Time
 
 	// Resource
 	ResourceID                 int64
@@ -53,7 +53,7 @@ func (c *tableRow) toPersistedContractModel() *model.PersistedContract {
 		ParticipantID:   c.ParticipantID,
 		ParticipantName: c.ParticipantName,
 		Version:         c.ContractVersion,
-		RawContract:     c.ContractRawContract,
+		ContractContent: c.ContractContent,
 		Resources:       make(map[string]model.PersistedResource),
 	}
 }
