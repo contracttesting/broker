@@ -2,6 +2,8 @@ package dsl
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 
 	"github.com/contracttesting/broker/internal/model"
@@ -14,6 +16,10 @@ type Contract struct {
 }
 
 func (c *Contract) HydrateContract(contract *model.UploadedContract) error {
+	if err := c.validateSchemaNames(); err != nil {
+		return err
+	}
+
 	for endpoint := range c.Provides.Rest {
 		if err := validateEndpoint(endpoint); err != nil {
 			return err
@@ -29,6 +35,43 @@ func (c *Contract) HydrateContract(contract *model.UploadedContract) error {
 	}
 
 	return c.hydrateResources(contract, NewResourcePath(""), *c)
+}
+
+// validateSchemaNames checks every ref of the contract, including refs inside schemas
+// no endpoint reaches.
+func (c *Contract) validateSchemaNames() error {
+	for _, name := range slices.Sorted(maps.Keys(c.Schemas)) {
+		if err := c.validateRefs(c.Schemas[name], NewPropertyPath(name)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateRefs walks a schema structurally without following its refs: every schema of
+// the contract is walked on its own, so a cycle is never entered here.
+func (c *Contract) validateRefs(schema Schema, propertyPath PropertyPath) error {
+	switch {
+	case schema.IsRef():
+		if _, resolved := c.Schemas[schema.Ref]; !resolved {
+			return unresolvedSchemaName(schema.Ref, propertyPath.String())
+		}
+
+	case schema.IsArray():
+		if schema.Items != nil {
+			return c.validateRefs(*schema.Items, propertyPath.AppendArray())
+		}
+
+	case schema.IsObject():
+		for _, name := range slices.Sorted(maps.Keys(schema.Properties)) {
+			if err := c.validateRefs(schema.Properties[name], propertyPath.Append(name)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (c *Contract) hydrateResources(
@@ -145,24 +188,41 @@ func (c *Contract) addResource(
 	resourcePath ResourcePath,
 	schemaName string,
 ) error {
-	properties := buildSchema(
+	properties := make(map[string]model.Property)
+	resource := resourcePath.ToResource(properties)
+
+	schema, resolved := c.Schemas[schemaName]
+	if !resolved {
+		return unresolvedSchemaName(schemaName, resource.Describe())
+	}
+
+	if err := buildSchema(
 		NewDepthCounter(schemaName),
 		c.Schemas,
-		make(map[string]model.Property),
+		properties,
 		NewPropertyPath("$"),
-		c.Schemas[schemaName],
-	)
+		schema,
+	); err != nil {
+		return err
+	}
 
-	return contract.AddResource(resourcePath.ToResource(properties))
+	return contract.AddResource(resource)
 }
 
+func unresolvedSchemaName(name, position string) error {
+	return fmt.Errorf("unresolved schema name: %s referenced at %s", name, position)
+}
+
+// buildSchema fills properties by walking the schema, following refs through the
+// namespace. It returns SchemaTooDeep once the walk passes MAX_DEPTH levels, which is
+// also how a cyclic chain of refs terminates.
 func buildSchema(
 	depthCounter *DepthCounter,
 	schemas SchemasMap,
 	properties map[string]model.Property,
 	propertyPath PropertyPath,
 	unknown any,
-) map[string]model.Property {
+) error {
 	switch unknown := unknown.(type) {
 	case Schema:
 		if unknown.IsObject() {
@@ -173,18 +233,18 @@ func buildSchema(
 			)
 
 			for name, schemaProperties := range unknown.Properties {
-				depthCounter.Enter()
-				properties = buildSchema(
+				if err := descend(
 					depthCounter,
 					schemas,
 					properties,
 					propertyPath.Append(name),
 					schemaProperties,
-				)
-				depthCounter.Exit()
+				); err != nil {
+					return err
+				}
 			}
 
-			return properties
+			return nil
 		}
 
 		if unknown.IsArray() {
@@ -194,17 +254,13 @@ func buildSchema(
 				unknown.Optional,
 			)
 
-			depthCounter.Enter()
-			properties = buildSchema(
+			return descend(
 				depthCounter,
 				schemas,
 				properties,
 				propertyPath.AppendArray(),
 				unknown.Items,
 			)
-			depthCounter.Exit()
-
-			return properties
 		}
 
 		if unknown.IsPrimitive() {
@@ -214,24 +270,20 @@ func buildSchema(
 				unknown.Optional,
 			)
 
-			return properties
+			return nil
 		}
 
 		if unknown.IsRef() {
-			depthCounter.Enter()
-			properties = buildSchema(
+			return descend(
 				depthCounter,
 				schemas,
 				properties,
 				propertyPath,
 				schemas[unknown.Ref],
 			)
-			depthCounter.Exit()
-
-			return properties
 		}
 
-		return properties
+		return nil
 	case *Schema:
 		return buildSchema(
 			depthCounter,
@@ -241,6 +293,27 @@ func buildSchema(
 			*unknown,
 		)
 	default:
-		panic(fmt.Sprintf("unknown schema type %T", unknown))
+		return fmt.Errorf("unknown schema type %T", unknown)
 	}
+}
+
+// descend takes buildSchema one level down, counting the level in and back out.
+func descend(
+	depthCounter *DepthCounter,
+	schemas SchemasMap,
+	properties map[string]model.Property,
+	propertyPath PropertyPath,
+	unknown any,
+) error {
+	if err := depthCounter.Enter(); err != nil {
+		return err
+	}
+
+	if err := buildSchema(depthCounter, schemas, properties, propertyPath, unknown); err != nil {
+		return err
+	}
+
+	depthCounter.Exit()
+
+	return nil
 }
