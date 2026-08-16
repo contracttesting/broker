@@ -40,7 +40,7 @@ func (s *IntegrationSuite) TestRenameParticipant_SuccessPreservesIdentityAndRefe
 	status, _ := s.post("/api/participants", renamePetsBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", `{"participant":"pets-service","version":"v1","contract":`+renameV1ContractBody+`}`)
+	status, _ = s.post("/api/contracts", s.publishBody("pets-service", "v1", contractFragment{"api.json", renameV1ContractBody}))
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/environments", renameProductionEnvBody)

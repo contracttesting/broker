@@ -3,6 +3,7 @@ module github.com/contracttesting/broker
 go 1.25.0
 
 require (
+	github.com/goccy/go-yaml v1.19.2
 	github.com/gofiber/fiber/v3 v3.2.0
 	github.com/guregu/null v4.0.0+incompatible
 	github.com/jackc/pgx/v5 v5.9.2
