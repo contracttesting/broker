@@ -34,23 +34,23 @@ const (
 
 	insertContractQuery = `
 		INSERT INTO contracts
-			(participant_id, checksum, raw_payload)
+			(participant_id, checksum)
 		VALUES
-			($1, $2, $3)
+			($1, $2)
 		RETURNING id
 	`
 
 	insertContractVersionQuery = `
 		INSERT INTO contract_versions
-			(participant_id, version, contract_id)
+			(participant_id, version, contract_id, raw_payload)
 		VALUES
-			($1, $2, $3)
+			($1, $2, $3, $4)
 	`
 
 	aliasVersionToSnapshotQuery = `
 		INSERT INTO contract_versions
-			(participant_id, version, contract_id)
-		SELECT $1, $2, id FROM contracts WHERE participant_id = $1 AND checksum = $3
+			(participant_id, version, contract_id, raw_payload)
+		SELECT $1, $2, id, $4 FROM contracts WHERE participant_id = $1 AND checksum = $3
 	`
 
 	insertResourceQuery = `
@@ -109,7 +109,7 @@ const (
 		SELECT
 			c.id,
 			(SELECT version FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
-			c.raw_payload,
+			(SELECT raw_payload FROM contract_versions WHERE contract_id = c.id ORDER BY id DESC LIMIT 1),
 			c.created_at,
 			pa.id,
 			pa.name,
@@ -157,7 +157,7 @@ const (
 		SELECT
 			c.id,
 			cv.version,
-			c.raw_payload,
+			cv.raw_payload,
 			c.created_at,
 			pa.id,
 			pa.name,
@@ -516,14 +516,20 @@ func uploadedProperties(contract *model.UploadedContract) map[string]contract_di
 }
 
 // AliasVersionToSnapshot points a new version at an existing snapshot with the same
-// content, reporting whether one matched.
+// content, reporting whether one matched. The alias still stamps its own raw payload:
+// the files are a property of the version, not of the snapshot they resolve to.
 func (r *ContractRepository) AliasVersionToSnapshot(
 	ctx context.Context,
-	participantID int64,
-	version string,
-	checksum string,
+	contract *model.UploadedContract,
 ) bool {
-	tag, err := r.pool.Exec(ctx, aliasVersionToSnapshotQuery, participantID, version, checksum)
+	tag, err := r.pool.Exec(
+		ctx,
+		aliasVersionToSnapshotQuery,
+		contract.ParticipantID,
+		contract.Version,
+		contract.Checksum(),
+		contract.RawContract,
+	)
 	if err != nil {
 		panic(fmt.Errorf("error aliasing version to snapshot: %w", err))
 	}
@@ -542,6 +548,7 @@ func (r *ContractRepository) insertContractVersion(
 		contract.ParticipantID,
 		contract.Version,
 		contract.ID,
+		contract.RawContract,
 	); err != nil {
 		panic(fmt.Errorf("error inserting contract version: %w", err))
 	}
@@ -557,7 +564,6 @@ func (r *ContractRepository) insertContract(
 		insertContractQuery,
 		contract.ParticipantID,
 		contract.Checksum(),
-		contract.RawContract,
 	).Scan(&contract.ID); err != nil {
 		panic(fmt.Errorf("error inserting contract: %w", err))
 	}

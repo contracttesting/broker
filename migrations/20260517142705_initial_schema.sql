@@ -14,7 +14,6 @@ CREATE TABLE contracts (
   id              BIGSERIAL PRIMARY KEY,
   participant_id  BIGINT NOT NULL REFERENCES participants(id),
   checksum        text NOT NULL,
-  raw_payload     text NOT NULL,
   created_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (participant_id, checksum)
 );
@@ -24,6 +23,7 @@ CREATE TABLE contract_versions (
   participant_id  BIGINT NOT NULL REFERENCES participants(id),
   version         text NOT NULL,
   contract_id     BIGINT NOT NULL REFERENCES contracts(id),
+  raw_payload     text NOT NULL,
   created_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (participant_id, version)
 );
