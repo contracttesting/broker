@@ -196,13 +196,15 @@ func (c *Contract) addResource(
 		return unresolvedSchemaName(schemaName, resource.Describe())
 	}
 
-	buildSchema(
+	if err := buildSchema(
 		NewDepthCounter(schemaName),
 		c.Schemas,
 		properties,
 		NewPropertyPath("$"),
 		schema,
-	)
+	); err != nil {
+		return err
+	}
 
 	return contract.AddResource(resource)
 }
@@ -211,13 +213,16 @@ func unresolvedSchemaName(name, position string) error {
 	return fmt.Errorf("unresolved schema name: %s referenced at %s", name, position)
 }
 
+// buildSchema fills properties by walking the schema, following refs through the
+// namespace. It returns SchemaTooDeep once the walk passes MAX_DEPTH levels, which is
+// also how a cyclic chain of refs terminates.
 func buildSchema(
 	depthCounter *DepthCounter,
 	schemas SchemasMap,
 	properties map[string]model.Property,
 	propertyPath PropertyPath,
 	unknown any,
-) map[string]model.Property {
+) error {
 	switch unknown := unknown.(type) {
 	case Schema:
 		if unknown.IsObject() {
@@ -228,18 +233,18 @@ func buildSchema(
 			)
 
 			for name, schemaProperties := range unknown.Properties {
-				depthCounter.Enter()
-				properties = buildSchema(
+				if err := descend(
 					depthCounter,
 					schemas,
 					properties,
 					propertyPath.Append(name),
 					schemaProperties,
-				)
-				depthCounter.Exit()
+				); err != nil {
+					return err
+				}
 			}
 
-			return properties
+			return nil
 		}
 
 		if unknown.IsArray() {
@@ -249,17 +254,13 @@ func buildSchema(
 				unknown.Optional,
 			)
 
-			depthCounter.Enter()
-			properties = buildSchema(
+			return descend(
 				depthCounter,
 				schemas,
 				properties,
 				propertyPath.AppendArray(),
 				unknown.Items,
 			)
-			depthCounter.Exit()
-
-			return properties
 		}
 
 		if unknown.IsPrimitive() {
@@ -269,24 +270,20 @@ func buildSchema(
 				unknown.Optional,
 			)
 
-			return properties
+			return nil
 		}
 
 		if unknown.IsRef() {
-			depthCounter.Enter()
-			properties = buildSchema(
+			return descend(
 				depthCounter,
 				schemas,
 				properties,
 				propertyPath,
 				schemas[unknown.Ref],
 			)
-			depthCounter.Exit()
-
-			return properties
 		}
 
-		return properties
+		return nil
 	case *Schema:
 		return buildSchema(
 			depthCounter,
@@ -296,6 +293,27 @@ func buildSchema(
 			*unknown,
 		)
 	default:
-		panic(fmt.Sprintf("unknown schema type %T", unknown))
+		return fmt.Errorf("unknown schema type %T", unknown)
 	}
+}
+
+// descend takes buildSchema one level down, counting the level in and back out.
+func descend(
+	depthCounter *DepthCounter,
+	schemas SchemasMap,
+	properties map[string]model.Property,
+	propertyPath PropertyPath,
+	unknown any,
+) error {
+	if err := depthCounter.Enter(); err != nil {
+		return err
+	}
+
+	if err := buildSchema(depthCounter, schemas, properties, propertyPath, unknown); err != nil {
+		return err
+	}
+
+	depthCounter.Exit()
+
+	return nil
 }

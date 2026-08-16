@@ -399,28 +399,22 @@ const deeplyNestedContractJSON = `{
   }
 }`
 
-func TestHydrateContract_Unhappy_PanicsOnDeeplyNestedSchema(t *testing.T) {
+func TestHydrateContract_Unhappy_RejectsDeeplyNestedSchema(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(deeplyNestedContractJSON), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", deeplyNestedContractJSON)
+	err := dslContract.HydrateContract(contract)
 
-	assert.PanicsWithValue(
-		t,
-		"schema Pet is too deep with more than 10 levels",
-		func() { _ = dslContract.HydrateContract(contract) },
-	)
+	require.EqualError(t, err, "schema Pet is too deep with more than 10 levels")
 }
 
-func TestHydrateContract_Unhappy_PanicsOnSchemaTooDeep(t *testing.T) {
+func TestHydrateContract_Unhappy_RejectsCyclicSchema(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(cyclicContractJSON), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", cyclicContractJSON)
+	err := dslContract.HydrateContract(contract)
 
-	assert.PanicsWithValue(
-		t,
-		"schema Pet is too deep with more than 10 levels",
-		func() { _ = dslContract.HydrateContract(contract) },
-	)
+	require.EqualError(t, err, "schema Pet is too deep with more than 10 levels")
 }

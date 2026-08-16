@@ -82,6 +82,28 @@ const namesDanglingSchemaJSON = `{
   }
 }`
 
+const namesCyclicSchemasJSON = `{
+  "provides": {
+    "rest": {
+      "/pets": {
+        "get": {
+          "responses": { "200": "Pet" }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Pet": {
+      "type": "object",
+      "properties": { "owner": { "ref": "Owner" } }
+    },
+    "Owner": {
+      "type": "object",
+      "properties": { "pet": { "ref": "Pet" } }
+    }
+  }
+}`
+
 func (s *IntegrationSuite) TestPublishContract_UnresolvedResponseSchema() {
 	status, _ := s.post("/api/participants", namesParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
@@ -140,4 +162,19 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedRefInUnreachedSchema() 
 	s.JSONEq(`{"message":"unresolved schema name: Payment referenced at Invoice.payment"}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_CyclicSchema_RejectedBrokerStaysUp() {
+	status, _ := s.post("/api/participants", namesParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts",
+		`{"participant":"names-service","version":"1","contract":`+namesCyclicSchemasJSON+`}`)
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"schema Pet is too deep with more than 10 levels"}`, body)
+
+	s.Equal(0, s.countRows("contracts"))
+
+	status, _ = s.post("/api/participants", `{"participant":"still-alive"}`)
+	s.Equal(http.StatusOK, status)
 }
