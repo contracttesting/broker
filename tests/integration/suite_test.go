@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http/httptest"
@@ -103,6 +104,26 @@ func (s *IntegrationSuite) post(path, body string) (status int, response string)
 	s.Require().NoError(err)
 
 	return resp.StatusCode, string(bytes)
+}
+
+type contractFragment struct {
+	Source  string `json:"source"`
+	Content string `json:"content"`
+}
+
+func (s *IntegrationSuite) publishBody(participant, version string, fragments ...contractFragment) string {
+	body, err := json.Marshal(struct {
+		Participant string             `json:"participant"`
+		Version     string             `json:"version"`
+		Contracts   []contractFragment `json:"contracts"`
+	}{
+		Participant: participant,
+		Version:     version,
+		Contracts:   fragments,
+	})
+	s.Require().NoError(err)
+
+	return string(body)
 }
 
 func (s *IntegrationSuite) countRows(table string) int {

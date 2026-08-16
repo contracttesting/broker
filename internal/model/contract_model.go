@@ -14,6 +14,8 @@ type UploadedContract struct {
 	Resources       map[string]UploadedResource
 	ParticipantID   int64
 	ParticipantName string
+
+	resourceSources map[string]string
 }
 
 func NewUploadedContract(
@@ -31,21 +33,28 @@ func NewUploadedContract(
 }
 
 // AddResource rejects a resource whose hash is already taken: two resources with the
-// same hash are the same resource, so a second one can only come from a contract
-// declaring it twice — silently overwriting picks a winner by map iteration order.
-func (contract *UploadedContract) AddResource(resource *UploadedResource) error {
+// same hash are the same resource, so a second one can only come from a fragment
+// redeclaring what another fragment already declared.
+func (contract *UploadedContract) AddResource(resource *UploadedResource, source string) error {
 	if contract.Resources == nil {
 		contract.Resources = make(map[string]UploadedResource)
+		contract.resourceSources = make(map[string]string)
 	}
 
 	resource.ParticipantName = contract.ParticipantName
 	hash := resource.PrimaryHash()
 
-	if _, taken := contract.Resources[hash]; taken {
-		return fmt.Errorf("duplicate resource: %s", resource.Describe())
+	if declaredIn, taken := contract.resourceSources[hash]; taken {
+		return fmt.Errorf(
+			"duplicate resource: %s declared in %s and %s",
+			resource.Describe(),
+			declaredIn,
+			source,
+		)
 	}
 
 	contract.Resources[hash] = *resource
+	contract.resourceSources[hash] = source
 
 	return nil
 }
