@@ -8,14 +8,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const participantName = "pets-service"
+const (
+	participantName = "pets-service"
+	contractSource  = "api.json"
+)
 
 func newContractWithOnePetsResource() *model.UploadedContract {
 	contract := model.NewUploadedContract(0, participantName, "1", "raw")
 	_ = contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
-	}))
+	}), contractSource)
 	return contract
 }
 
@@ -43,7 +46,7 @@ func TestDiff_ReportsAddedResource(t *testing.T) {
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
 	})
-	_ = next.AddResource(added)
+	_ = next.AddResource(added, contractSource)
 	key := added.PrimaryHash()
 
 	diff := contract_differ.DiffResourceProperties(props(prev), props(next))
@@ -67,7 +70,7 @@ func TestDiff_RemovedResource(t *testing.T) {
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "string", false),
 	})
-	_ = oldContract.AddResource(removed)
+	_ = oldContract.AddResource(removed, contractSource)
 	key := removed.PrimaryHash()
 
 	newContract := newContractWithOnePetsResource()
@@ -88,7 +91,7 @@ func TestDiff_ModifiedResource_PropertyAdded(t *testing.T) {
 		"$":      model.NewProperty("$", "object", false),
 		"$.id":   model.NewProperty("$.id", "string", false),
 		"$.name": model.NewProperty("$.name", "string", false),
-	}))
+	}), contractSource)
 
 	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
 
@@ -108,6 +111,7 @@ func TestDiff_ModifiedResource_PropertyRemoved(t *testing.T) {
 			"$.id":   model.NewProperty("$.id", "string", false),
 			"$.name": model.NewProperty("$.name", "string", false),
 		}),
+		contractSource,
 	)
 	newContract := newContractWithOnePetsResource()
 
@@ -127,7 +131,7 @@ func TestDiff_ModifiedResource_PropertyTypeChanged(t *testing.T) {
 	_ = newContract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),
 		"$.id": model.NewProperty("$.id", "int", false),
-	}))
+	}), contractSource)
 
 	diff := contract_differ.DiffResourceProperties(props(oldContract), props(newContract))
 

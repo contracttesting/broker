@@ -62,7 +62,10 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(happyContractJSON), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", happyContractJSON)
-	require.NoError(t, dslContract.HydrateContract(contract))
+	require.NoError(t, dsl.HydrateFragments(
+		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
+		contract,
+	))
 
 	require.Len(t, contract.Resources, 1)
 
@@ -190,7 +193,10 @@ func hydrate(t *testing.T, raw string) *model.UploadedContract {
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", raw)
-	require.NoError(t, dslContract.HydrateContract(contract))
+	require.NoError(t, dsl.HydrateFragments(
+		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
+		contract,
+	))
 	return contract
 }
 
@@ -399,22 +405,28 @@ const deeplyNestedContractJSON = `{
   }
 }`
 
-func TestHydrateContract_Unhappy_RejectsDeeplyNestedSchema(t *testing.T) {
+func TestHydrateFragments_Unhappy_RejectsDeeplyNestedSchema(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(deeplyNestedContractJSON), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", deeplyNestedContractJSON)
-	err := dslContract.HydrateContract(contract)
+	err := dsl.HydrateFragments(
+		[]dsl.Fragment{{Source: "schemas.yaml", Contract: &dslContract}},
+		contract,
+	)
 
-	require.EqualError(t, err, "schema Pet is too deep with more than 10 levels")
+	require.EqualError(t, err, "schema Pet is too deep with more than 10 levels (schemas.yaml)")
 }
 
-func TestHydrateContract_Unhappy_RejectsCyclicSchema(t *testing.T) {
+func TestHydrateFragments_Unhappy_RejectsCyclicSchema(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(cyclicContractJSON), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", cyclicContractJSON)
-	err := dslContract.HydrateContract(contract)
+	err := dsl.HydrateFragments(
+		[]dsl.Fragment{{Source: "schemas.yaml", Contract: &dslContract}},
+		contract,
+	)
 
-	require.EqualError(t, err, "schema Pet is too deep with more than 10 levels")
+	require.EqualError(t, err, "schema Pet is too deep with more than 10 levels (schemas.yaml)")
 }

@@ -38,8 +38,8 @@ func (s *IntegrationSuite) TestPublish_IdenticalContentNewVersion_AliasesTheSnap
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
-	mustPost("/api/contracts", `{"participant":"api","version":"a1b2c3d","contract":`+aliasProviderContract+`}`)
-	mustPost("/api/contracts", `{"participant":"api","version":"e4f5a6b","contract":`+aliasProviderContract+`}`)
+	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.json", aliasProviderContract}))
+	mustPost("/api/contracts", s.publishBody("api", "e4f5a6b", contractFragment{"api.json", aliasProviderContract}))
 
 	// one snapshot, two version names pointing at it
 	s.Equal(1, s.countRows("contracts"))
@@ -58,8 +58,8 @@ func (s *IntegrationSuite) TestPublish_ChangedContentNewVersion_CreatesSnapshot(
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
-	mustPost("/api/contracts", `{"participant":"api","version":"a1b2c3d","contract":`+aliasProviderContract+`}`)
-	mustPost("/api/contracts", `{"participant":"api","version":"e4f5a6b","contract":`+aliasProviderChangedContract+`}`)
+	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.json", aliasProviderContract}))
+	mustPost("/api/contracts", s.publishBody("api", "e4f5a6b", contractFragment{"api.json", aliasProviderChangedContract}))
 
 	s.Equal(2, s.countRows("contracts"))
 	s.Equal(2, s.countRows("contract_versions"))
@@ -75,12 +75,12 @@ func (s *IntegrationSuite) TestCanIDeploy_ResolvesAnAliasedVersion() {
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/environments", `{"participant":"production"}`)
 
-	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+aliasProviderContract+`}`)
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", aliasProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 
 	// republished unchanged under a commit sha, the way CI does
-	mustPost("/api/contracts", `{"participant":"front","version":"v1","contract":`+aliasConsumerContract+`}`)
-	mustPost("/api/contracts", `{"participant":"front","version":"a1b2c3d","contract":`+aliasConsumerContract+`}`)
+	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", aliasConsumerContract}))
+	mustPost("/api/contracts", s.publishBody("front", "a1b2c3d", contractFragment{"api.json", aliasConsumerContract}))
 
 	status, body := s.post("/api/can-i-deploy", `{"participant":"front","version":"a1b2c3d","environment":"production"}`)
 	s.Equal(http.StatusOK, status)
@@ -97,8 +97,8 @@ func (s *IntegrationSuite) TestRecordDeployment_ResolvesAnAliasedVersion() {
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/environments", `{"participant":"production"}`)
 
-	mustPost("/api/contracts", `{"participant":"api","version":"v1","contract":`+aliasProviderContract+`}`)
-	mustPost("/api/contracts", `{"participant":"api","version":"a1b2c3d","contract":`+aliasProviderContract+`}`)
+	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", aliasProviderContract}))
+	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.json", aliasProviderContract}))
 
 	status, _ := s.post("/api/deployments", `{"participant":"api","version":"a1b2c3d","environment":"production"}`)
 	s.Equal(http.StatusOK, status)

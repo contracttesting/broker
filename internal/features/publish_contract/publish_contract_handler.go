@@ -32,13 +32,22 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	version := strings.TrimSpace(requestBody.Version)
-	if version == "" || len(requestBody.Contract) == 0 {
+	if version == "" || len(requestBody.Contracts) == 0 {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	dslContract := &dsl.Contract{}
-	if err := json.Unmarshal(requestBody.Contract, dslContract); err != nil {
-		return ctr.respondInvalidInput(ctx)
+	fragments := make([]dsl.Fragment, 0, len(requestBody.Contracts))
+	for _, uploaded := range requestBody.Contracts {
+		if strings.TrimSpace(uploaded.Source) == "" {
+			return ctr.respondInvalidInput(ctx)
+		}
+
+		parsed, err := parseFragment(uploaded)
+		if err != nil {
+			return ctr.respondBadRequest(ctx, err)
+		}
+
+		fragments = append(fragments, dsl.Fragment{Source: uploaded.Source, Contract: parsed})
 	}
 
 	participant, exists := ctr.participantRepository.FindByName(ctx.Context(), requestBody.Participant)
@@ -46,8 +55,12 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondParticipantNotFound(ctx)
 	}
 
-	contract := model.NewUploadedContract(participant.ID, participant.Name, version, string(requestBody.Contract))
-	if err := dslContract.HydrateContract(contract); err != nil {
+	// the uploaded files are stamped on the version verbatim, so a version reconstructs
+	// letter by letter what was published under it
+	contractContent, _ := json.Marshal(requestBody.Contracts)
+
+	contract := model.NewUploadedContract(participant.ID, participant.Name, version, string(contractContent))
+	if err := dsl.HydrateFragments(fragments, contract); err != nil {
 		return ctr.respondBadRequest(ctx, err)
 	}
 

@@ -55,7 +55,10 @@ func hydrateEndpointContract(t *testing.T, raw string) (*model.UploadedContract,
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
 	contract := model.NewUploadedContract(0, "things-app", "1", raw)
-	return contract, dslContract.HydrateContract(contract)
+	return contract, dsl.HydrateFragments(
+		[]dsl.Fragment{{Source: "things.yaml", Contract: &dslContract}},
+		contract,
+	)
 }
 
 func singleEndpointResource(t *testing.T, contract *model.UploadedContract) model.UploadedResource {
@@ -102,10 +105,10 @@ func TestHydrateContract_EndpointRules_Rejects(t *testing.T) {
 		endpoint string
 		wantErr  string
 	}{
-		{"/users/{userId}", `invalid endpoint "/users/{userId}": dynamic path segments must use *`},
-		{"/users/u*", `invalid endpoint "/users/u*": dynamic path segments must use *`},
-		{"users", `invalid endpoint "users": malformed path`},
-		{"/users//x", `invalid endpoint "/users//x": malformed path`},
+		{"/users/{userId}", `invalid endpoint "/users/{userId}": dynamic path segments must use * (things.yaml)`},
+		{"/users/u*", `invalid endpoint "/users/u*": dynamic path segments must use * (things.yaml)`},
+		{"users", `invalid endpoint "users": malformed path (things.yaml)`},
+		{"/users//x", `invalid endpoint "/users//x": malformed path (things.yaml)`},
 	}
 
 	for _, c := range cases {
@@ -117,7 +120,7 @@ func TestHydrateContract_EndpointRules_Rejects(t *testing.T) {
 }
 
 func TestHydrateContract_ParamEndpoint_ErrorsFromProvidesAndConsumes(t *testing.T) {
-	wantErr := `invalid endpoint "/users/{userId}": dynamic path segments must use *`
+	wantErr := `invalid endpoint "/users/{userId}": dynamic path segments must use * (things.yaml)`
 
 	_, err := hydrateEndpointContract(t, endpointProvidesJSON("/users/{userId}"))
 	require.EqualError(t, err, wantErr)
