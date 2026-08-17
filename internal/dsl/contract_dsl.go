@@ -14,7 +14,7 @@ type Contract struct {
 }
 
 func (c Contract) Validate(vctx ValidationContext) {
-	c.Provides.Validate(vctx.At("provides"))
+	c.Provides.Validate(vctx.At("provides").atResource("provides"))
 	c.ConsumesServices.Validate(vctx)
 	c.Schemas.Validate(vctx)
 }

@@ -1,7 +1,6 @@
 package dsl
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -13,20 +12,21 @@ func normalizeEndpoint(endpoint string) string {
 	return endpoint
 }
 
-// validateEndpoint expects an endpoint that Normalize already rewrote: a trailing slash
-// past the root is a malformed path here, not a spelling to be trimmed.
-func validateEndpoint(endpoint string) error {
+// endpointViolation says why an endpoint is invalid, or "" when it is valid. It expects
+// a normalized endpoint: a trailing slash past the root is a malformed path here, not a
+// spelling to be trimmed.
+func endpointViolation(endpoint string) string {
 	if !strings.HasPrefix(endpoint, "/") {
-		return fmt.Errorf("invalid endpoint %q: malformed path", endpoint)
+		return "malformed path"
 	}
 
 	if endpoint == "/" {
-		return nil
+		return ""
 	}
 
 	for _, segment := range strings.Split(endpoint[1:], "/") {
 		if segment == "" || strings.Contains(segment, ";") {
-			return fmt.Errorf("invalid endpoint %q: malformed path", endpoint)
+			return "malformed path"
 		}
 
 		if segment == "*" {
@@ -34,9 +34,9 @@ func validateEndpoint(endpoint string) error {
 		}
 
 		if strings.ContainsAny(segment, "*{}") {
-			return fmt.Errorf("invalid endpoint %q: dynamic path segments must use *", endpoint)
+			return "dynamic path segments must use *"
 		}
 	}
 
-	return nil
+	return ""
 }

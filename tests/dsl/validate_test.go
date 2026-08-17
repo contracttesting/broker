@@ -229,8 +229,7 @@ func validateFiles(t *testing.T, files ...validatedFile) []string {
 		fragments = append(fragments, dsl.Fragment{Source: file.source, Contract: contract})
 	}
 
-	violations := dsl.Normalize(fragments)
-	violations = append(violations, dsl.Validate(fragments)...)
+	violations := dsl.NewValidator().Validate(fragments)
 
 	messages := make([]string, 0, len(violations))
 	for _, violation := range violations {
@@ -354,6 +353,33 @@ func TestValidate_DuplicateResources_NameTheResourceAndBothSources(t *testing.T)
 		"duplicate resource: provides POST /pets request declared in c.json and d.json",
 		"duplicate resource: provides POST /pets 201 declared in c.json and d.json",
 		"duplicate resource: consumes payments GET /invoices 200 declared in e.json and f.json",
+	}, messages)
+}
+
+func TestValidate_BothSpellingsInOneFile_ReportsDuplicateEndpointOnly(t *testing.T) {
+	bothSpellings := `{
+  "provides": {
+    "rest": {
+      "/pets": {
+        "get": { "responses": { "200": "Pet" } }
+      },
+      "/pets/": {
+        "get": { "responses": { "200": "Pet" } }
+      }
+    }
+  },
+  "schemas": {
+    "Pet": {
+      "type": "object",
+      "properties": { "id": { "type": "string" } }
+    }
+  }
+}`
+
+	messages := validateFiles(t, validatedFile{"pets.json", bothSpellings})
+
+	assert.Equal(t, []string{
+		"duplicate endpoint: /pets declared twice in pets.json",
 	}, messages)
 }
 

@@ -13,15 +13,18 @@ import (
 type PublishContractHandler struct {
 	contractRepository    *repository.ContractRepository
 	participantRepository *repository.ParticipantRepository
+	validator             dsl.Validator
 }
 
 func NewPublishContractHandler(
 	contractRepository *repository.ContractRepository,
 	participantRepository *repository.ParticipantRepository,
+	validator dsl.Validator,
 ) *PublishContractHandler {
 	return &PublishContractHandler{
 		contractRepository:    contractRepository,
 		participantRepository: participantRepository,
+		validator:             validator,
 	}
 }
 
@@ -56,11 +59,11 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondParticipantNotFound(ctx)
 	}
 
-	validationErrors := dsl.Normalize(fragments)
-	validationErrors = append(validationErrors, dsl.Validate(fragments)...)
-	if len(validationErrors) > 0 {
-		return ctr.respondValidationFailed(ctx, validationErrors)
+	if violations := ctr.validator.Validate(fragments); len(violations) > 0 {
+		return ctr.respondValidationFailed(ctx, violations)
 	}
+
+	dsl.Normalize(fragments)
 
 	// the uploaded files are stamped on the version verbatim, so a version reconstructs
 	// letter by letter what was published under it

@@ -58,11 +58,11 @@ func endpointContract(t *testing.T, raw string) (*model.UploadedContract, []erro
 
 	fragments := []dsl.Fragment{{Source: "things.yaml", Contract: &dslContract}}
 
-	errs := dsl.Normalize(fragments)
-	errs = append(errs, dsl.Validate(fragments)...)
-	if len(errs) > 0 {
+	if errs := dsl.NewValidator().Validate(fragments); len(errs) > 0 {
 		return nil, errs
 	}
+
+	dsl.Normalize(fragments)
 
 	contract := model.NewUploadedContract(0, "things-app", "1", raw)
 	require.NoError(t, dsl.HydrateFragments(fragments, contract))
@@ -118,6 +118,9 @@ func TestEndpointRules_Rejects(t *testing.T) {
 		{"/users/u*", `invalid endpoint "/users/u*": dynamic path segments must use * (things.yaml)`},
 		{"users", `invalid endpoint "users": malformed path (things.yaml)`},
 		{"/users//x", `invalid endpoint "/users//x": malformed path (things.yaml)`},
+		// the message quotes the raw spelling even though the identity under judgment
+		// is the normalized one
+		{"/users//", `invalid endpoint "/users//": malformed path (things.yaml)`},
 	}
 
 	for _, c := range cases {

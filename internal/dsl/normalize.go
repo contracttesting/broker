@@ -6,36 +6,23 @@ import (
 )
 
 // Normalize rewrites every endpoint of every fragment to its normalized spelling, in
-// place, so validation and build only ever see one spelling of a path. It is the only
+// place, so the build only ever sees one spelling of a path. It runs after validation
+// passed, so it never meets a collision: it is a pure transformation. It is the only
 // normalization the publish does: everything else that feeds a hash is rejected.
-func Normalize(fragments []Fragment) []error {
-	errs := &ErrorList{}
+func Normalize(fragments []Fragment) {
+	for _, fragment := range fragments {
+		normalizeRest(fragment.Contract.Provides.Rest)
 
-	for _, fragment := range sortedBySource(fragments) {
-		normalizeRest(fragment.Contract.Provides.Rest, fragment.Source, errs)
-
-		for _, service := range slices.Sorted(maps.Keys(fragment.Contract.ConsumesServices)) {
-			normalizeRest(fragment.Contract.ConsumesServices[service].Rest, fragment.Source, errs)
+		for _, service := range fragment.Contract.ConsumesServices {
+			normalizeRest(service.Rest)
 		}
 	}
-
-	return errs.All()
 }
 
-// normalizeRest renames the endpoints of one map. Two spellings of the same path in the
-// same map would silently overwrite each other, so the first one in sorted order stays
-// and the second is reported.
-func normalizeRest(rest Rest, source string, errs *ErrorList) {
+func normalizeRest(rest Rest) {
 	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
 		normalized := normalizeEndpoint(endpoint)
 		if normalized == endpoint {
-			continue
-		}
-
-		if _, taken := rest[normalized]; taken {
-			errs.Addf("duplicate endpoint: %s declared twice in %s", normalized, source)
-			delete(rest, endpoint)
-
 			continue
 		}
 

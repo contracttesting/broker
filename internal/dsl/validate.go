@@ -8,31 +8,13 @@ import (
 	"strings"
 )
 
-// Validate walks every fragment and reports everything wrong with the contract at once:
-// a publish is either rejected with the full list or handed to the build as valid DSL.
-// It expects the fragments to have gone through Normalize.
-func Validate(fragments []Fragment) []error {
-	errs := &ErrorList{}
-	index := buildIndex(fragments, errs)
-
-	for _, fragment := range sortedBySource(fragments) {
-		fragment.Contract.Validate(ValidationContext{
-			Index: index,
-			Errs:  errs,
-			Pos:   Position{Source: fragment.Source},
-		})
-	}
-
-	return errs.All()
-}
-
 // Index is what a rule needs to know about the contract as a whole: the schema
-// namespace every fragment shares, and who declared what. It is built once, before the
-// walk, and never changes during it.
+// namespace every fragment shares, and the resources they declare. It is built once,
+// before the walk, and never changes during it. It exists for O(1) lookup: it merges
+// silently, first entry winning — duplicate detection is the rules' job.
 type Index struct {
-	schemas       SchemasMap
-	schemaSources map[string]string
-	resources     map[string]string
+	schemas   SchemasMap
+	resources map[string]string
 }
 
 func (i *Index) Schema(name string) (Schema, bool) {
@@ -41,94 +23,81 @@ func (i *Index) Schema(name string) (Schema, bool) {
 	return schema, declared
 }
 
-// buildIndex indexes the fragments in source order. Duplicates are a by-product of the
-// indexing: the second declaration of a name or of a resource path is the one that
-// cannot be inserted.
-func buildIndex(fragments []Fragment, errs *ErrorList) *Index {
+func buildIndex(fragments []Fragment) *Index {
 	index := &Index{
-		schemas:       make(SchemasMap),
-		schemaSources: make(map[string]string),
-		resources:     make(map[string]string),
+		schemas:   make(SchemasMap),
+		resources: make(map[string]string),
 	}
 
 	for _, fragment := range sortedBySource(fragments) {
-		index.indexSchemas(fragment, errs)
+		index.indexSchemas(fragment)
 	}
 
 	for _, fragment := range sortedBySource(fragments) {
-		index.indexResources(fragment, errs)
+		index.indexResources(fragment)
 	}
 
 	return index
 }
 
-func (i *Index) indexSchemas(fragment Fragment, errs *ErrorList) {
+func (i *Index) indexSchemas(fragment Fragment) {
 	for _, name := range slices.Sorted(maps.Keys(fragment.Contract.Schemas)) {
-		if declaredIn, taken := i.schemaSources[name]; taken {
-			errs.Addf("duplicate schema: %s declared in %s and %s", name, declaredIn, fragment.Source)
-
+		if _, taken := i.schemas[name]; taken {
 			continue
 		}
 
 		i.schemas[name] = fragment.Contract.Schemas[name]
-		i.schemaSources[name] = fragment.Source
 	}
 }
 
-func (i *Index) indexResources(fragment Fragment, errs *ErrorList) {
+func (i *Index) indexResources(fragment Fragment) {
 	root := NewResourcePath("")
 
 	providesPath := root.Append("provides")
-	i.indexRest(fragment.Contract.Provides.Rest, providesPath, fragment.Source, errs)
+	i.indexRest(fragment.Contract.Provides.Rest, providesPath, fragment.Source)
 
 	for _, service := range slices.Sorted(maps.Keys(fragment.Contract.ConsumesServices)) {
 		consumesPath := root.Append("consumes", service)
-		i.indexRest(fragment.Contract.ConsumesServices[service].Rest, consumesPath, fragment.Source, errs)
+		i.indexRest(fragment.Contract.ConsumesServices[service].Rest, consumesPath, fragment.Source)
 	}
 }
 
-func (i *Index) indexRest(rest Rest, base ResourcePath, source string, errs *ErrorList) {
+func (i *Index) indexRest(rest Rest, base ResourcePath, source string) {
 	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
 		// an endpoint the walk will reject declares no resource, and its path would not
 		// parse back into one
-		if validateEndpoint(endpoint) != nil {
+		normalized := normalizeEndpoint(endpoint)
+		if endpointViolation(normalized) != "" {
 			continue
 		}
 
 		methods := rest[endpoint]
-		endpointPath := base.Append("rest", endpoint)
+		endpointPath := base.Append("rest", normalized)
 
-		i.indexResponses(endpointPath.Append("get", "responses"), methods.Get.Responses, source, errs)
+		i.indexResponses(endpointPath.Append("get", "responses"), methods.Get.Responses, source)
 
 		if methods.Post.HasRequestBody() {
-			i.indexResource(endpointPath.Append("post", "request"), source, errs)
+			i.indexResource(endpointPath.Append("post", "request"), source)
 		}
-		i.indexResponses(endpointPath.Append("post", "responses"), methods.Post.Responses, source, errs)
+		i.indexResponses(endpointPath.Append("post", "responses"), methods.Post.Responses, source)
 
 		if methods.Put.HasRequestBody() {
-			i.indexResource(endpointPath.Append("put", "request"), source, errs)
+			i.indexResource(endpointPath.Append("put", "request"), source)
 		}
-		i.indexResponses(endpointPath.Append("put", "responses"), methods.Put.Responses, source, errs)
+		i.indexResponses(endpointPath.Append("put", "responses"), methods.Put.Responses, source)
 
-		i.indexResponses(endpointPath.Append("delete", "responses"), methods.Delete.Responses, source, errs)
+		i.indexResponses(endpointPath.Append("delete", "responses"), methods.Delete.Responses, source)
 	}
 }
 
-func (i *Index) indexResponses(base ResourcePath, responses Responses, source string, errs *ErrorList) {
+func (i *Index) indexResponses(base ResourcePath, responses Responses, source string) {
 	for _, statusCode := range slices.Sorted(maps.Keys(responses)) {
-		i.indexResource(base.Append(strconv.Itoa(statusCode)), source, errs)
+		i.indexResource(base.Append(strconv.Itoa(statusCode)), source)
 	}
 }
 
-func (i *Index) indexResource(resourcePath ResourcePath, source string, errs *ErrorList) {
-	if declaredIn, taken := i.resources[resourcePath.String()]; taken {
-		errs.Addf(
-			"duplicate resource: %s declared in %s and %s",
-			resourcePath.ToResource(nil).Describe(),
-			declaredIn,
-			source,
-		)
-
+func (i *Index) indexResource(resourcePath ResourcePath, source string) {
+	if _, taken := i.resources[resourcePath.String()]; taken {
 		return
 	}
 
@@ -161,12 +130,19 @@ type Position struct {
 	// an endpoint is visited before its methods but reads after them
 	// ("provides GET /pets 200"), so it waits here for the method segment
 	pendingEndpoint string
+
+	// the resource key of the branch (direction, service when consumes, normalized
+	// endpoint, method, request|status), grown by atResource as the walk descends
+	resource ResourcePath
 }
 
 type ValidationContext struct {
 	Index *Index
 	Errs  *ErrorList
 	Pos   Position
+
+	// the rule set of this execution: stateless rules shared, stateful ones fresh
+	rules []Rule
 }
 
 // At advances the breadcrumb that names a resource in an error message.
@@ -215,25 +191,76 @@ func (v ValidationContext) Deeper() ValidationContext {
 	return v
 }
 
+// atResource grows the resource key of the branch, mirroring the keys buildIndex
+// builds.
+func (v ValidationContext) atResource(parts ...string) ValidationContext {
+	v.Pos.resource = v.Pos.resource.Append(parts...)
+
+	return v
+}
+
+func (v ValidationContext) checkEndpoint(endpoint string) {
+	for _, rule := range v.rules {
+		if hook, ok := rule.(EndpointRule); ok {
+			hook.CheckEndpoint(endpoint, v)
+		}
+	}
+}
+
+func (v ValidationContext) checkRest(r Rest) {
+	for _, rule := range v.rules {
+		if hook, ok := rule.(RestRule); ok {
+			hook.CheckRest(r, v)
+		}
+	}
+}
+
+func (v ValidationContext) checkSchemas(s SchemasMap) {
+	for _, rule := range v.rules {
+		if hook, ok := rule.(SchemasRule); ok {
+			hook.CheckSchemas(s, v)
+		}
+	}
+}
+
+func (v ValidationContext) checkResource() {
+	for _, rule := range v.rules {
+		if hook, ok := rule.(ResourceRule); ok {
+			hook.CheckResource(v.Pos.resource.String(), v)
+		}
+	}
+}
+
+func (v ValidationContext) checkSchemaName(name string) {
+	for _, rule := range v.rules {
+		if hook, ok := rule.(SchemaNameRule); ok {
+			hook.CheckSchemaName(name, v)
+		}
+	}
+}
+
+func (v ValidationContext) checkSchema(s Schema) {
+	for _, rule := range v.rules {
+		if hook, ok := rule.(SchemaRule); ok {
+			hook.CheckSchema(s, v)
+		}
+	}
+}
+
+func (v ValidationContext) checkResponses(r Responses) {
+	for _, rule := range v.rules {
+		if hook, ok := rule.(ResponsesRule); ok {
+			hook.CheckResponses(r, v)
+		}
+	}
+}
+
 func joinWhere(where, segment string) string {
 	if where == "" || segment == "" {
 		return where + segment
 	}
 
 	return where + " " + segment
-}
-
-// validateSchemaName checks that a request or response names a schema of the namespace.
-// The schema itself is walked once, from its declaration, so nothing descends here.
-func validateSchemaName(vctx ValidationContext, name string) {
-	if _, declared := vctx.Index.Schema(name); !declared {
-		vctx.Errs.Addf(
-			"unresolved schema name: %s referenced at %s (%s)",
-			name,
-			vctx.Pos.Where,
-			vctx.Pos.Source,
-		)
-	}
 }
 
 func sortedBySource(fragments []Fragment) []Fragment {

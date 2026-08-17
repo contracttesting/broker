@@ -9,15 +9,28 @@ import (
 type Rest map[string]HttpMethods
 
 func (r Rest) Validate(vctx ValidationContext) {
-	for _, endpoint := range slices.Sorted(maps.Keys(r)) {
-		if err := validateEndpoint(endpoint); err != nil {
-			vctx.Errs.Addf("%s (%s)", err, vctx.Pos.Source)
+	vctx.checkRest(r)
 
-			// what an invalid endpoint declares is unreachable anyway
+	visited := make(map[string]bool)
+
+	for _, endpoint := range slices.Sorted(maps.Keys(r)) {
+		vctx.checkEndpoint(endpoint)
+
+		normalized := normalizeEndpoint(endpoint)
+
+		// what an invalid endpoint declares is unreachable anyway
+		if endpointViolation(normalized) != "" {
 			continue
 		}
 
-		r[endpoint].Validate(vctx.AtEndpoint(endpoint))
+		// the second spelling of a same-file duplicate: the first one won, and
+		// descending again would only pile resource noise on the same problem
+		if visited[normalized] {
+			continue
+		}
+		visited[normalized] = true
+
+		r[endpoint].Validate(vctx.AtEndpoint(normalized).atResource("rest", normalized))
 	}
 }
 
@@ -29,10 +42,10 @@ type HttpMethods struct {
 }
 
 func (m HttpMethods) Validate(vctx ValidationContext) {
-	m.Get.Validate(vctx.At("GET"))
-	m.Post.Validate(vctx.At("POST"))
-	m.Put.Validate(vctx.At("PUT"))
-	m.Delete.Validate(vctx.At("DELETE"))
+	m.Get.Validate(vctx.At("GET").atResource("get"))
+	m.Post.Validate(vctx.At("POST").atResource("post"))
+	m.Put.Validate(vctx.At("PUT").atResource("put"))
+	m.Delete.Validate(vctx.At("DELETE").atResource("delete"))
 }
 
 type GetMethod struct {
@@ -62,7 +75,9 @@ func (p *PostMethod) IsNonZero() bool {
 
 func (p PostMethod) Validate(vctx ValidationContext) {
 	if p.HasRequestBody() {
-		validateSchemaName(vctx.At("request"), p.RequestBody)
+		rctx := vctx.At("request").atResource("request")
+		rctx.checkResource()
+		rctx.checkSchemaName(p.RequestBody)
 	}
 
 	p.Responses.Validate(vctx)
@@ -83,7 +98,9 @@ func (p *PutMethod) IsNonZero() bool {
 
 func (p PutMethod) Validate(vctx ValidationContext) {
 	if p.HasRequestBody() {
-		validateSchemaName(vctx.At("request"), p.RequestBody)
+		rctx := vctx.At("request").atResource("request")
+		rctx.checkResource()
+		rctx.checkSchemaName(p.RequestBody)
 	}
 
 	p.Responses.Validate(vctx)
@@ -109,16 +126,11 @@ const (
 type Responses map[int]string
 
 func (r Responses) Validate(vctx ValidationContext) {
-	for _, statusCode := range slices.Sorted(maps.Keys(r)) {
-		if statusCode < MIN_STATUS_CODE || statusCode > MAX_STATUS_CODE {
-			vctx.Errs.Addf(
-				"invalid status code %d at %s (%s)",
-				statusCode,
-				vctx.Pos.Where,
-				vctx.Pos.Source,
-			)
-		}
+	vctx.checkResponses(r)
 
-		validateSchemaName(vctx.At(strconv.Itoa(statusCode)), r[statusCode])
+	for _, statusCode := range slices.Sorted(maps.Keys(r)) {
+		sctx := vctx.At(strconv.Itoa(statusCode)).atResource("responses", strconv.Itoa(statusCode))
+		sctx.checkResource()
+		sctx.checkSchemaName(r[statusCode])
 	}
 }

@@ -20,6 +20,6 @@ type ConsumesServicesMap map[string]Consumes
 
 func (c ConsumesServicesMap) Validate(vctx ValidationContext) {
 	for _, service := range slices.Sorted(maps.Keys(c)) {
-		c[service].Validate(vctx.At("consumes").At(service))
+		c[service].Validate(vctx.At("consumes").At(service).atResource("consumes", service))
 	}
 }

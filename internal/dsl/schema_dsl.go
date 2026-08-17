@@ -10,6 +10,8 @@ type SchemasMap map[string]Schema
 // Validate walks every declared schema, referenced by an endpoint or not, each one the
 // root of its own descent and of its own depth budget.
 func (s SchemasMap) Validate(vctx ValidationContext) {
+	vctx.checkSchemas(s)
+
 	for _, name := range slices.Sorted(maps.Keys(s)) {
 		s[name].Validate(vctx.AtSchema(name))
 	}
@@ -62,15 +64,12 @@ func (s *Schema) IsRef() bool {
 
 // Validate descends the schema, following its refs through the namespace. Following a
 // ref is what catches a cycle: the descent only ends when the depth budget runs out.
+// The messages come from the rules; the gates that stop a dead-end descent are the
+// walker's own.
 func (s Schema) Validate(vctx ValidationContext) {
-	if vctx.Pos.Depth.Exceeded() {
-		vctx.Errs.Addf(
-			"schema %s is too deep with more than %d levels (%s)",
-			vctx.Pos.Root,
-			MAX_DEPTH,
-			vctx.Pos.Source,
-		)
+	vctx.checkSchema(s)
 
+	if vctx.Pos.Depth.Exceeded() {
 		return
 	}
 
@@ -78,13 +77,6 @@ func (s Schema) Validate(vctx ValidationContext) {
 	case s.IsRef():
 		target, declared := vctx.Index.Schema(s.Ref)
 		if !declared {
-			vctx.Errs.Addf(
-				"unresolved schema name: %s referenced at %s (%s)",
-				s.Ref,
-				vctx.Pos.Path.String(),
-				vctx.Pos.Source,
-			)
-
 			return
 		}
 
@@ -92,12 +84,6 @@ func (s Schema) Validate(vctx ValidationContext) {
 
 	case s.IsArray():
 		if s.Items == nil {
-			vctx.Errs.Addf(
-				"array schema without items at %s (%s)",
-				vctx.Pos.Path.String(),
-				vctx.Pos.Source,
-			)
-
 			return
 		}
 
@@ -107,13 +93,5 @@ func (s Schema) Validate(vctx ValidationContext) {
 		for _, name := range slices.Sorted(maps.Keys(s.Properties)) {
 			s.Properties[name].Validate(vctx.Deeper().AtProperty(name))
 		}
-
-	case !s.IsPrimitive():
-		vctx.Errs.Addf(
-			"invalid schema type %q at %s (%s)",
-			s.Type,
-			vctx.Pos.Path.String(),
-			vctx.Pos.Source,
-		)
 	}
 }
