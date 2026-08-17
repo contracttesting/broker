@@ -149,6 +149,38 @@ const arrayWithoutItemsJSON = `{
   }
 }`
 
+const invalidSchemaTypesJSON = `{
+  "schemas": {
+    "Owner": { "type": "objct" },
+    "Pet": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "strng" },
+        "tags": { "type": "array", "items": {} }
+      }
+    }
+  }
+}`
+
+const invalidStatusCodesJSON = `{
+  "provides": {
+    "rest": {
+      "/pets": {
+        "get": { "responses": { "99": "Pet", "200": "Pet", "600": "Pet" } }
+      }
+    }
+  },
+  "consumes": {
+    "payments": {
+      "rest": {
+        "/invoices": {
+          "post": { "responses": { "-1": "Invoice" } }
+        }
+      }
+    }
+  }
+}`
+
 const petsResponseFragment = `{
   "provides": {
     "rest": {
@@ -268,6 +300,29 @@ func TestValidate_ArrayWithoutItems_Rejected(t *testing.T) {
 	assert.Equal(t, []string{
 		"array schema without items at Owner.pets (schemas.json)",
 		"array schema without items at Pets (schemas.json)",
+	}, messages)
+}
+
+func TestValidate_InvalidSchemaTypes_Rejected(t *testing.T) {
+	messages := validateFiles(t, validatedFile{"schemas.json", invalidSchemaTypesJSON})
+
+	assert.Equal(t, []string{
+		`invalid schema type "objct" at Owner (schemas.json)`,
+		`invalid schema type "strng" at Pet.id (schemas.json)`,
+		`invalid schema type "" at Pet.tags[] (schemas.json)`,
+	}, messages)
+}
+
+func TestValidate_StatusCodesOutOfRange_Rejected(t *testing.T) {
+	messages := validateFiles(t,
+		validatedFile{"api.json", invalidStatusCodesJSON},
+		validatedFile{"schemas.json", validSchemasJSON},
+	)
+
+	assert.Equal(t, []string{
+		"invalid status code 99 at provides GET /pets (api.json)",
+		"invalid status code 600 at provides GET /pets (api.json)",
+		"invalid status code -1 at consumes payments POST /invoices (api.json)",
 	}, messages)
 }
 
