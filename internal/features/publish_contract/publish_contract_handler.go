@@ -55,13 +55,21 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondParticipantNotFound(ctx)
 	}
 
+	validationErrors := dsl.Normalize(fragments)
+	validationErrors = append(validationErrors, dsl.Validate(fragments)...)
+	if len(validationErrors) > 0 {
+		return ctr.respondValidationFailed(ctx, validationErrors)
+	}
+
 	// the uploaded files are stamped on the version verbatim, so a version reconstructs
 	// letter by letter what was published under it
 	contractContent, _ := json.Marshal(requestBody.Contracts)
 
 	contract := model.NewUploadedContract(participant.ID, participant.Name, version, string(contractContent))
+	// the fragments are valid by now, so the build only transforms: an error here is a
+	// broken invariant, not something the publisher can fix
 	if err := dsl.HydrateFragments(fragments, contract); err != nil {
-		return ctr.respondBadRequest(ctx, err)
+		return ctr.respondPublishFailed(ctx)
 	}
 
 	if existing, found := ctr.contractRepository.LoadChecksumForVersion(ctx.Context(), contract.ParticipantID, version); found {
@@ -101,6 +109,24 @@ func (ctr *PublishContractHandler) upsert(ctx fiber.Ctx, contract *model.Uploade
 func (ctr *PublishContractHandler) respondBadRequest(ctx fiber.Ctx, err error) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractResponseBody{
 		Message: err.Error(),
+	})
+}
+
+func (ctr *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []error) error {
+	messages := make([]string, 0, len(violations))
+	for _, violation := range violations {
+		messages = append(messages, violation.Error())
+	}
+
+	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractValidationResponseBody{
+		Message: ContractValidationFailed,
+		Errors:  messages,
+	})
+}
+
+func (ctr *PublishContractHandler) respondPublishFailed(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusInternalServerError).JSON(PublishContractResponseBody{
+		Message: ContractPublishFailed,
 	})
 }
 

@@ -2,8 +2,6 @@ package dsl
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 	"strconv"
 
 	"github.com/contracttesting/broker/internal/model"
@@ -13,6 +11,12 @@ type Contract struct {
 	Provides         Provides            `json:"provides,omitzero"`
 	ConsumesServices ConsumesServicesMap `json:"consumes,omitzero"`
 	Schemas          SchemasMap          `json:"schemas,omitzero"`
+}
+
+func (c Contract) Validate(vctx ValidationContext) {
+	c.Provides.Validate(vctx.At("provides"))
+	c.ConsumesServices.Validate(vctx)
+	c.Schemas.Validate(vctx)
 }
 
 // Fragment is one uploaded file: the contract parsed out of it plus the path it came
@@ -25,63 +29,18 @@ type Fragment struct {
 // HydrateFragments merges the fragments into a single contract: the schemas of every
 // fragment form one namespace, and each fragment is hydrated against that namespace,
 // so refs cross files and resources accumulate into one contract.
+//
+// It transforms, it does not validate: the fragments have already been through
+// Normalize and Validate, so an error here is a broken invariant, not bad input.
 func HydrateFragments(fragments []Fragment, contract *model.UploadedContract) error {
-	hydrator, err := newHydrator(fragments)
-	if err != nil {
-		return err
-	}
-
-	if err := hydrator.validateSchemaNames(); err != nil {
-		return err
-	}
+	hydrator := newHydrator(fragments)
 
 	for _, fragment := range fragments {
-		if err := hydrator.hydrateFragment(fragment, contract); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-type hydrator struct {
-	schemas       SchemasMap
-	schemaSources map[string]string
-}
-
-func newHydrator(fragments []Fragment) (*hydrator, error) {
-	h := &hydrator{
-		schemas:       make(SchemasMap),
-		schemaSources: make(map[string]string),
-	}
-
-	for _, fragment := range fragments {
-		for _, name := range slices.Sorted(maps.Keys(fragment.Contract.Schemas)) {
-			if declaredIn, taken := h.schemaSources[name]; taken {
-				return nil, fmt.Errorf(
-					"duplicate schema: %s declared in %s and %s",
-					name,
-					declaredIn,
-					fragment.Source,
-				)
-			}
-
-			h.schemas[name] = fragment.Contract.Schemas[name]
-			h.schemaSources[name] = fragment.Source
-		}
-	}
-
-	return h, nil
-}
-
-// validateSchemaNames checks every ref of the namespace, including refs inside schemas
-// no endpoint reaches.
-func (h *hydrator) validateSchemaNames() error {
-	for _, name := range slices.Sorted(maps.Keys(h.schemas)) {
-		if err := h.validateRefs(
-			h.schemas[name],
-			NewPropertyPath(name),
-			h.schemaSources[name],
+		if err := hydrator.hydrateResources(
+			contract,
+			fragment.Source,
+			NewResourcePath(""),
+			*fragment.Contract,
 		); err != nil {
 			return err
 		}
@@ -90,51 +49,20 @@ func (h *hydrator) validateSchemaNames() error {
 	return nil
 }
 
-// validateRefs walks a schema structurally without following its refs: every schema of
-// the namespace is walked on its own, so a cycle is never entered here.
-func (h *hydrator) validateRefs(schema Schema, propertyPath PropertyPath, source string) error {
-	switch {
-	case schema.IsRef():
-		if _, resolved := h.schemas[schema.Ref]; !resolved {
-			return unresolvedSchemaName(schema.Ref, propertyPath.String(), source)
-		}
-
-	case schema.IsArray():
-		if schema.Items != nil {
-			return h.validateRefs(*schema.Items, propertyPath.AppendArray(), source)
-		}
-
-	case schema.IsObject():
-		for _, name := range slices.Sorted(maps.Keys(schema.Properties)) {
-			if err := h.validateRefs(
-				schema.Properties[name],
-				propertyPath.Append(name),
-				source,
-			); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+type hydrator struct {
+	schemas SchemasMap
 }
 
-func (h *hydrator) hydrateFragment(fragment Fragment, contract *model.UploadedContract) error {
-	for endpoint := range fragment.Contract.Provides.Rest {
-		if err := validateEndpoint(endpoint); err != nil {
-			return fmt.Errorf("%w (%s)", err, fragment.Source)
+func newHydrator(fragments []Fragment) *hydrator {
+	h := &hydrator{schemas: make(SchemasMap)}
+
+	for _, fragment := range fragments {
+		for name, schema := range fragment.Contract.Schemas {
+			h.schemas[name] = schema
 		}
 	}
 
-	for _, consumes := range fragment.Contract.ConsumesServices {
-		for endpoint := range consumes.Rest {
-			if err := validateEndpoint(endpoint); err != nil {
-				return fmt.Errorf("%w (%s)", err, fragment.Source)
-			}
-		}
-	}
-
-	return h.hydrateResources(contract, fragment.Source, NewResourcePath(""), *fragment.Contract)
+	return h
 }
 
 func (h *hydrator) hydrateResources(
@@ -167,7 +95,7 @@ func (h *hydrator) hydrateResources(
 
 	case Rest:
 		for endpoint, methods := range unknown {
-			endpointPath := resourcePath.Append("rest", normalizeEndpoint(endpoint))
+			endpointPath := resourcePath.Append("rest", endpoint)
 
 			if methods.Get.IsNonZero() {
 				if err := h.hydrateResources(contract, source, endpointPath, methods.Get); err != nil {
@@ -261,33 +189,22 @@ func (h *hydrator) addResource(
 	properties := make(map[string]model.Property)
 	resource := resourcePath.ToResource(properties)
 
-	schema, resolved := h.schemas[schemaName]
-	if !resolved {
-		return unresolvedSchemaName(schemaName, resource.Describe(), source)
-	}
-
 	if err := buildSchema(
-		NewDepthCounter(schemaName),
 		h.schemas,
 		properties,
 		NewPropertyPath("$"),
-		schema,
+		h.schemas[schemaName],
 	); err != nil {
-		return fmt.Errorf("%w (%s)", err, h.schemaSources[schemaName])
+		return err
 	}
 
 	return contract.AddResource(resource, source)
 }
 
-func unresolvedSchemaName(name, position, source string) error {
-	return fmt.Errorf("unresolved schema name: %s referenced at %s (%s)", name, position, source)
-}
-
 // buildSchema fills properties by walking the schema, following refs through the
-// namespace. It returns SchemaTooDeep once the walk passes MAX_DEPTH levels, which is
-// also how a cyclic chain of refs terminates.
+// namespace. Validation has already ruled out the cycles and the missing pieces that
+// would keep this walk from terminating.
 func buildSchema(
-	depthCounter *DepthCounter,
 	schemas SchemasMap,
 	properties map[string]model.Property,
 	propertyPath PropertyPath,
@@ -303,8 +220,7 @@ func buildSchema(
 			)
 
 			for name, schemaProperties := range unknown.Properties {
-				if err := descend(
-					depthCounter,
+				if err := buildSchema(
 					schemas,
 					properties,
 					propertyPath.Append(name),
@@ -324,8 +240,7 @@ func buildSchema(
 				unknown.Optional,
 			)
 
-			return descend(
-				depthCounter,
+			return buildSchema(
 				schemas,
 				properties,
 				propertyPath.AppendArray(),
@@ -344,8 +259,7 @@ func buildSchema(
 		}
 
 		if unknown.IsRef() {
-			return descend(
-				depthCounter,
+			return buildSchema(
 				schemas,
 				properties,
 				propertyPath,
@@ -356,7 +270,6 @@ func buildSchema(
 		return nil
 	case *Schema:
 		return buildSchema(
-			depthCounter,
 			schemas,
 			properties,
 			propertyPath,
@@ -365,25 +278,4 @@ func buildSchema(
 	default:
 		return fmt.Errorf("unknown schema type %T", unknown)
 	}
-}
-
-// descend takes buildSchema one level down, counting the level in and back out.
-func descend(
-	depthCounter *DepthCounter,
-	schemas SchemasMap,
-	properties map[string]model.Property,
-	propertyPath PropertyPath,
-	unknown any,
-) error {
-	if err := depthCounter.Enter(); err != nil {
-		return err
-	}
-
-	if err := buildSchema(depthCounter, schemas, properties, propertyPath, unknown); err != nil {
-		return err
-	}
-
-	depthCounter.Exit()
-
-	return nil
 }

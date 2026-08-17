@@ -59,7 +59,7 @@ func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
 	assert.Equal(t, a.Checksum(), b.Checksum())
 }
 
-func TestContract_AddResource_RejectsDuplicateHash(t *testing.T) {
+func TestContract_AddResource_RejectsAlreadyAddedHash(t *testing.T) {
 	contract := newContractWithOnePetsResource("pets-service")
 
 	err := contract.AddResource(model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
@@ -69,12 +69,12 @@ func TestContract_AddResource_RejectsDuplicateHash(t *testing.T) {
 	require.EqualError(
 		t,
 		err,
-		"duplicate resource: provides GET /pets 200 declared in pets.yaml and store.yaml",
+		"resource already added: provides GET /pets 200 from pets.yaml and store.yaml",
 	)
 	assert.Len(t, contract.Resources, 1)
 }
 
-func TestContract_AddResource_DescribesEachResourceShape(t *testing.T) {
+func TestContract_AddResource_DescribesEachResourceShapeInTheInvariant(t *testing.T) {
 	cases := []struct {
 		name     string
 		resource *model.UploadedResource
@@ -83,22 +83,22 @@ func TestContract_AddResource_DescribesEachResourceShape(t *testing.T) {
 		{
 			name:     "provides response",
 			resource: model.NewRestResponseProvider("/pets", "get", "200", nil),
-			want:     "duplicate resource: provides GET /pets 200 declared in pets.yaml and store.yaml",
+			want:     "resource already added: provides GET /pets 200 from pets.yaml and store.yaml",
 		},
 		{
 			name:     "provides request",
 			resource: model.NewRestRequestProvider("/pets", "post", nil),
-			want:     "duplicate resource: provides POST /pets request declared in pets.yaml and store.yaml",
+			want:     "resource already added: provides POST /pets request from pets.yaml and store.yaml",
 		},
 		{
 			name:     "consumes response",
 			resource: model.NewRestResponseConsumer("payments", "/invoices", "get", "200", nil),
-			want:     "duplicate resource: consumes payments GET /invoices 200 declared in pets.yaml and store.yaml",
+			want:     "resource already added: consumes payments GET /invoices 200 from pets.yaml and store.yaml",
 		},
 		{
 			name:     "consumes request",
 			resource: model.NewRestRequestConsumer("payments", "/invoices", "post", nil),
-			want:     "duplicate resource: consumes payments POST /invoices request declared in pets.yaml and store.yaml",
+			want:     "resource already added: consumes payments POST /invoices request from pets.yaml and store.yaml",
 		},
 	}
 
