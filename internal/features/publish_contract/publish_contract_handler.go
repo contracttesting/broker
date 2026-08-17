@@ -31,8 +31,9 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondInvalidInput(ctx)
 	}
 
+	participantName := strings.TrimSpace(requestBody.Participant)
 	version := strings.TrimSpace(requestBody.Version)
-	if version == "" || len(requestBody.Contracts) == 0 {
+	if participantName == "" || version == "" || len(requestBody.Contracts) == 0 {
 		return ctr.respondInvalidInput(ctx)
 	}
 
@@ -50,7 +51,7 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		fragments = append(fragments, dsl.Fragment{Source: uploaded.Source, Contract: parsed})
 	}
 
-	participant, exists := ctr.participantRepository.FindByName(ctx.Context(), requestBody.Participant)
+	participant, exists := ctr.participantRepository.FindByName(ctx.Context(), participantName)
 	if !exists {
 		return ctr.respondParticipantNotFound(ctx)
 	}

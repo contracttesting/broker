@@ -244,6 +244,17 @@ func (s *IntegrationSuite) TestPublishContract_EmptyContracts() {
 	s.JSONEq(`{"message":"contract invalid input"}`, body)
 }
 
+func (s *IntegrationSuite) TestPublishContract_BlankParticipant() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	for _, participant := range []string{"", "   "} {
+		status, body := s.post("/api/contracts", s.publishBody(participant, "1", contractFragment{"api.json", contractBody}))
+		s.Equal(http.StatusBadRequest, status)
+		s.JSONEq(`{"message":"contract invalid input"}`, body)
+	}
+}
+
 func (s *IntegrationSuite) TestPublishContract_BlankSource() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
@@ -270,7 +281,7 @@ func (s *IntegrationSuite) TestPublishContract_MalformedYAML() {
 
 	status, body := s.post("/api/contracts", s.publishBody("pets-service", "1", contractFragment{"broken.yaml", "provides: {"}))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"malformed contract file: broken.yaml"}`, body)
+	s.JSONEq(`{"message":"malformed contract file: broken.yaml: [1:11] could not find flow mapping end token '}'\n>  1 | provides: {\n                 ^\n"}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -281,7 +292,7 @@ func (s *IntegrationSuite) TestPublishContract_MalformedJSON() {
 
 	status, body := s.post("/api/contracts", s.publishBody("pets-service", "1", contractFragment{"broken.json", `{"provides":`}))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"malformed contract file: broken.json"}`, body)
+	s.JSONEq(`{"message":"malformed contract file: broken.json: unexpected end of JSON input"}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
