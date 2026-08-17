@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/contracttesting/broker/internal/builder"
 	"github.com/contracttesting/broker/internal/dsl"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
@@ -73,7 +74,7 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 	contract := model.NewUploadedContract(participant.ID, participant.Name, version, string(contractContent))
 	// the fragments are valid by now, so the build only transforms: an error here is a
 	// broken invariant, not something the publisher can fix
-	if err := dsl.HydrateFragments(fragments, contract); err != nil {
+	if err := builder.Hydrate(fragments, contract); err != nil {
 		return ctr.respondPublishFailed(ctx)
 	}
 
