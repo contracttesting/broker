@@ -1,4 +1,4 @@
-package dsl
+package validator
 
 // The schema itself is walked once, from its declaration, so nothing descends here.
 type schemaUnresolvedNameRule struct{}

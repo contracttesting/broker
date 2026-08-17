@@ -1,10 +1,11 @@
-package dsl_test
+package validator_test
 
 import (
 	"encoding/json"
 	"testing"
 
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,7 +51,7 @@ type endpointSpyRule struct{}
 
 func (endpointSpyRule) Code() string { return "custom.endpoint-spy" }
 
-func (endpointSpyRule) CheckEndpoint(endpoint string, vctx dsl.ValidationContext) {
+func (endpointSpyRule) CheckEndpoint(endpoint string, vctx validator.ValidationContext) {
 	vctx.Errs.Addf("custom rule saw endpoint %s (%s)", endpoint, vctx.Pos.Source)
 }
 
@@ -75,7 +76,7 @@ func validatorMessages(violations []error) []string {
 func TestValidator_WithoutPolicyRule_StopsReportingIt(t *testing.T) {
 	fragments := []dsl.Fragment{validatorFragment(t, "api.json", outOfRangeStatusJSON)}
 
-	relaxed, err := dsl.NewValidator().Without("status.out-of-range")
+	relaxed, err := validator.New().Without("status.out-of-range")
 	require.NoError(t, err)
 
 	assert.Empty(t, relaxed.Validate(fragments))
@@ -84,23 +85,23 @@ func TestValidator_WithoutPolicyRule_StopsReportingIt(t *testing.T) {
 func TestValidator_Without_LeavesTheReceiverIntact(t *testing.T) {
 	fragments := []dsl.Fragment{validatorFragment(t, "api.json", outOfRangeStatusJSON)}
 
-	validator := dsl.NewValidator()
-	_, err := validator.Without("status.out-of-range")
+	original := validator.New()
+	_, err := original.Without("status.out-of-range")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{
 		"invalid status code 600 at provides GET /pets (api.json)",
-	}, validatorMessages(validator.Validate(fragments)))
+	}, validatorMessages(original.Validate(fragments)))
 }
 
 func TestValidator_WithoutInvariantRule_ErrorsCitingTheCode(t *testing.T) {
-	_, err := dsl.NewValidator().Without("schema.unresolved-ref")
+	_, err := validator.New().Without("schema.unresolved-ref")
 
 	assert.EqualError(t, err, "cannot remove rule schema.unresolved-ref: invariant rules are locked")
 }
 
 func TestValidator_WithoutUnknownCode_ErrorsCitingTheCode(t *testing.T) {
-	_, err := dsl.NewValidator().Without("no.such-rule")
+	_, err := validator.New().Without("no.such-rule")
 
 	assert.EqualError(t, err, "cannot remove rule no.such-rule: not in the catalog")
 }
@@ -108,7 +109,7 @@ func TestValidator_WithoutUnknownCode_ErrorsCitingTheCode(t *testing.T) {
 func TestValidator_AppendedCustomRule_FiresAtItsNode(t *testing.T) {
 	fragments := []dsl.Fragment{validatorFragment(t, "api.json", outOfRangeStatusJSON)}
 
-	extended := dsl.NewValidator().Append(endpointSpyRule{})
+	extended := validator.New().Append(endpointSpyRule{})
 
 	assert.Equal(t, []string{
 		"custom rule saw endpoint /pets (api.json)",
@@ -119,12 +120,12 @@ func TestValidator_AppendedCustomRule_FiresAtItsNode(t *testing.T) {
 func TestValidator_Append_LeavesTheReceiverIntact(t *testing.T) {
 	fragments := []dsl.Fragment{validatorFragment(t, "api.json", outOfRangeStatusJSON)}
 
-	validator := dsl.NewValidator()
-	validator.Append(endpointSpyRule{})
+	original := validator.New()
+	original.Append(endpointSpyRule{})
 
 	assert.Equal(t, []string{
 		"invalid status code 600 at provides GET /pets (api.json)",
-	}, validatorMessages(validator.Validate(fragments)))
+	}, validatorMessages(original.Validate(fragments)))
 }
 
 func TestValidator_ConsecutiveValidates_DontLeakStatefulState(t *testing.T) {
@@ -135,13 +136,13 @@ func TestValidator_ConsecutiveValidates_DontLeakStatefulState(t *testing.T) {
 		validatorFragment(t, "d.json", petSchemaJSON),
 	}
 
-	validator := dsl.NewValidator()
+	shared := validator.New()
 
 	expected := []string{
 		"duplicate resource: provides GET /pets 200 declared in a.json and b.json",
 		"duplicate schema: Pet declared in c.json and d.json",
 	}
 
-	assert.Equal(t, expected, validatorMessages(validator.Validate(fragments)))
-	assert.Equal(t, expected, validatorMessages(validator.Validate(fragments)))
+	assert.Equal(t, expected, validatorMessages(shared.Validate(fragments)))
+	assert.Equal(t, expected, validatorMessages(shared.Validate(fragments)))
 }

@@ -21,7 +21,7 @@ func Normalize(fragments []Fragment) {
 
 func normalizeRest(rest Rest) {
 	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
-		normalized := normalizeEndpoint(endpoint)
+		normalized := NormalizeEndpoint(endpoint)
 		if normalized == endpoint {
 			continue
 		}

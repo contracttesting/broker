@@ -1,4 +1,8 @@
-package dsl
+package validator
+
+import (
+	"github.com/contracttesting/broker/internal/dsl"
+)
 
 // Rule is the identity of one validation check in the catalog. Where a rule applies is
 // declared by implementing the optional hook interfaces below: the walker, at each
@@ -12,12 +16,12 @@ type EndpointRule interface {
 
 type RestRule interface {
 	Rule
-	CheckRest(r Rest, vctx ValidationContext)
+	CheckRest(r dsl.Rest, vctx ValidationContext)
 }
 
 type SchemasRule interface {
 	Rule
-	CheckSchemas(s SchemasMap, vctx ValidationContext)
+	CheckSchemas(s dsl.SchemasMap, vctx ValidationContext)
 }
 
 // ResourceRule sees each leaf of the walk with the full resource key (direction,
@@ -36,12 +40,12 @@ type SchemaNameRule interface {
 // SchemaRule sees each node of the schema descent.
 type SchemaRule interface {
 	Rule
-	CheckSchema(s Schema, vctx ValidationContext)
+	CheckSchema(s dsl.Schema, vctx ValidationContext)
 }
 
 type ResponsesRule interface {
 	Rule
-	CheckResponses(r Responses, vctx ValidationContext)
+	CheckResponses(r dsl.Responses, vctx ValidationContext)
 }
 
 // StatefulRule marks a rule whose checks accumulate state across hook calls. Every

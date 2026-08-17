@@ -1,10 +1,14 @@
-package dsl
+package validator
+
+import (
+	"github.com/contracttesting/broker/internal/dsl"
+)
 
 type schemaTooDeepRule struct{}
 
 func (schemaTooDeepRule) Code() string { return "schema.too-deep" }
 
-func (schemaTooDeepRule) CheckSchema(_ Schema, vctx ValidationContext) {
+func (schemaTooDeepRule) CheckSchema(_ dsl.Schema, vctx ValidationContext) {
 	if !vctx.Pos.Depth.Exceeded() {
 		return
 	}

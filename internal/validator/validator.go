@@ -1,6 +1,10 @@
-package dsl
+package validator
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/contracttesting/broker/internal/dsl"
+)
 
 // Validator is the composition the publish runs: the default catalog hardcoded today,
 // the point where per-company rules will be appended tomorrow. It is immutable: Append
@@ -16,7 +20,7 @@ type catalogEntry struct {
 	invariant bool
 }
 
-func NewValidator() Validator {
+func New() Validator {
 	return Validator{entries: []catalogEntry{
 		{rule: endpointSyntaxRule{}, invariant: true},
 		{rule: endpointDuplicateRule{}, invariant: true},
@@ -61,8 +65,8 @@ func (v Validator) Without(code string) (Validator, error) {
 
 // Validate walks every fragment of the raw DSL and reports everything wrong with the
 // contract at once: a publish is either rejected with the full list or handed to
-// Normalize and the build as valid DSL.
-func (v Validator) Validate(fragments []Fragment) []error {
+// dsl.Normalize and the build as valid DSL.
+func (v Validator) Validate(fragments []dsl.Fragment) []error {
 	rules := make([]Rule, 0, len(v.entries))
 	for _, entry := range v.entries {
 		rule := entry.rule
@@ -77,7 +81,7 @@ func (v Validator) Validate(fragments []Fragment) []error {
 	index := buildIndex(fragments)
 
 	for _, fragment := range sortedBySource(fragments) {
-		fragment.Contract.Validate(ValidationContext{
+		walkContract(*fragment.Contract, ValidationContext{
 			Index: index,
 			Errs:  errs,
 			Pos:   Position{Source: fragment.Source},

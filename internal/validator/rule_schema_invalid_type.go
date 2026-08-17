@@ -1,10 +1,14 @@
-package dsl
+package validator
+
+import (
+	"github.com/contracttesting/broker/internal/dsl"
+)
 
 type schemaInvalidTypeRule struct{}
 
 func (schemaInvalidTypeRule) Code() string { return "schema.invalid-type" }
 
-func (schemaInvalidTypeRule) CheckSchema(s Schema, vctx ValidationContext) {
+func (schemaInvalidTypeRule) CheckSchema(s dsl.Schema, vctx ValidationContext) {
 	if vctx.Pos.Depth.Exceeded() || s.IsRef() || s.IsArray() || s.IsObject() || s.IsPrimitive() {
 		return
 	}

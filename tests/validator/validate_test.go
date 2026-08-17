@@ -1,10 +1,11 @@
-package dsl_test
+package validator_test
 
 import (
 	"encoding/json"
 	"testing"
 
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -229,7 +230,7 @@ func validateFiles(t *testing.T, files ...validatedFile) []string {
 		fragments = append(fragments, dsl.Fragment{Source: file.source, Contract: contract})
 	}
 
-	violations := dsl.NewValidator().Validate(fragments)
+	violations := validator.New().Validate(fragments)
 
 	messages := make([]string, 0, len(violations))
 	for _, violation := range violations {

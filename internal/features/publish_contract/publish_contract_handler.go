@@ -7,24 +7,25 @@ import (
 	"github.com/contracttesting/broker/internal/dsl"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
+	"github.com/contracttesting/broker/internal/validator"
 	"github.com/gofiber/fiber/v3"
 )
 
 type PublishContractHandler struct {
 	contractRepository    *repository.ContractRepository
 	participantRepository *repository.ParticipantRepository
-	validator             dsl.Validator
+	validator             validator.Validator
 }
 
 func NewPublishContractHandler(
 	contractRepository *repository.ContractRepository,
 	participantRepository *repository.ParticipantRepository,
-	validator dsl.Validator,
+	contractValidator validator.Validator,
 ) *PublishContractHandler {
 	return &PublishContractHandler{
 		contractRepository:    contractRepository,
 		participantRepository: participantRepository,
-		validator:             validator,
+		validator:             contractValidator,
 	}
 }
 

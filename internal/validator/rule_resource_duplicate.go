@@ -1,4 +1,8 @@
-package dsl
+package validator
+
+import (
+	"github.com/contracttesting/broker/internal/dsl"
+)
 
 type resourceDuplicateRule struct {
 	seen map[string]string
@@ -10,7 +14,7 @@ func (resourceDuplicateRule) Fresh() Rule { return &resourceDuplicateRule{seen: 
 
 func (r *resourceDuplicateRule) CheckResource(resource string, vctx ValidationContext) {
 	if declaredIn, taken := r.seen[resource]; taken {
-		resourcePath := NewResourcePath(resource)
+		resourcePath := dsl.NewResourcePath(resource)
 		vctx.Errs.Addf(
 			"duplicate resource: %s declared in %s and %s",
 			resourcePath.ToResource(nil).Describe(),
