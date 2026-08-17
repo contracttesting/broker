@@ -536,6 +536,70 @@ const manyViolationsYAML = `provides:
           200: Missing
 `
 
+const invalidSchemaTypesYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: strng
+      tags:
+        type: array
+        items: {}
+`
+
+const invalidStatusCodesYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          -1: Pet
+          999: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+func (s *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", s.publishBody("pets-service", "1",
+		contractFragment{"api.yaml", invalidSchemaTypesYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"contract validation failed","errors":[`+
+		`"invalid schema type \"strng\" at Pet.id (api.yaml)",`+
+		`"invalid schema type \"\" at Pet.tags[] (api.yaml)"`+
+		`]}`, body)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_StatusCodeOutOfRange_Rejected() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", s.publishBody("pets-service", "1",
+		contractFragment{"api.yaml", invalidStatusCodesYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"contract validation failed","errors":[`+
+		`"invalid status code -1 at provides GET /pets (api.yaml)",`+
+		`"invalid status code 999 at provides GET /pets (api.yaml)"`+
+		`]}`, body)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
 func (s *IntegrationSuite) TestPublishContract_ArrayWithoutItems_RejectedBrokerStaysUp() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)

@@ -101,10 +101,24 @@ func (d DeleteMethod) Validate(vctx ValidationContext) {
 	d.Responses.Validate(vctx)
 }
 
+const (
+	MIN_STATUS_CODE = 100
+	MAX_STATUS_CODE = 599
+)
+
 type Responses map[int]string
 
 func (r Responses) Validate(vctx ValidationContext) {
 	for _, statusCode := range slices.Sorted(maps.Keys(r)) {
+		if statusCode < MIN_STATUS_CODE || statusCode > MAX_STATUS_CODE {
+			vctx.Errs.Addf(
+				"invalid status code %d at %s (%s)",
+				statusCode,
+				vctx.Pos.Where,
+				vctx.Pos.Source,
+			)
+		}
+
 		validateSchemaName(vctx.At(strconv.Itoa(statusCode)), r[statusCode])
 	}
 }

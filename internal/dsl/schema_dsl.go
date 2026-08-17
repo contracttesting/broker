@@ -107,5 +107,13 @@ func (s Schema) Validate(vctx ValidationContext) {
 		for _, name := range slices.Sorted(maps.Keys(s.Properties)) {
 			s.Properties[name].Validate(vctx.Deeper().AtProperty(name))
 		}
+
+	case !s.IsPrimitive():
+		vctx.Errs.Addf(
+			"invalid schema type %q at %s (%s)",
+			s.Type,
+			vctx.Pos.Path.String(),
+			vctx.Pos.Source,
+		)
 	}
 }
