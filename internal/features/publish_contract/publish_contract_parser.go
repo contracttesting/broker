@@ -32,19 +32,19 @@ func parseFragment(fragment ContractFragment) (*dsl.Contract, error) {
 	if extension != ".json" {
 		converted, err := yaml.YAMLToJSON(content)
 		if err != nil {
-			return nil, malformedContractFile(fragment.Source)
+			return nil, malformedContractFile(fragment.Source, err)
 		}
 
 		content = converted
 	}
 
 	if err := json.Unmarshal(content, contract); err != nil {
-		return nil, malformedContractFile(fragment.Source)
+		return nil, malformedContractFile(fragment.Source, err)
 	}
 
 	return contract, nil
 }
 
-func malformedContractFile(source string) error {
-	return fmt.Errorf("malformed contract file: %s", source)
+func malformedContractFile(source string, err error) error {
+	return fmt.Errorf("malformed contract file: %s: %v", source, err)
 }
