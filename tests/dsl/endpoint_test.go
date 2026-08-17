@@ -48,17 +48,26 @@ func endpointConsumesJSON(endpoint string) string {
 }`
 }
 
-func hydrateEndpointContract(t *testing.T, raw string) (*model.UploadedContract, error) {
+// endpointContract runs the publish pipeline over one file: normalize, validate, and
+// only build what validation accepted.
+func endpointContract(t *testing.T, raw string) (*model.UploadedContract, []error) {
 	t.Helper()
 
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
+	fragments := []dsl.Fragment{{Source: "things.yaml", Contract: &dslContract}}
+
+	errs := dsl.Normalize(fragments)
+	errs = append(errs, dsl.Validate(fragments)...)
+	if len(errs) > 0 {
+		return nil, errs
+	}
+
 	contract := model.NewUploadedContract(0, "things-app", "1", raw)
-	return contract, dsl.HydrateFragments(
-		[]dsl.Fragment{{Source: "things.yaml", Contract: &dslContract}},
-		contract,
-	)
+	require.NoError(t, dsl.HydrateFragments(fragments, contract))
+
+	return contract, nil
 }
 
 func singleEndpointResource(t *testing.T, contract *model.UploadedContract) model.UploadedResource {
@@ -74,11 +83,11 @@ func singleEndpointResource(t *testing.T, contract *model.UploadedContract) mode
 	return resource
 }
 
-func TestHydrateContract_EndpointRules_Accepts(t *testing.T) {
+func TestEndpointRules_Accepts(t *testing.T) {
 	for _, endpoint := range []string{"/users", "/users/*", "/users/*/orders/*", "/"} {
 		t.Run(endpoint, func(t *testing.T) {
-			contract, err := hydrateEndpointContract(t, endpointProvidesJSON(endpoint))
-			require.NoError(t, err)
+			contract, errs := endpointContract(t, endpointProvidesJSON(endpoint))
+			require.Empty(t, errs)
 
 			resource := singleEndpointResource(t, contract)
 			assert.Equal(t, endpoint, resource.Endpoint)
@@ -86,12 +95,12 @@ func TestHydrateContract_EndpointRules_Accepts(t *testing.T) {
 	}
 }
 
-func TestHydrateContract_TrailingSlash_NormalizesToSameResource(t *testing.T) {
-	slashed, err := hydrateEndpointContract(t, endpointProvidesJSON("/users/"))
-	require.NoError(t, err)
+func TestEndpointRules_TrailingSlash_NormalizesToSameResource(t *testing.T) {
+	slashed, errs := endpointContract(t, endpointProvidesJSON("/users/"))
+	require.Empty(t, errs)
 
-	plain, err := hydrateEndpointContract(t, endpointProvidesJSON("/users"))
-	require.NoError(t, err)
+	plain, errs := endpointContract(t, endpointProvidesJSON("/users"))
+	require.Empty(t, errs)
 
 	slashedResource := singleEndpointResource(t, slashed)
 	plainResource := singleEndpointResource(t, plain)
@@ -100,7 +109,7 @@ func TestHydrateContract_TrailingSlash_NormalizesToSameResource(t *testing.T) {
 	assert.Equal(t, plainResource.ProviderHash(), slashedResource.ProviderHash())
 }
 
-func TestHydrateContract_EndpointRules_Rejects(t *testing.T) {
+func TestEndpointRules_Rejects(t *testing.T) {
 	cases := []struct {
 		endpoint string
 		wantErr  string
@@ -113,18 +122,22 @@ func TestHydrateContract_EndpointRules_Rejects(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.endpoint, func(t *testing.T) {
-			_, err := hydrateEndpointContract(t, endpointProvidesJSON(c.endpoint))
-			require.EqualError(t, err, c.wantErr)
+			_, errs := endpointContract(t, endpointProvidesJSON(c.endpoint))
+
+			require.Len(t, errs, 1)
+			assert.EqualError(t, errs[0], c.wantErr)
 		})
 	}
 }
 
-func TestHydrateContract_ParamEndpoint_ErrorsFromProvidesAndConsumes(t *testing.T) {
+func TestEndpointRules_ParamEndpoint_ErrorsFromProvidesAndConsumes(t *testing.T) {
 	wantErr := `invalid endpoint "/users/{userId}": dynamic path segments must use * (things.yaml)`
 
-	_, err := hydrateEndpointContract(t, endpointProvidesJSON("/users/{userId}"))
-	require.EqualError(t, err, wantErr)
+	_, errs := endpointContract(t, endpointProvidesJSON("/users/{userId}"))
+	require.Len(t, errs, 1)
+	assert.EqualError(t, errs[0], wantErr)
 
-	_, err = hydrateEndpointContract(t, endpointConsumesJSON("/users/{userId}"))
-	require.EqualError(t, err, wantErr)
+	_, errs = endpointContract(t, endpointConsumesJSON("/users/{userId}"))
+	require.Len(t, errs, 1)
+	assert.EqualError(t, errs[0], wantErr)
 }

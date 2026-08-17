@@ -1,49 +1,18 @@
 package dsl
 
-import "fmt"
-
 const MAX_DEPTH = 10
 
-// SchemaTooDeep is the error returned when a schema nests past MAX_DEPTH, which is
-// also how a cyclic chain of refs terminates. Hydration propagates it up as a publish
-// error.
-type SchemaTooDeep struct {
-	SchemaName string
-	MaxDepth   int
-}
-
-func (e SchemaTooDeep) Error() string {
-	return fmt.Sprintf(
-		"schema %s is too deep with more than %d levels",
-		e.SchemaName,
-		e.MaxDepth,
-	)
-}
-
+// DepthCounter is the budget a schema descent carries in its Position. It is copied at
+// every level, so a deep branch never charges the branches beside it, and a cyclic
+// chain of refs terminates once the budget runs out.
 type DepthCounter struct {
-	counter    int
-	limit      int
-	schemaName string
+	levels int
 }
 
-func (dc *DepthCounter) Enter() error {
-	dc.counter = dc.counter + 1
-
-	if dc.counter >= dc.limit {
-		return SchemaTooDeep{SchemaName: dc.schemaName, MaxDepth: dc.limit}
-	}
-
-	return nil
+func (dc DepthCounter) Deeper() DepthCounter {
+	return DepthCounter{levels: dc.levels + 1}
 }
 
-func (dc *DepthCounter) Exit() {
-	dc.counter = dc.counter - 1
-}
-
-func NewDepthCounter(schemaName string) *DepthCounter {
-	return &DepthCounter{
-		counter:    0,
-		limit:      MAX_DEPTH,
-		schemaName: schemaName,
-	}
+func (dc DepthCounter) Exceeded() bool {
+	return dc.levels >= MAX_DEPTH
 }

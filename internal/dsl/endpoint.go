@@ -13,18 +13,18 @@ func normalizeEndpoint(endpoint string) string {
 	return endpoint
 }
 
+// validateEndpoint expects an endpoint that Normalize already rewrote: a trailing slash
+// past the root is a malformed path here, not a spelling to be trimmed.
 func validateEndpoint(endpoint string) error {
-	normalized := normalizeEndpoint(endpoint)
-
-	if !strings.HasPrefix(normalized, "/") {
+	if !strings.HasPrefix(endpoint, "/") {
 		return fmt.Errorf("invalid endpoint %q: malformed path", endpoint)
 	}
 
-	if normalized == "/" {
+	if endpoint == "/" {
 		return nil
 	}
 
-	for _, segment := range strings.Split(normalized[1:], "/") {
+	for _, segment := range strings.Split(endpoint[1:], "/") {
 		if segment == "" || strings.Contains(segment, ";") {
 			return fmt.Errorf("invalid endpoint %q: malformed path", endpoint)
 		}

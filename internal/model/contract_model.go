@@ -33,8 +33,8 @@ func NewUploadedContract(
 }
 
 // AddResource rejects a resource whose hash is already taken: two resources with the
-// same hash are the same resource, so a second one can only come from a fragment
-// redeclaring what another fragment already declared.
+// same hash are the same resource. Publish validation rejects a redeclaration before
+// the build starts, so a hit here is a broken invariant rather than bad input.
 func (contract *UploadedContract) AddResource(resource *UploadedResource, source string) error {
 	if contract.Resources == nil {
 		contract.Resources = make(map[string]UploadedResource)
@@ -46,7 +46,7 @@ func (contract *UploadedContract) AddResource(resource *UploadedResource, source
 
 	if declaredIn, taken := contract.resourceSources[hash]; taken {
 		return fmt.Errorf(
-			"duplicate resource: %s declared in %s and %s",
+			"resource already added: %s from %s and %s",
 			resource.Describe(),
 			declaredIn,
 			source,

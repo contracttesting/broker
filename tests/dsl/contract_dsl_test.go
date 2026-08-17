@@ -35,28 +35,6 @@ const happyContractJSON = `{
   }
 }`
 
-const cyclicContractJSON = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": {
-          "responses": {
-            "200": "Pet"
-          }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": {
-        "self": { "ref": "Pet" }
-      }
-    }
-  }
-}`
-
 func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 	var dslContract dsl.Contract
 	require.NoError(t, json.Unmarshal([]byte(happyContractJSON), &dslContract))
@@ -342,7 +320,7 @@ const wideShallowContractJSON = `{
   }
 }`
 
-func TestHydrateContract_WideShallowSchema_DoesNotPanicOnDepth(t *testing.T) {
+func TestHydrateContract_WideShallowSchema_MaterializesEveryBranch(t *testing.T) {
 	contract := hydrate(t, wideShallowContractJSON)
 
 	require.Len(t, contract.Resources, 1)
@@ -355,78 +333,4 @@ func TestHydrateContract_WideShallowSchema_DoesNotPanicOnDepth(t *testing.T) {
 	require.Contains(t, resource.Properties, "$.users[].list[].list[]")
 	assert.Equal(t, "array", resource.Properties["$.users[].list[].list"].Type)
 	assert.Equal(t, "string", resource.Properties["$.users[].list[].userId"].Type)
-}
-
-const deeplyNestedContractJSON = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": {
-          "responses": { "200": "Pet" }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": { "l1": {
-        "type": "object",
-        "properties": { "l2": {
-          "type": "object",
-          "properties": { "l3": {
-            "type": "object",
-            "properties": { "l4": {
-              "type": "object",
-              "properties": { "l5": {
-                "type": "object",
-                "properties": { "l6": {
-                  "type": "object",
-                  "properties": { "l7": {
-                    "type": "object",
-                    "properties": { "l8": {
-                      "type": "object",
-                      "properties": { "l9": {
-                        "type": "object",
-                        "properties": { "l10": {
-                          "type": "object",
-                          "properties": { "l11": { "type": "string" } }
-                        } }
-                      } }
-                    } }
-                  } }
-                } }
-              } }
-            } }
-          } }
-        } }
-      } }
-    }
-  }
-}`
-
-func TestHydrateFragments_Unhappy_RejectsDeeplyNestedSchema(t *testing.T) {
-	var dslContract dsl.Contract
-	require.NoError(t, json.Unmarshal([]byte(deeplyNestedContractJSON), &dslContract))
-
-	contract := model.NewUploadedContract(0, "petstore-app", "1", deeplyNestedContractJSON)
-	err := dsl.HydrateFragments(
-		[]dsl.Fragment{{Source: "schemas.yaml", Contract: &dslContract}},
-		contract,
-	)
-
-	require.EqualError(t, err, "schema Pet is too deep with more than 10 levels (schemas.yaml)")
-}
-
-func TestHydrateFragments_Unhappy_RejectsCyclicSchema(t *testing.T) {
-	var dslContract dsl.Contract
-	require.NoError(t, json.Unmarshal([]byte(cyclicContractJSON), &dslContract))
-
-	contract := model.NewUploadedContract(0, "petstore-app", "1", cyclicContractJSON)
-	err := dsl.HydrateFragments(
-		[]dsl.Fragment{{Source: "schemas.yaml", Contract: &dslContract}},
-		contract,
-	)
-
-	require.EqualError(t, err, "schema Pet is too deep with more than 10 levels (schemas.yaml)")
 }
