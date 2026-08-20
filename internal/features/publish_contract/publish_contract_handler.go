@@ -6,9 +6,9 @@ import (
 
 	"github.com/contracttesting/broker/internal/builder"
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/validator"
 	"github.com/gofiber/fiber/v3"
 )
 

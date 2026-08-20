@@ -16,7 +16,7 @@ func (schemaUnresolvedNameRule) Validate(segment any, validationContext *Validat
 		validationContext.AddViolation(fmt.Sprintf(
 			"unresolved schema name: %s referenced at %s (%s)",
 			name,
-			validationContext.Segment,
+			validationContext.Where,
 			validationContext.Source,
 		))
 	}

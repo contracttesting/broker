@@ -24,7 +24,7 @@ func (schemaUnresolvedRefRule) Validate(segment any, validationContext *Validati
 		validationContext.AddViolation(fmt.Sprintf(
 			"unresolved schema name: %s referenced at %s (%s)",
 			schema.Ref,
-			validationContext.Segment,
+			validationContext.Where,
 			validationContext.Source,
 		))
 	}

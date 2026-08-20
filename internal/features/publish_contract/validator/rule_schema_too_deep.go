@@ -21,7 +21,7 @@ func (schemaTooDeepRule) Validate(segment any, validationContext *ValidationCont
 
 	validationContext.AddViolation(fmt.Sprintf(
 		"schema %s is too deep with more than %d levels (%s)",
-		validationContext.Segment,
+		validationContext.RootSchema,
 		MAX_DEPTH,
 		validationContext.Source,
 	))

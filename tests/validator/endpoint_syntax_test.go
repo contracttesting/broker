@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/contracttesting/broker/internal/dsl"
-	"github.com/contracttesting/broker/internal/validator"
+	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +48,7 @@ func syntaxConsumesJSON(endpoint string) string {
 }`
 }
 
-func syntaxViolations(t *testing.T, raw string) []error {
+func syntaxViolations(t *testing.T, raw string) []string {
 	t.Helper()
 
 	var dslContract dsl.Contract
@@ -56,7 +56,7 @@ func syntaxViolations(t *testing.T, raw string) []error {
 
 	fragments := []dsl.Fragment{{Source: "things.yaml", Contract: &dslContract}}
 
-	return validator.New().Validate(fragments)
+	return validator.NewDslValidator().Validate(fragments)
 }
 
 func TestEndpointSyntax_Accepts(t *testing.T) {
@@ -86,7 +86,7 @@ func TestEndpointSyntax_Rejects(t *testing.T) {
 			errs := syntaxViolations(t, syntaxProvidesJSON(c.endpoint))
 
 			require.Len(t, errs, 1)
-			assert.EqualError(t, errs[0], c.wantErr)
+			assert.Equal(t, c.wantErr, errs[0])
 		})
 	}
 }
@@ -96,9 +96,9 @@ func TestEndpointSyntax_ParamEndpoint_ErrorsFromProvidesAndConsumes(t *testing.T
 
 	errs := syntaxViolations(t, syntaxProvidesJSON("/users/{userId}"))
 	require.Len(t, errs, 1)
-	assert.EqualError(t, errs[0], wantErr)
+	assert.Equal(t, wantErr, errs[0])
 
 	errs = syntaxViolations(t, syntaxConsumesJSON("/users/{userId}"))
 	require.Len(t, errs, 1)
-	assert.EqualError(t, errs[0], wantErr)
+	assert.Equal(t, wantErr, errs[0])
 }

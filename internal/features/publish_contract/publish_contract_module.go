@@ -2,8 +2,8 @@ package publish_contract
 
 import (
 	"github.com/contracttesting/broker/internal/components"
+	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/validator"
 )
 
 func Register(components *components.Components) {

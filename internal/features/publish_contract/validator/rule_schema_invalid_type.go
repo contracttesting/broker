@@ -23,7 +23,7 @@ func (schemaInvalidTypeRule) Validate(segment any, validationContext *Validation
 	validationContext.AddViolation(fmt.Sprintf(
 		"invalid schema type %q at %s (%s)",
 		schema.Type,
-		validationContext.Segment,
+		validationContext.Where,
 		validationContext.Source,
 	))
 }

@@ -28,7 +28,7 @@ func (statusCodeRangeRule) Validate(segment any, validationContext *ValidationCo
 			validationContext.AddViolation(fmt.Sprintf(
 				"invalid status code %d at %s (%s)",
 				statusCode,
-				validationContext.Segment,
+				validationContext.Where,
 				validationContext.Source,
 			))
 		}

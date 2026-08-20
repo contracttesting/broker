@@ -319,7 +319,7 @@ func (s *IntegrationSuite) TestPublishContract_ParamEndpoint_RejectedNothingStor
 
 	status, body := s.post("/api/contracts", s.publishBody("pets-service", "1", contractFragment{"api.json", contractBodyParamEndpoint}))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":["invalid endpoint \"/users/{userId}\": dynamic path segments must use * (api.json)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["invalid endpoint \"/users/{userId}\": dynamic path segments must use * (api.json)"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -410,7 +410,7 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateResponseResource_Rejecte
 		contractFragment{"schemas.yaml", petsSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":["duplicate resource: provides GET /pets 200 declared in pets.yaml and store.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: provides GET /pets 200 declared in pets.yaml and store.yaml"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 	s.Equal(0, s.countRows("resources"))
@@ -426,7 +426,7 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateRequestResource_Rejected
 		contractFragment{"schemas.yaml", petsSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":["duplicate resource: provides POST /pets request declared in pets.yaml and store.yaml","duplicate resource: provides POST /pets 201 declared in pets.yaml and store.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: provides POST /pets request declared in pets.yaml and store.yaml","duplicate resource: provides POST /pets 201 declared in pets.yaml and store.yaml"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -441,7 +441,7 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateConsumedResource_Rejecte
 		contractFragment{"schemas.yaml", invoicesSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":["duplicate resource: consumes payments GET /invoices 200 declared in a.yaml and b.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: consumes payments GET /invoices 200 declared in a.yaml and b.yaml"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -456,7 +456,7 @@ func (s *IntegrationSuite) TestPublishContract_TrailingSlashCountsAsDuplicate() 
 		contractFragment{"schemas.yaml", petsSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":["duplicate resource: provides GET /pets 200 declared in pets.yaml and store.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: provides GET /pets 200 declared in pets.yaml and store.yaml"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -471,7 +471,7 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateSchema_Rejected() {
 		contractFragment{"billing.yaml", billingSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":["duplicate schema: Pet declared in billing.yaml and schemas.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate schema: Pet declared in billing.yaml and schemas.yaml"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -576,7 +576,7 @@ func (s *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
 		contractFragment{"api.yaml", invalidSchemaTypesYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":[`+
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`"invalid schema type \"strng\" at Pet.id (api.yaml)",`+
 		`"invalid schema type \"\" at Pet.tags[] (api.yaml)"`+
 		`]}`, body)
@@ -592,7 +592,7 @@ func (s *IntegrationSuite) TestPublishContract_StatusCodeOutOfRange_Rejected() {
 		contractFragment{"api.yaml", invalidStatusCodesYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":[`+
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`"invalid status code -1 at provides GET /pets (api.yaml)",`+
 		`"invalid status code 999 at provides GET /pets (api.yaml)"`+
 		`]}`, body)
@@ -608,7 +608,7 @@ func (s *IntegrationSuite) TestPublishContract_ArrayWithoutItems_RejectedBrokerS
 		contractFragment{"api.yaml", arrayWithoutItemsYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":["array schema without items at Pets (api.yaml)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["array schema without items at Pets (api.yaml)"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 
@@ -625,7 +625,7 @@ func (s *IntegrationSuite) TestPublishContract_BothEndpointSpellingsInOneFile_Re
 		contractFragment{"schemas.yaml", duplicateEndpointSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":["duplicate endpoint: /pets declared twice in api.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate endpoint: /pets declared twice in api.yaml"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -638,7 +638,7 @@ func (s *IntegrationSuite) TestPublishContract_ManyViolations_ReportedInOneRespo
 		contractFragment{"api.yaml", manyViolationsYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","errors":[`+
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`"unresolved schema name: Missing referenced at provides GET /pets 200 (api.yaml)",`+
 		`"invalid endpoint \"/users/*/{orderId}\": dynamic path segments must use * (api.yaml)"`+
 		`]}`, body)

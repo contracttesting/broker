@@ -22,7 +22,7 @@ func (schemaArrayWithoutItemsRule) Validate(segment any, validationContext *Vali
 
 	validationContext.AddViolation(fmt.Sprintf(
 		"array schema without items at %s (%s)",
-		validationContext.Segment,
+		validationContext.Where,
 		validationContext.Source,
 	))
 }

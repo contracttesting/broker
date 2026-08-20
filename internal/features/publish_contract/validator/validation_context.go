@@ -1,9 +1,10 @@
 package validator
 
 type ValidationContext struct {
-	Segment    string
+	Where      string
+	RootSchema string
 	Violations []string
-	Depth      *DepthCounter
+	Depth      DepthCounter
 
 	Source        string
 	ContractIndex ContractIndex
@@ -19,7 +20,7 @@ func NewValidationContext(
 		Source:        source,
 		ContractIndex: contractIndex,
 		Rules:         rules,
-		Depth:         NewDepthCounter(),
+		Depth:         DepthCounter{},
 		Violations:    []string{},
 	}
 }
