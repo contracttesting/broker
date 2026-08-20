@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 
@@ -11,15 +12,18 @@ type endpointDuplicateRule struct{}
 
 func (endpointDuplicateRule) Code() string { return "endpoint.duplicate" }
 
-// Two spellings of the same path in one file would silently overwrite each other once
-// normalized, so the first one in sorted order wins and the second is reported.
-func (endpointDuplicateRule) CheckRest(r dsl.Rest, vctx ValidationContext) {
+func (endpointDuplicateRule) Validate(segment any, validationContext *ValidationContext) {
+	rest, ok := segment.(dsl.Rest)
+	if !ok {
+		return
+	}
+
 	seen := make(map[string]bool)
 
-	for _, endpoint := range slices.Sorted(maps.Keys(r)) {
+	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
 		normalized := dsl.NormalizeEndpoint(endpoint)
 		if seen[normalized] {
-			vctx.Errs.Addf("duplicate endpoint: %s declared twice in %s", normalized, vctx.Pos.Source)
+			validationContext.AddViolation(fmt.Sprintf("duplicate endpoint: %s declared twice in %s", normalized, validationContext.Source))
 
 			continue
 		}

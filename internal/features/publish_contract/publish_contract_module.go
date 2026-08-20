@@ -9,9 +9,7 @@ import (
 func Register(components *components.Components) {
 	contractRepository := repository.NewContractRepository(components.Pool)
 	participantRepository := repository.NewParticipantRepository(components.Pool)
-	// built once and reused by every request: the point where per-company rules will be
-	// appended in the future
-	contractValidator := validator.New()
+	contractValidator := validator.NewDslValidator()
 	handler := NewPublishContractHandler(contractRepository, participantRepository, contractValidator)
 	components.Server.Post("/api/contracts", handler.Handle)
 }

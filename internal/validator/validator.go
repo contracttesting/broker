@@ -6,88 +6,121 @@ import (
 	"github.com/contracttesting/broker/internal/dsl"
 )
 
-// Validator is the composition the publish runs: the default catalog hardcoded today,
-// the point where per-company rules will be appended tomorrow. It is immutable: Append
-// and Without return a new Validator and never mutate the receiver.
-type Validator struct {
-	entries []catalogEntry
+type DslValidator struct {
+	ruleEntries []ruleEntry
 }
 
-// catalogEntry pairs a rule with its stratum: invariant rules keep the DSL buildable
-// and are locked; policy rules are opinions a composition may remove.
-type catalogEntry struct {
+type ruleEntry struct {
+	segment   string
 	rule      Rule
 	invariant bool
 }
 
-func New() Validator {
-	return Validator{entries: []catalogEntry{
-		{rule: endpointSyntaxRule{}, invariant: true},
-		{rule: endpointDuplicateRule{}, invariant: true},
-		{rule: schemaDuplicateRule{}, invariant: true},
-		{rule: resourceDuplicateRule{}, invariant: true},
-		{rule: schemaUnresolvedNameRule{}, invariant: true},
-		{rule: schemaUnresolvedRefRule{}, invariant: true},
-		{rule: schemaTooDeepRule{}, invariant: true},
-		{rule: schemaArrayWithoutItemsRule{}, invariant: true},
-		{rule: schemaInvalidTypeRule{}, invariant: true},
-		{rule: statusCodeRangeRule{}, invariant: false},
+func NewDslValidator() *DslValidator {
+	return &DslValidator{ruleEntries: []ruleEntry{
+		{segment: SegmentEndpoint, rule: endpointSyntaxRule{}, invariant: true},
+		{segment: SegmentRest, rule: endpointDuplicateRule{}, invariant: true},
+		{segment: SegmentSchemas, rule: &schemaDuplicateRule{}, invariant: true},
+		{segment: SegmentResource, rule: &resourceDuplicateRule{}, invariant: true},
+		{segment: SegmentSchemaName, rule: schemaUnresolvedNameRule{}, invariant: true},
+		{segment: SegmentSchema, rule: schemaUnresolvedRefRule{}, invariant: true},
+		{segment: SegmentSchema, rule: schemaTooDeepRule{}, invariant: true},
+		{segment: SegmentSchema, rule: schemaArrayWithoutItemsRule{}, invariant: true},
+		{segment: SegmentSchema, rule: schemaInvalidTypeRule{}, invariant: true},
+		{segment: SegmentResponses, rule: statusCodeRangeRule{}, invariant: false},
 	}}
 }
 
-func (v Validator) Append(rule Rule) Validator {
-	entries := make([]catalogEntry, 0, len(v.entries)+1)
-	entries = append(entries, v.entries...)
-	entries = append(entries, catalogEntry{rule: rule})
+// freshRules builds the execution's rule set, indexed by the segment each entry is
+// registered at. Stateful rules enter through Fresh(): one instance per execution,
+// never shared across concurrent publishes.
+func (v *DslValidator) freshRules() map[string][]Rule {
+	rules := make(map[string][]Rule, len(v.ruleEntries))
 
-	return Validator{entries: entries}
-}
-
-func (v Validator) Without(code string) (Validator, error) {
-	for i, entry := range v.entries {
-		if entry.rule.Code() != code {
-			continue
-		}
-
-		if entry.invariant {
-			return Validator{}, fmt.Errorf("cannot remove rule %s: invariant rules are locked", code)
-		}
-
-		entries := make([]catalogEntry, 0, len(v.entries)-1)
-		entries = append(entries, v.entries[:i]...)
-		entries = append(entries, v.entries[i+1:]...)
-
-		return Validator{entries: entries}, nil
-	}
-
-	return Validator{}, fmt.Errorf("cannot remove rule %s: not in the catalog", code)
-}
-
-// Validate walks every fragment of the raw DSL and reports everything wrong with the
-// contract at once: a publish is either rejected with the full list or handed to
-// dsl.Normalize and the build as valid DSL.
-func (v Validator) Validate(fragments []dsl.Fragment) []error {
-	rules := make([]Rule, 0, len(v.entries))
-	for _, entry := range v.entries {
+	for _, entry := range v.ruleEntries {
 		rule := entry.rule
+
 		if stateful, ok := rule.(StatefulRule); ok {
 			rule = stateful.Fresh()
 		}
 
-		rules = append(rules, rule)
+		rules[entry.segment] = append(rules[entry.segment], rule)
 	}
 
-	errs := &ErrorList{}
-	index := buildIndex(fragments)
+	return rules
+}
+
+func (v *DslValidator) Validate(fragments []dsl.Fragment) []string {
+	contractIndex := NewContractIndex(fragments)
+	rules := v.freshRules()
 
 	for _, fragment := range sortedBySource(fragments) {
-		walkContract(*fragment.Contract, ValidationContext{
-			Index: index,
-			Errs:  errs,
-			Pos:   Position{Source: fragment.Source},
-			rules: rules,
-		})
+		validationContext := NewValidationContext(fragment.Source, *contractIndex, rules)
+		v.validateContract(fragment, validationContext)
 	}
 
-	return errs.All()
+	return []string{}
 }
+
+func (v *DslValidator) validateContract(fragment dsl.Fragment, validationContext *ValidationContext) {
+	v.validateProvides(fragment.Contract.Provides, validationContext)
+
+	for _, consumes := range fragment.Contract.ConsumesServices {
+		v.validateConsumes(consumes, validationContext)
+	}
+}
+
+func (v *DslValidator) validateProvides(provides dsl.Provides, validationContext *ValidationContext) {
+	for endpoint, methods := range provides.Rest {
+		v.validateEndpoint(endpoint, validationContext)
+		v.validateMethod(methods, validationContext)
+	}
+}
+
+func (v *DslValidator) validateEndpoint(endpoint string, validationContext *ValidationContext) {
+}
+
+func (v *DslValidator) validateConsumes(consumes dsl.Consumes, validationContext *ValidationContext) {
+}
+
+func (v *DslValidator) validateMethod(methods dsl.HttpMethods, validationContext *ValidationContext) {
+	v.validateGet(methods.Get, validationContext)
+	v.validatePost(methods.Post, validationContext)
+	v.validatePut(methods.Put, validationContext)
+	v.validateDelete(methods.Delete, validationContext)
+
+}
+
+func (v *DslValidator) validateGet(getMethod dsl.GetMethod, validationContext *ValidationContext) {
+	for statusCode, schemaName := range getMethod.Responses {
+		fmt.Println(statusCode, schemaName)
+	}
+}
+
+func (v *DslValidator) validatePost(postMethod dsl.PostMethod, validationContext *ValidationContext) {
+	if postMethod.HasRequestBody() {
+		fmt.Println("request", postMethod.RequestBody)
+	}
+
+	for statusCode, schemaName := range postMethod.Responses {
+		fmt.Println("response", statusCode, schemaName)
+	}
+}
+
+func (v *DslValidator) validatePut(putMethod dsl.PutMethod, validationContext *ValidationContext) {
+	if putMethod.HasRequestBody() {
+		fmt.Println("request", putMethod.RequestBody)
+	}
+
+	for statusCode, schemaName := range putMethod.Responses {
+		fmt.Println(statusCode, schemaName)
+	}
+}
+
+func (v *DslValidator) validateDelete(deleteMethod dsl.DeleteMethod, validationContext *ValidationContext) {
+	for statusCode, schemaName := range deleteMethod.Responses {
+		fmt.Println(statusCode, schemaName)
+	}
+}
+
+func (v *DslValidator) validateSchema(schema dsl.Schema, validationContext *ValidationContext) {}

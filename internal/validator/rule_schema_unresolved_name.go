@@ -1,17 +1,23 @@
 package validator
 
-// The schema itself is walked once, from its declaration, so nothing descends here.
+import "fmt"
+
 type schemaUnresolvedNameRule struct{}
 
-func (schemaUnresolvedNameRule) Code() string { return "schema.unresolved-name" }
+func (schemaUnresolvedNameRule) Code() string { return "schema.unresolved_name" }
 
-func (schemaUnresolvedNameRule) CheckSchemaName(name string, vctx ValidationContext) {
-	if _, declared := vctx.Index.Schema(name); !declared {
-		vctx.Errs.Addf(
+func (schemaUnresolvedNameRule) Validate(segment any, validationContext *ValidationContext) {
+	name, ok := segment.(string)
+	if !ok {
+		return
+	}
+
+	if _, declared := validationContext.ContractIndex.Schema(name); !declared {
+		validationContext.AddViolation(fmt.Sprintf(
 			"unresolved schema name: %s referenced at %s (%s)",
 			name,
-			vctx.Pos.Where,
-			vctx.Pos.Source,
-		)
+			validationContext.Segment,
+			validationContext.Source,
+		))
 	}
 }

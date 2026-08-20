@@ -1,21 +1,28 @@
 package validator
 
 import (
+	"fmt"
+
 	"github.com/contracttesting/broker/internal/dsl"
 )
 
 type schemaArrayWithoutItemsRule struct{}
 
-func (schemaArrayWithoutItemsRule) Code() string { return "schema.array-without-items" }
+func (schemaArrayWithoutItemsRule) Code() string { return "schema.array_without_items" }
 
-func (schemaArrayWithoutItemsRule) CheckSchema(s dsl.Schema, vctx ValidationContext) {
-	if vctx.Pos.Depth.Exceeded() || s.IsRef() || !s.IsArray() || s.Items != nil {
+func (schemaArrayWithoutItemsRule) Validate(segment any, validationContext *ValidationContext) {
+	schema, ok := segment.(dsl.Schema)
+	if !ok {
 		return
 	}
 
-	vctx.Errs.Addf(
+	if validationContext.Depth.Exceeded() || schema.IsRef() || !schema.IsArray() || schema.Items != nil {
+		return
+	}
+
+	validationContext.AddViolation(fmt.Sprintf(
 		"array schema without items at %s (%s)",
-		vctx.Pos.Path.String(),
-		vctx.Pos.Source,
-	)
+		validationContext.Segment,
+		validationContext.Source,
+	))
 }

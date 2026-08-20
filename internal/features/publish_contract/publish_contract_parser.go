@@ -11,8 +11,6 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-// parseFragment picks the parser by the extension of the source. YAML goes through
-// YAMLToJSON so both formats land on the same JSON unmarshal into dsl.Contract.
 func parseFragment(fragment ContractFragment) (*dsl.Contract, error) {
 	extension := strings.ToLower(filepath.Ext(fragment.Source))
 	if extension != ".yaml" && extension != ".yml" && extension != ".json" {

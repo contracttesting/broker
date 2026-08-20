@@ -1,22 +1,29 @@
 package validator
 
 import (
+	"fmt"
+
 	"github.com/contracttesting/broker/internal/dsl"
 )
 
 type schemaInvalidTypeRule struct{}
 
-func (schemaInvalidTypeRule) Code() string { return "schema.invalid-type" }
+func (schemaInvalidTypeRule) Code() string { return "schema.invalid_type" }
 
-func (schemaInvalidTypeRule) CheckSchema(s dsl.Schema, vctx ValidationContext) {
-	if vctx.Pos.Depth.Exceeded() || s.IsRef() || s.IsArray() || s.IsObject() || s.IsPrimitive() {
+func (schemaInvalidTypeRule) Validate(segment any, validationContext *ValidationContext) {
+	schema, ok := segment.(dsl.Schema)
+	if !ok {
 		return
 	}
 
-	vctx.Errs.Addf(
+	if validationContext.Depth.Exceeded() || schema.IsRef() || schema.IsArray() || schema.IsObject() || schema.IsPrimitive() {
+		return
+	}
+
+	validationContext.AddViolation(fmt.Sprintf(
 		"invalid schema type %q at %s (%s)",
-		s.Type,
-		vctx.Pos.Path.String(),
-		vctx.Pos.Source,
-	)
+		schema.Type,
+		validationContext.Segment,
+		validationContext.Source,
+	))
 }

@@ -1,6 +1,8 @@
 package validator
 
 import (
+	"fmt"
+
 	"github.com/contracttesting/broker/internal/dsl"
 )
 
@@ -8,10 +10,13 @@ type endpointSyntaxRule struct{}
 
 func (endpointSyntaxRule) Code() string { return "endpoint.syntax" }
 
-// The identity under judgment is the normalized spelling — a trailing slash is spelling
-// without meaning — but the message quotes the raw one the user wrote.
-func (endpointSyntaxRule) CheckEndpoint(endpoint string, vctx ValidationContext) {
+func (endpointSyntaxRule) Validate(segment any, validationContext *ValidationContext) {
+	endpoint, ok := segment.(string)
+	if !ok {
+		return
+	}
+
 	if reason := endpointViolation(dsl.NormalizeEndpoint(endpoint)); reason != "" {
-		vctx.Errs.Addf("invalid endpoint %q: %s (%s)", endpoint, reason, vctx.Pos.Source)
+		validationContext.AddViolation(fmt.Sprintf("invalid endpoint %q: %s (%s)", endpoint, reason, validationContext.Source))
 	}
 }

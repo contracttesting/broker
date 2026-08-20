@@ -15,13 +15,13 @@ import (
 type PublishContractHandler struct {
 	contractRepository    *repository.ContractRepository
 	participantRepository *repository.ParticipantRepository
-	validator             validator.Validator
+	validator             *validator.DslValidator
 }
 
 func NewPublishContractHandler(
 	contractRepository *repository.ContractRepository,
 	participantRepository *repository.ParticipantRepository,
-	contractValidator validator.Validator,
+	contractValidator *validator.DslValidator,
 ) *PublishContractHandler {
 	return &PublishContractHandler{
 		contractRepository:    contractRepository,
@@ -118,15 +118,10 @@ func (ctr *PublishContractHandler) respondBadRequest(ctx fiber.Ctx, err error) e
 	})
 }
 
-func (ctr *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []error) error {
-	messages := make([]string, 0, len(violations))
-	for _, violation := range violations {
-		messages = append(messages, violation.Error())
-	}
-
+func (ctr *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []string) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractValidationResponseBody{
-		Message: ContractValidationFailed,
-		Errors:  messages,
+		Message:    ContractValidationFailed,
+		Violations: violations,
 	})
 }
 

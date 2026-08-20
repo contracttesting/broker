@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 
@@ -14,17 +15,22 @@ const (
 
 type statusCodeRangeRule struct{}
 
-func (statusCodeRangeRule) Code() string { return "status.out-of-range" }
+func (statusCodeRangeRule) Code() string { return "status.out_of_range" }
 
-func (statusCodeRangeRule) CheckResponses(r dsl.Responses, vctx ValidationContext) {
-	for _, statusCode := range slices.Sorted(maps.Keys(r)) {
+func (statusCodeRangeRule) Validate(segment any, validationContext *ValidationContext) {
+	responses, ok := segment.(dsl.Responses)
+	if !ok {
+		return
+	}
+
+	for _, statusCode := range slices.Sorted(maps.Keys(responses)) {
 		if statusCode < MIN_STATUS_CODE || statusCode > MAX_STATUS_CODE {
-			vctx.Errs.Addf(
+			validationContext.AddViolation(fmt.Sprintf(
 				"invalid status code %d at %s (%s)",
 				statusCode,
-				vctx.Pos.Where,
-				vctx.Pos.Source,
-			)
+				validationContext.Segment,
+				validationContext.Source,
+			))
 		}
 	}
 }

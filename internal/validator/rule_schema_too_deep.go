@@ -1,22 +1,28 @@
 package validator
 
 import (
+	"fmt"
+
 	"github.com/contracttesting/broker/internal/dsl"
 )
 
 type schemaTooDeepRule struct{}
 
-func (schemaTooDeepRule) Code() string { return "schema.too-deep" }
+func (schemaTooDeepRule) Code() string { return "schema.too_deep" }
 
-func (schemaTooDeepRule) CheckSchema(_ dsl.Schema, vctx ValidationContext) {
-	if !vctx.Pos.Depth.Exceeded() {
+func (schemaTooDeepRule) Validate(segment any, validationContext *ValidationContext) {
+	if _, ok := segment.(dsl.Schema); !ok {
 		return
 	}
 
-	vctx.Errs.Addf(
+	if !validationContext.Depth.Exceeded() {
+		return
+	}
+
+	validationContext.AddViolation(fmt.Sprintf(
 		"schema %s is too deep with more than %d levels (%s)",
-		vctx.Pos.Root,
+		validationContext.Segment,
 		MAX_DEPTH,
-		vctx.Pos.Source,
-	)
+		validationContext.Source,
+	))
 }
