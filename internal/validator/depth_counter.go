@@ -1,4 +1,4 @@
-package dsl
+package validator
 
 const MAX_DEPTH = 10
 

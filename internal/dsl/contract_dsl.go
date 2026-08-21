@@ -13,12 +13,6 @@ type Contract struct {
 	Schemas          SchemasMap          `json:"schemas,omitzero"`
 }
 
-func (c Contract) Validate(vctx ValidationContext) {
-	c.Provides.Validate(vctx.At("provides"))
-	c.ConsumesServices.Validate(vctx)
-	c.Schemas.Validate(vctx)
-}
-
 // Fragment is one uploaded file: the contract parsed out of it plus the path it came
 // from, which every publish error quotes.
 type Fragment struct {
@@ -30,8 +24,9 @@ type Fragment struct {
 // fragment form one namespace, and each fragment is hydrated against that namespace,
 // so refs cross files and resources accumulate into one contract.
 //
-// It transforms, it does not validate: the fragments have already been through
-// Normalize and Validate, so an error here is a broken invariant, not bad input.
+// It transforms, it does not validate: the fragments have already been through the
+// contract validator and Normalize, so an error here is a broken invariant, not bad
+// input.
 func HydrateFragments(fragments []Fragment, contract *model.UploadedContract) error {
 	hydrator := newHydrator(fragments)
 
