@@ -334,3 +334,38 @@ func TestHydrateContract_WideShallowSchema_MaterializesEveryBranch(t *testing.T)
 	assert.Equal(t, "array", resource.Properties["$.users[].list[].list"].Type)
 	assert.Equal(t, "string", resource.Properties["$.users[].list[].userId"].Type)
 }
+
+const unknownTypeContractJSON = `{
+  "consumes": {
+    "pets-service": {
+      "rest": {
+        "/pets": {
+          "get": {
+            "responses": { "200": "Pet" }
+          }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Pet": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "auid" }
+      }
+    }
+  }
+}`
+
+func TestHydrateContract_UnknownSchemaType_ReturnsError(t *testing.T) {
+	var dslContract dsl.Contract
+	require.NoError(t, json.Unmarshal([]byte(unknownTypeContractJSON), &dslContract))
+
+	contract := model.NewUploadedContract(0, "petstore-app", "1", unknownTypeContractJSON)
+	err := dsl.HydrateFragments(
+		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
+		contract,
+	)
+
+	require.EqualError(t, err, `unknown schema type "auid" at $.id`)
+}

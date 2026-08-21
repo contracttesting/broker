@@ -267,7 +267,7 @@ func buildSchema(
 			)
 		}
 
-		return nil
+		return fmt.Errorf("unknown schema type %q at %s", unknown.Type, propertyPath)
 	case *Schema:
 		return buildSchema(
 			schemas,
