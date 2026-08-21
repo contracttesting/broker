@@ -31,7 +31,7 @@ func syntaxProvidesJSON(endpoint string) string {
 func syntaxConsumesJSON(endpoint string) string {
 	return `{
   "consumes": {
-    "things-service": {
+    "things_service": {
       "rest": {
         "` + endpoint + `": {
           "get": { "responses": { "200": "Thing" } }

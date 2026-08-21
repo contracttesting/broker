@@ -29,7 +29,7 @@ const petSchemaJSON = `{
   }
 }`
 
-// everyRuleJSONA and everyRuleJSONB together violate all ten catalog rules: a wrong
+// everyRuleJSONA and everyRuleJSONB together violate all eleven catalog rules: a wrong
 // registration segment would silence its rule's message, so this list is the catalog.
 const everyRuleJSONA = `{
   "provides": {
@@ -39,6 +39,9 @@ const everyRuleJSONA = `{
       "/bad//x": { "get": { "responses": { "200": "Pet" } } },
       "/pets": { "get": { "responses": { "200": "Missing", "600": "Pet" } } }
     }
+  },
+  "consumes": {
+    "Bad;Svc": { "rest": { "/c": { "get": { "responses": { "200": "Pet" } } } } }
   },
   "schemas": {
     "Loop": { "ref": "Loop" },
@@ -84,6 +87,7 @@ func TestValidator_EveryCatalogRule_FiresAtItsRegisteredSegment(t *testing.T) {
 		`invalid endpoint "/bad//x": malformed path (a.json)`,
 		"invalid status code 600 at provides GET /pets (a.json)",
 		"unresolved schema name: Missing referenced at provides GET /pets 200 (a.json)",
+		`invalid service name "Bad;Svc": must be snake_case (a.json)`,
 		"schema Loop is too deep with more than 10 levels (a.json)",
 		`invalid schema type "auid" at Pet.kind (a.json)`,
 		"unresolved schema name: Ghost referenced at Pet.owner (a.json)",

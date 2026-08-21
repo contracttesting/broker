@@ -1,6 +1,7 @@
 package validator
 
 const (
+	SegmentService    = "service"
 	SegmentRest       = "rest"
 	SegmentEndpoint   = "endpoint"
 	SegmentResource   = "resource"

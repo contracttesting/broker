@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/model"
 )
 
 type DslValidator struct {
@@ -20,6 +21,7 @@ type ruleEntry struct {
 
 func NewDslValidator() *DslValidator {
 	return &DslValidator{ruleEntries: []ruleEntry{
+		{segment: SegmentService, rule: serviceNameRule{}},
 		{segment: SegmentEndpoint, rule: endpointSyntaxRule{}},
 		{segment: SegmentRest, rule: endpointDuplicateRule{}},
 		{segment: SegmentSchemas, rule: &schemaDuplicateRule{}},
@@ -72,6 +74,13 @@ func (v *DslValidator) validateContract(fragment dsl.Fragment, validationContext
 	v.validateRest(fragment.Contract.Provides.Rest, "provides", root.Append("provides"), validationContext)
 
 	for _, service := range slices.Sorted(maps.Keys(fragment.Contract.ConsumesServices)) {
+		dispatch(validationContext, SegmentService, service)
+
+		// what an invalid service name declares is unreachable anyway
+		if model.ParticipantNameViolation(service) != "" {
+			continue
+		}
+
 		v.validateRest(
 			fragment.Contract.ConsumesServices[service].Rest,
 			joinWhere("consumes", service),

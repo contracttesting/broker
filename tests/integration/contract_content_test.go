@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-const contentParticipantBody = `{"participant":"content-service"}`
+const contentParticipantBody = `{"participant":"content_service"}`
 
 const singleFileYAML = `# the whole service in one file
 provides:
@@ -57,12 +57,12 @@ func (s *IntegrationSuite) TestPublish_EachVersionStampsItsOwnFiles() {
 	status, _ := s.post("/api/participants", contentParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("content-service", "v42",
+	status, _ = s.post("/api/contracts", s.publishBody("content_service", "v42",
 		contractFragment{"api.yaml", singleFileYAML},
 	))
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("content-service", "v43",
+	status, _ = s.post("/api/contracts", s.publishBody("content_service", "v43",
 		contractFragment{".contracts/api/pets.yaml", endpointsYAML},
 		contractFragment{".contracts/api/schemas.yaml", schemasYAML},
 	))
@@ -89,12 +89,12 @@ func (s *IntegrationSuite) TestPublish_RepublishingTheSameVersionKeepsTheFirstFi
 	status, _ := s.post("/api/participants", contentParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("content-service", "v42",
+	status, _ = s.post("/api/contracts", s.publishBody("content_service", "v42",
 		contractFragment{"api.yaml", singleFileYAML},
 	))
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("content-service", "v42",
+	status, _ = s.post("/api/contracts", s.publishBody("content_service", "v42",
 		contractFragment{".contracts/api/pets.yaml", endpointsYAML},
 		contractFragment{".contracts/api/schemas.yaml", schemasYAML},
 	))

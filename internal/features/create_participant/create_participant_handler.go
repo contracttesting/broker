@@ -28,6 +28,10 @@ func (ctr *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondInvalidInput(ctx)
 	}
 
+	if model.ParticipantNameViolation(requestBody.Participant) != "" {
+		return ctr.respondInvalidName(ctx)
+	}
+
 	if ctr.participantRepository.ExistsByName(ctx.Context(), requestBody.Participant) {
 		return ctr.respondAlreadyExists(ctx)
 	}
@@ -42,6 +46,12 @@ func (ctr *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
 func (ctr *CreateParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponseBody{
 		Message: ParticipantInvalidInput,
+	})
+}
+
+func (ctr *CreateParticipantHandler) respondInvalidName(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusBadRequest).JSON(CreateParticipantResponseBody{
+		Message: ParticipantNameNotSnakeCase,
 	})
 }
 

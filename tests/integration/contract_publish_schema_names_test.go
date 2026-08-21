@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-const namesParticipantBody = `{"participant":"names-service"}`
+const namesParticipantBody = `{"participant":"names_service"}`
 
 const namesEndpointsYAML = `provides:
   rest:
@@ -99,7 +99,7 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedResponseSchema_Multiple
 	status, _ := s.post("/api/participants", namesParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("names-service", "1",
+	status, body := s.post("/api/contracts", s.publishBody("names_service", "1",
 		contractFragment{"pets.yaml", namesEndpointsYAML},
 		contractFragment{"schemas.yaml", namesResolvedSchemasYAML},
 	))
@@ -113,7 +113,7 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedResponseSchema_SingleFi
 	status, _ := s.post("/api/participants", namesParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("names-service", "1",
+	status, body := s.post("/api/contracts", s.publishBody("names_service", "1",
 		contractFragment{"api.json", namesSingleFileJSON},
 	))
 	s.Equal(http.StatusBadRequest, status)
@@ -126,7 +126,7 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedRequestSchema() {
 	status, _ := s.post("/api/participants", namesParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("names-service", "1",
+	status, body := s.post("/api/contracts", s.publishBody("names_service", "1",
 		contractFragment{"pets.yaml", namesRequestYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
@@ -139,7 +139,7 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedConsumedResponseSchema(
 	status, _ := s.post("/api/participants", namesParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("names-service", "1",
+	status, body := s.post("/api/contracts", s.publishBody("names_service", "1",
 		contractFragment{"a.yaml", namesConsumerYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
@@ -152,7 +152,7 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedConsumedRequestSchema()
 	status, _ := s.post("/api/participants", namesParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("names-service", "1",
+	status, body := s.post("/api/contracts", s.publishBody("names_service", "1",
 		contractFragment{"a.yaml", namesConsumerRequestYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
@@ -165,7 +165,7 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedRefInUnreachedSchema() 
 	status, _ := s.post("/api/participants", namesParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("names-service", "1",
+	status, body := s.post("/api/contracts", s.publishBody("names_service", "1",
 		contractFragment{"pets.yaml", namesEndpointsYAML},
 		contractFragment{"billing.yaml", namesDanglingSchemaYAML},
 	))
@@ -179,7 +179,7 @@ func (s *IntegrationSuite) TestPublishContract_CyclicSchema_RejectedBrokerStaysU
 	status, _ := s.post("/api/participants", namesParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, body := s.post("/api/contracts", s.publishBody("names-service", "1",
+	status, body := s.post("/api/contracts", s.publishBody("names_service", "1",
 		contractFragment{"pets.yaml", namesCyclicEndpointsYAML},
 		contractFragment{"schemas.yaml", namesCyclicSchemasYAML},
 	))
@@ -188,6 +188,6 @@ func (s *IntegrationSuite) TestPublishContract_CyclicSchema_RejectedBrokerStaysU
 
 	s.Equal(0, s.countRows("contracts"))
 
-	status, _ = s.post("/api/participants", `{"participant":"still-alive"}`)
+	status, _ = s.post("/api/participants", `{"participant":"still_alive"}`)
 	s.Equal(http.StatusOK, status)
 }
