@@ -38,7 +38,7 @@ func serviceNameViolations(t *testing.T, raw string) []string {
 
 	fragments := []dsl.Fragment{{Source: "things.yaml", Contract: &dslContract}}
 
-	return validator.NewDslValidator().Validate(fragments)
+	return validator.NewContextualValidator().Validate(fragments)
 }
 
 func TestServiceName_Accepts(t *testing.T) {

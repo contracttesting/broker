@@ -12,11 +12,7 @@ type resourceDuplicateRule struct {
 
 func (resourceDuplicateRule) Code() string { return "resource.duplicate" }
 
-func (resourceDuplicateRule) Fresh() StatefulRule {
-	return &resourceDuplicateRule{seen: map[string]string{}}
-}
-
-func (r *resourceDuplicateRule) Validate(value any, validationContext *ValidationContext) {
+func (r *resourceDuplicateRule) Validate(value any, contextualValidator *ContextualValidator) {
 	resource, ok := value.(string)
 	if !ok {
 		return
@@ -24,15 +20,15 @@ func (r *resourceDuplicateRule) Validate(value any, validationContext *Validatio
 
 	if declaredIn, taken := r.seen[resource]; taken {
 		resourcePath := dsl.NewResourcePath(resource)
-		validationContext.AddViolation(fmt.Sprintf(
+		contextualValidator.addViolation(fmt.Sprintf(
 			"duplicate resource: %s declared in %s and %s",
 			resourcePath.ToResource(nil).Describe(),
 			declaredIn,
-			validationContext.Source,
+			contextualValidator.source,
 		))
 
 		return
 	}
 
-	r.seen[resource] = validationContext.Source
+	r.seen[resource] = contextualValidator.source
 }

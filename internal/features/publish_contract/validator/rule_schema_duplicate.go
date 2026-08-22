@@ -10,21 +10,17 @@ type schemaDuplicateRule struct {
 
 func (schemaDuplicateRule) Code() string { return "schema.duplicate" }
 
-func (schemaDuplicateRule) Fresh() StatefulRule {
-	return &schemaDuplicateRule{seen: map[string]string{}}
-}
-
-func (r *schemaDuplicateRule) Validate(value any, validationContext *ValidationContext) {
+func (r *schemaDuplicateRule) Validate(value any, contextualValidator *ContextualValidator) {
 	name, ok := value.(string)
 	if !ok {
 		return
 	}
 
 	if declaredIn, taken := r.seen[name]; taken {
-		validationContext.AddViolation(fmt.Sprintf("duplicate schema: %s declared in %s and %s", name, declaredIn, validationContext.Source))
+		contextualValidator.addViolation(fmt.Sprintf("duplicate schema: %s declared in %s and %s", name, declaredIn, contextualValidator.source))
 
 		return
 	}
 
-	r.seen[name] = validationContext.Source
+	r.seen[name] = contextualValidator.source
 }

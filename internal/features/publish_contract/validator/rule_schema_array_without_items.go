@@ -10,19 +10,19 @@ type schemaArrayWithoutItemsRule struct{}
 
 func (schemaArrayWithoutItemsRule) Code() string { return "schema.array_without_items" }
 
-func (schemaArrayWithoutItemsRule) Validate(value any, validationContext *ValidationContext) {
+func (schemaArrayWithoutItemsRule) Validate(value any, contextualValidator *ContextualValidator) {
 	schema, ok := value.(dsl.Schema)
 	if !ok {
 		return
 	}
 
-	if validationContext.Depth.Exceeded() || schema.IsRef() || !schema.IsArray() || schema.Items != nil {
+	if contextualValidator.depth.Exceeded() || schema.IsRef() || !schema.IsArray() || schema.Items != nil {
 		return
 	}
 
-	validationContext.AddViolation(fmt.Sprintf(
+	contextualValidator.addViolation(fmt.Sprintf(
 		"array schema without items at %s (%s)",
-		validationContext.Where,
-		validationContext.Source,
+		contextualValidator.where,
+		contextualValidator.source,
 	))
 }

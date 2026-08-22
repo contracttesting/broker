@@ -230,7 +230,7 @@ func validateFiles(t *testing.T, files ...validatedFile) []string {
 		fragments = append(fragments, dsl.Fragment{Source: file.source, Contract: contract})
 	}
 
-	return validator.NewDslValidator().Validate(fragments)
+	return validator.NewContextualValidator().Validate(fragments)
 }
 
 func TestValidate_ValidContractAcrossFragments_ReportsNothing(t *testing.T) {

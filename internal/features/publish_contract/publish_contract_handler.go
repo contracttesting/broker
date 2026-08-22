@@ -15,18 +15,15 @@ import (
 type PublishContractHandler struct {
 	contractRepository    *repository.ContractRepository
 	participantRepository *repository.ParticipantRepository
-	validator             *validator.DslValidator
 }
 
 func NewPublishContractHandler(
 	contractRepository *repository.ContractRepository,
 	participantRepository *repository.ParticipantRepository,
-	contractValidator *validator.DslValidator,
 ) *PublishContractHandler {
 	return &PublishContractHandler{
 		contractRepository:    contractRepository,
 		participantRepository: participantRepository,
-		validator:             contractValidator,
 	}
 }
 
@@ -61,7 +58,7 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondParticipantNotFound(ctx)
 	}
 
-	if violations := ctr.validator.Validate(contractFragments); len(violations) > 0 {
+	if violations := validator.NewContextualValidator().Validate(contractFragments); len(violations) > 0 {
 		return ctr.respondValidationFailed(ctx, violations)
 	}
 

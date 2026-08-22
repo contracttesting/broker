@@ -77,7 +77,7 @@ func validatorFragment(t *testing.T, source, raw string) dsl.Fragment {
 }
 
 func TestValidator_EveryCatalogRule_FiresAtItsRegisteredSegment(t *testing.T) {
-	violations := validator.NewDslValidator().Validate([]dsl.Fragment{
+	violations := validator.NewContextualValidator().Validate([]dsl.Fragment{
 		validatorFragment(t, "b.json", everyRuleJSONB),
 		validatorFragment(t, "a.json", everyRuleJSONA),
 	})
@@ -97,7 +97,9 @@ func TestValidator_EveryCatalogRule_FiresAtItsRegisteredSegment(t *testing.T) {
 	}, violations)
 }
 
-func TestValidator_ConsecutiveValidates_DontLeakStatefulState(t *testing.T) {
+// a ContextualValidator is one run: consecutive publishes each build their own, so
+// the duplicate tracking of one run must never surface in the next
+func TestValidator_EachRunStartsWithFreshDuplicateTracking(t *testing.T) {
 	fragments := []dsl.Fragment{
 		validatorFragment(t, "a.json", petsProviderJSON),
 		validatorFragment(t, "b.json", petsProviderJSON),
@@ -105,13 +107,11 @@ func TestValidator_ConsecutiveValidates_DontLeakStatefulState(t *testing.T) {
 		validatorFragment(t, "d.json", petSchemaJSON),
 	}
 
-	shared := validator.NewDslValidator()
-
 	expected := []string{
 		"duplicate resource: provides GET /pets 200 declared in a.json and b.json",
 		"duplicate schema: Pet declared in c.json and d.json",
 	}
 
-	assert.Equal(t, expected, shared.Validate(fragments))
-	assert.Equal(t, expected, shared.Validate(fragments))
+	assert.Equal(t, expected, validator.NewContextualValidator().Validate(fragments))
+	assert.Equal(t, expected, validator.NewContextualValidator().Validate(fragments))
 }

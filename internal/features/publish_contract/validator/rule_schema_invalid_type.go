@@ -10,20 +10,20 @@ type schemaInvalidTypeRule struct{}
 
 func (schemaInvalidTypeRule) Code() string { return "schema.invalid_type" }
 
-func (schemaInvalidTypeRule) Validate(value any, validationContext *ValidationContext) {
+func (schemaInvalidTypeRule) Validate(value any, contextualValidator *ContextualValidator) {
 	schema, ok := value.(dsl.Schema)
 	if !ok {
 		return
 	}
 
-	if validationContext.Depth.Exceeded() || schema.IsRef() || schema.IsArray() || schema.IsObject() || schema.IsPrimitive() {
+	if contextualValidator.depth.Exceeded() || schema.IsRef() || schema.IsArray() || schema.IsObject() || schema.IsPrimitive() {
 		return
 	}
 
-	validationContext.AddViolation(fmt.Sprintf(
+	contextualValidator.addViolation(fmt.Sprintf(
 		"invalid schema type %q at %s (%s)",
 		schema.Type,
-		validationContext.Where,
-		validationContext.Source,
+		contextualValidator.where,
+		contextualValidator.source,
 	))
 }

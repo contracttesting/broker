@@ -11,63 +11,63 @@ import (
 	"github.com/contracttesting/broker/internal/validations"
 )
 
-type DslValidator struct {
+// ContextualValidator carries the state of a single validation run — the rules with
+// their duplicate tracking and the walk cursor — so build one per Validate call: a
+// reused instance would remember the previous run's duplicates.
+type ContextualValidator struct {
 	rules map[string][]Rule
+
+	source        string
+	where         string
+	rootSchema    string
+	depth         DepthCounter
+	contractIndex ContractIndex
+	violations    []string
 }
 
-func NewDslValidator() *DslValidator {
-	return &DslValidator{rules: map[string][]Rule{
-		SegmentServiceName:       {serviceNameRule{}},
-		SegmentEndpoint:          {endpointSyntaxRule{}, &endpointDuplicateRule{}},
-		SegmentResource:          {&resourceDuplicateRule{}},
-		SegmentSchemaName:        {schemaUnresolvedNameRule{}},
-		SegmentSchemaDeclaration: {&schemaDuplicateRule{}},
-		SegmentSchema:            {schemaUnresolvedRefRule{}, schemaTooDeepRule{}, schemaArrayWithoutItemsRule{}, schemaInvalidTypeRule{}},
-		SegmentStatusCode:        {statusCodeRangeRule{}},
-	}}
-}
-
-func (v *DslValidator) freshRules() map[string][]Rule {
-	rules := make(map[string][]Rule, len(v.rules))
-
-	for segment, segmentRules := range v.rules {
-		fresh := make([]Rule, len(segmentRules))
-
-		for position, rule := range segmentRules {
-			if stateful, ok := rule.(StatefulRule); ok {
-				rule = stateful.Fresh()
-			}
-
-			fresh[position] = rule
-		}
-
-		rules[segment] = fresh
+func NewContextualValidator() *ContextualValidator {
+	return &ContextualValidator{
+		rules: map[string][]Rule{
+			SegmentServiceName:       {serviceNameRule{}},
+			SegmentEndpoint:          {endpointSyntaxRule{}, &endpointDuplicateRule{seen: map[string]bool{}}},
+			SegmentResource:          {&resourceDuplicateRule{seen: map[string]string{}}},
+			SegmentSchemaName:        {schemaUnresolvedNameRule{}},
+			SegmentSchemaDeclaration: {&schemaDuplicateRule{seen: map[string]string{}}},
+			SegmentSchema:            {schemaUnresolvedRefRule{}, schemaTooDeepRule{}, schemaArrayWithoutItemsRule{}, schemaInvalidTypeRule{}},
+			SegmentStatusCode:        {statusCodeRangeRule{}},
+		},
+		violations: []string{},
 	}
-
-	return rules
 }
 
-func (v *DslValidator) Validate(fragments []dsl.Fragment) []string {
-	contractIndex := NewContractIndex(fragments)
-	rules := v.freshRules()
-	violations := []string{}
+func (v *ContextualValidator) Validate(fragments []dsl.Fragment) []string {
+	v.contractIndex = *NewContractIndex(fragments)
 
 	for _, fragment := range sortedBySource(fragments) {
-		validationContext := NewValidationContext(fragment.Source, *contractIndex, rules)
-		v.validateContract(fragment, validationContext)
-		violations = append(violations, validationContext.Violations...)
+		v.source = fragment.Source
+		v.validateContract(fragment)
 	}
 
-	return violations
+	return v.violations
 }
 
-func (v *DslValidator) validateContract(fragment dsl.Fragment, validationContext *ValidationContext) {
+func (v *ContextualValidator) validateBySegment(segment string, value any) {
+	for _, rule := range v.rules[segment] {
+		rule.Validate(value, v)
+	}
+}
+
+func (v *ContextualValidator) addViolation(violation string) {
+	v.violations = append(v.violations, violation)
+}
+
+func (v *ContextualValidator) validateContract(fragment dsl.Fragment) {
 	root := dsl.NewResourcePath("")
 
-	v.validateRest(fragment.Contract.Provides.Rest, "provides", root.Append("provides"), validationContext)
+	v.validateRest(fragment.Contract.Provides.Rest, "provides", root.Append("provides"))
 
 	for _, serviceName := range slices.Sorted(maps.Keys(fragment.Contract.ConsumesServices)) {
-		validationContext.Validate(SegmentServiceName, serviceName)
+		v.validateBySegment(SegmentServiceName, serviceName)
 
 		if validations.ParticipantName(serviceName) != nil {
 			continue
@@ -77,19 +77,18 @@ func (v *DslValidator) validateContract(fragment dsl.Fragment, validationContext
 			fragment.Contract.ConsumesServices[serviceName].Rest,
 			joinWhere("consumes", serviceName),
 			root.Append("consumes", serviceName),
-			validationContext,
 		)
 	}
 
-	v.validateSchemas(fragment.Contract.Schemas, validationContext)
+	v.validateSchemas(fragment.Contract.Schemas)
 }
 
-func (v *DslValidator) validateRest(rest dsl.Rest, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
+func (v *ContextualValidator) validateRest(rest dsl.Rest, where string, resourcePath dsl.ResourcePath) {
 	visited := map[string]bool{}
 
 	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
-		validationContext.Where = where
-		validationContext.Validate(SegmentEndpoint, endpoint)
+		v.where = where
+		v.validateBySegment(SegmentEndpoint, endpoint)
 
 		normalized := common.NormalizeEndpoint(endpoint)
 
@@ -105,78 +104,78 @@ func (v *DslValidator) validateRest(rest dsl.Rest, where string, resourcePath ds
 		}
 		visited[normalized] = true
 
-		v.validateMethod(rest[endpoint], where, normalized, resourcePath.Append("rest", normalized), validationContext)
+		v.validateMethod(rest[endpoint], where, normalized, resourcePath.Append("rest", normalized))
 	}
 }
 
-func (v *DslValidator) validateMethod(methods dsl.HttpMethods, where string, endpoint string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
+func (v *ContextualValidator) validateMethod(methods dsl.HttpMethods, where string, endpoint string, resourcePath dsl.ResourcePath) {
 	// the pinned breadcrumb order is verb before endpoint: "provides GET /pets 200"
-	v.validateGet(methods.Get, joinWhere(joinWhere(where, "GET"), endpoint), resourcePath.Append("get"), validationContext)
-	v.validatePost(methods.Post, joinWhere(joinWhere(where, "POST"), endpoint), resourcePath.Append("post"), validationContext)
-	v.validatePut(methods.Put, joinWhere(joinWhere(where, "PUT"), endpoint), resourcePath.Append("put"), validationContext)
-	v.validateDelete(methods.Delete, joinWhere(joinWhere(where, "DELETE"), endpoint), resourcePath.Append("delete"), validationContext)
+	v.validateGet(methods.Get, joinWhere(joinWhere(where, "GET"), endpoint), resourcePath.Append("get"))
+	v.validatePost(methods.Post, joinWhere(joinWhere(where, "POST"), endpoint), resourcePath.Append("post"))
+	v.validatePut(methods.Put, joinWhere(joinWhere(where, "PUT"), endpoint), resourcePath.Append("put"))
+	v.validateDelete(methods.Delete, joinWhere(joinWhere(where, "DELETE"), endpoint), resourcePath.Append("delete"))
 }
 
-func (v *DslValidator) validateGet(getMethod dsl.GetMethod, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
-	v.validateResponses(getMethod.Responses, where, resourcePath.Append("responses"), validationContext)
+func (v *ContextualValidator) validateGet(getMethod dsl.GetMethod, where string, resourcePath dsl.ResourcePath) {
+	v.validateResponses(getMethod.Responses, where, resourcePath.Append("responses"))
 }
 
-func (v *DslValidator) validatePost(postMethod dsl.PostMethod, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
+func (v *ContextualValidator) validatePost(postMethod dsl.PostMethod, where string, resourcePath dsl.ResourcePath) {
 	if postMethod.HasRequestBody() {
-		v.validateRequestBody(postMethod.RequestBody, where, resourcePath, validationContext)
+		v.validateRequestBody(postMethod.RequestBody, where, resourcePath)
 	}
 
-	v.validateResponses(postMethod.Responses, where, resourcePath.Append("responses"), validationContext)
+	v.validateResponses(postMethod.Responses, where, resourcePath.Append("responses"))
 }
 
-func (v *DslValidator) validatePut(putMethod dsl.PutMethod, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
+func (v *ContextualValidator) validatePut(putMethod dsl.PutMethod, where string, resourcePath dsl.ResourcePath) {
 	if putMethod.HasRequestBody() {
-		v.validateRequestBody(putMethod.RequestBody, where, resourcePath, validationContext)
+		v.validateRequestBody(putMethod.RequestBody, where, resourcePath)
 	}
 
-	v.validateResponses(putMethod.Responses, where, resourcePath.Append("responses"), validationContext)
+	v.validateResponses(putMethod.Responses, where, resourcePath.Append("responses"))
 }
 
-func (v *DslValidator) validateDelete(deleteMethod dsl.DeleteMethod, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
-	v.validateResponses(deleteMethod.Responses, where, resourcePath.Append("responses"), validationContext)
+func (v *ContextualValidator) validateDelete(deleteMethod dsl.DeleteMethod, where string, resourcePath dsl.ResourcePath) {
+	v.validateResponses(deleteMethod.Responses, where, resourcePath.Append("responses"))
 }
 
-func (v *DslValidator) validateRequestBody(schemaName string, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
+func (v *ContextualValidator) validateRequestBody(schemaName string, where string, resourcePath dsl.ResourcePath) {
 	requestPath := resourcePath.Append("request")
 
-	validationContext.Where = joinWhere(where, "request")
-	validationContext.Validate(SegmentResource, requestPath.String())
-	validationContext.Validate(SegmentSchemaName, schemaName)
+	v.where = joinWhere(where, "request")
+	v.validateBySegment(SegmentResource, requestPath.String())
+	v.validateBySegment(SegmentSchemaName, schemaName)
 }
 
-func (v *DslValidator) validateResponses(responses dsl.Responses, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
+func (v *ContextualValidator) validateResponses(responses dsl.Responses, where string, resourcePath dsl.ResourcePath) {
 	for _, statusCode := range slices.Sorted(maps.Keys(responses)) {
 		status := strconv.Itoa(statusCode)
 		statusPath := resourcePath.Append(status)
 
-		validationContext.Where = where
-		validationContext.Validate(SegmentStatusCode, statusCode)
+		v.where = where
+		v.validateBySegment(SegmentStatusCode, statusCode)
 
-		validationContext.Where = joinWhere(where, status)
-		validationContext.Validate(SegmentResource, statusPath.String())
-		validationContext.Validate(SegmentSchemaName, responses[statusCode])
+		v.where = joinWhere(where, status)
+		v.validateBySegment(SegmentResource, statusPath.String())
+		v.validateBySegment(SegmentSchemaName, responses[statusCode])
 	}
 }
 
-func (v *DslValidator) validateSchemas(schemas dsl.SchemasMap, validationContext *ValidationContext) {
+func (v *ContextualValidator) validateSchemas(schemas dsl.SchemasMap) {
 	for _, name := range slices.Sorted(maps.Keys(schemas)) {
-		validationContext.Where = ""
-		validationContext.Validate(SegmentSchemaDeclaration, name)
+		v.where = ""
+		v.validateBySegment(SegmentSchemaDeclaration, name)
 
-		validationContext.RootSchema = name
-		v.validateSchema(schemas[name], name, DepthCounter{}, validationContext)
+		v.rootSchema = name
+		v.validateSchema(schemas[name], name, DepthCounter{})
 	}
 }
 
-func (v *DslValidator) validateSchema(schema dsl.Schema, path string, depth DepthCounter, validationContext *ValidationContext) {
-	validationContext.Where = path
-	validationContext.Depth = depth
-	validationContext.Validate(SegmentSchema, schema)
+func (v *ContextualValidator) validateSchema(schema dsl.Schema, path string, depth DepthCounter) {
+	v.where = path
+	v.depth = depth
+	v.validateBySegment(SegmentSchema, schema)
 
 	// the descent stops where there is nothing sound to descend into; the message,
 	// when one is due, came from the rules above
@@ -186,23 +185,23 @@ func (v *DslValidator) validateSchema(schema dsl.Schema, path string, depth Dept
 
 	switch {
 	case schema.IsRef():
-		target, declared := validationContext.ContractIndex.Schema(schema.Ref)
+		target, declared := v.contractIndex.Schema(schema.Ref)
 		if !declared {
 			return
 		}
 
-		v.validateSchema(target, path, depth.Deeper(), validationContext)
+		v.validateSchema(target, path, depth.Deeper())
 
 	case schema.IsArray():
 		if schema.Items == nil {
 			return
 		}
 
-		v.validateSchema(*schema.Items, path+"[]", depth.Deeper(), validationContext)
+		v.validateSchema(*schema.Items, path+"[]", depth.Deeper())
 
 	case schema.IsObject():
 		for _, name := range slices.Sorted(maps.Keys(schema.Properties)) {
-			v.validateSchema(schema.Properties[name], path+"."+name, depth.Deeper(), validationContext)
+			v.validateSchema(schema.Properties[name], path+"."+name, depth.Deeper())
 		}
 	}
 }

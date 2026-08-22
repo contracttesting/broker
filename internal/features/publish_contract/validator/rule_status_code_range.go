@@ -13,18 +13,18 @@ type statusCodeRangeRule struct{}
 
 func (statusCodeRangeRule) Code() string { return "status.out_of_range" }
 
-func (statusCodeRangeRule) Validate(value any, validationContext *ValidationContext) {
+func (statusCodeRangeRule) Validate(value any, contextualValidator *ContextualValidator) {
 	statusCode, ok := value.(int)
 	if !ok {
 		return
 	}
 
 	if statusCode < MIN_STATUS_CODE || statusCode > MAX_STATUS_CODE {
-		validationContext.AddViolation(fmt.Sprintf(
+		contextualValidator.addViolation(fmt.Sprintf(
 			"invalid status code %d at %s (%s)",
 			statusCode,
-			validationContext.Where,
-			validationContext.Source,
+			contextualValidator.where,
+			contextualValidator.source,
 		))
 	}
 }

@@ -10,22 +10,22 @@ type schemaUnresolvedRefRule struct{}
 
 func (schemaUnresolvedRefRule) Code() string { return "schema.unresolved_ref" }
 
-func (schemaUnresolvedRefRule) Validate(value any, validationContext *ValidationContext) {
+func (schemaUnresolvedRefRule) Validate(value any, contextualValidator *ContextualValidator) {
 	schema, ok := value.(dsl.Schema)
 	if !ok {
 		return
 	}
 
-	if validationContext.Depth.Exceeded() || !schema.IsRef() {
+	if contextualValidator.depth.Exceeded() || !schema.IsRef() {
 		return
 	}
 
-	if _, declared := validationContext.ContractIndex.Schema(schema.Ref); !declared {
-		validationContext.AddViolation(fmt.Sprintf(
+	if _, declared := contextualValidator.contractIndex.Schema(schema.Ref); !declared {
+		contextualValidator.addViolation(fmt.Sprintf(
 			"unresolved schema name: %s referenced at %s (%s)",
 			schema.Ref,
-			validationContext.Where,
-			validationContext.Source,
+			contextualValidator.where,
+			contextualValidator.source,
 		))
 	}
 }

@@ -10,19 +10,19 @@ type schemaTooDeepRule struct{}
 
 func (schemaTooDeepRule) Code() string { return "schema.too_deep" }
 
-func (schemaTooDeepRule) Validate(value any, validationContext *ValidationContext) {
+func (schemaTooDeepRule) Validate(value any, contextualValidator *ContextualValidator) {
 	if _, ok := value.(dsl.Schema); !ok {
 		return
 	}
 
-	if !validationContext.Depth.Exceeded() {
+	if !contextualValidator.depth.Exceeded() {
 		return
 	}
 
-	validationContext.AddViolation(fmt.Sprintf(
+	contextualValidator.addViolation(fmt.Sprintf(
 		"schema %s is too deep with more than %d levels (%s)",
-		validationContext.RootSchema,
+		contextualValidator.rootSchema,
 		MAX_DEPTH,
-		validationContext.Source,
+		contextualValidator.source,
 	))
 }

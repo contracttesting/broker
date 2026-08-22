@@ -12,10 +12,5 @@ const (
 
 type Rule interface {
 	Code() string
-	Validate(value any, validationContext *ValidationContext)
-}
-
-type StatefulRule interface {
-	Rule
-	Fresh() StatefulRule
+	Validate(value any, contextualValidator *ContextualValidator)
 }

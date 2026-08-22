@@ -12,13 +12,13 @@ type serviceNameRule struct{}
 
 func (serviceNameRule) Code() string { return "service.name_syntax" }
 
-func (serviceNameRule) Validate(value any, validationContext *ValidationContext) {
+func (serviceNameRule) Validate(value any, contextualValidator *ContextualValidator) {
 	serviceName, ok := value.(string)
 	if !ok {
 		return
 	}
 
 	if err := validations.ParticipantName(serviceName); err != nil {
-		validationContext.AddViolation(fmt.Sprintf("invalid service name %q: %s (%s)", serviceName, err, validationContext.Source))
+		contextualValidator.addViolation(fmt.Sprintf("invalid service name %q: %s (%s)", serviceName, err, contextualValidator.source))
 	}
 }
