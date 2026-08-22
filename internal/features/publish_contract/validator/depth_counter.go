@@ -2,9 +2,8 @@ package validator
 
 const MAX_DEPTH = 10
 
-// DepthCounter is the budget a schema descent carries in its Position. It is copied at
-// every level, so a deep branch never charges the branches beside it, and a cyclic
-// chain of refs terminates once the budget runs out.
+// DepthCounter is the budget one schema branch carries. It travels by value: every
+// level gets a copy, so a deep branch never charges the branches beside it.
 type DepthCounter struct {
 	levels int
 }

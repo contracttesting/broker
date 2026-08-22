@@ -1,9 +1,10 @@
-package dsl_test
+package builder_test
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/contracttesting/broker/internal/builder"
 	"github.com/contracttesting/broker/internal/dsl"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 
 const happyContractJSON = `{
   "consumes": {
-    "pets-service": {
+    "pets_service": {
       "rest": {
         "/pets": {
           "get": {
@@ -40,7 +41,7 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(happyContractJSON), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", happyContractJSON)
-	require.NoError(t, dsl.HydrateFragments(
+	require.NoError(t, builder.Hydrate(
 		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
 		contract,
 	))
@@ -54,7 +55,7 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 
 	assert.Equal(t, model.Consumes, resource.Direction)
 	assert.Equal(t, model.RestResponse, resource.Interaction)
-	assert.Equal(t, "pets-service", resource.ConsumedProvider.String)
+	assert.Equal(t, "pets_service", resource.ConsumedProvider.String)
 	assert.Equal(t, "/pets", resource.Endpoint)
 	assert.Equal(t, "get", resource.Method)
 	assert.Equal(t, "200", resource.ResponseStatusCode.String)
@@ -67,7 +68,7 @@ func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
 
 const postWithRequestBodyJSON = `{
   "consumes": {
-    "pets-service": {
+    "pets_service": {
       "rest": {
         "/pets": {
           "post": {
@@ -124,7 +125,7 @@ const primitiveTopLevelJSON = `{
 
 const arrayOfObjectsJSON = `{
   "consumes": {
-    "pets-service": {
+    "pets_service": {
       "rest": {
         "/pets": {
           "get": { "responses": { "200": "PetList" } }
@@ -147,7 +148,7 @@ const arrayOfObjectsJSON = `{
 
 const refResolvesJSON = `{
   "consumes": {
-    "pets-service": {
+    "pets_service": {
       "rest": {
         "/pets": {
           "get": { "responses": { "200": "PetRef" } }
@@ -171,7 +172,7 @@ func hydrate(t *testing.T, raw string) *model.UploadedContract {
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", raw)
-	require.NoError(t, dsl.HydrateFragments(
+	require.NoError(t, builder.Hydrate(
 		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
 		contract,
 	))
@@ -337,7 +338,7 @@ func TestHydrateContract_WideShallowSchema_MaterializesEveryBranch(t *testing.T)
 
 const unknownTypeContractJSON = `{
   "consumes": {
-    "pets-service": {
+    "pets_service": {
       "rest": {
         "/pets": {
           "get": {
@@ -362,7 +363,7 @@ func TestHydrateContract_UnknownSchemaType_ReturnsError(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(unknownTypeContractJSON), &dslContract))
 
 	contract := model.NewUploadedContract(0, "petstore-app", "1", unknownTypeContractJSON)
-	err := dsl.HydrateFragments(
+	err := builder.Hydrate(
 		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
 		contract,
 	)

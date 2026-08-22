@@ -1,6 +1,8 @@
 package validator
 
 import (
+	"fmt"
+
 	"github.com/contracttesting/broker/internal/dsl"
 )
 
@@ -10,20 +12,23 @@ type resourceDuplicateRule struct {
 
 func (resourceDuplicateRule) Code() string { return "resource.duplicate" }
 
-func (resourceDuplicateRule) Fresh() Rule { return &resourceDuplicateRule{seen: map[string]string{}} }
+func (r *resourceDuplicateRule) Validate(value any, contextualValidator *ContextualValidator) {
+	resource, ok := value.(string)
+	if !ok {
+		return
+	}
 
-func (r *resourceDuplicateRule) CheckResource(resource string, vctx ValidationContext) {
 	if declaredIn, taken := r.seen[resource]; taken {
 		resourcePath := dsl.NewResourcePath(resource)
-		vctx.Errs.Addf(
+		contextualValidator.addViolation(fmt.Sprintf(
 			"duplicate resource: %s declared in %s and %s",
 			resourcePath.ToResource(nil).Describe(),
 			declaredIn,
-			vctx.Pos.Source,
-		)
+			contextualValidator.source,
+		))
 
 		return
 	}
 
-	r.seen[resource] = vctx.Pos.Source
+	r.seen[resource] = contextualValidator.source
 }

@@ -4,28 +4,26 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/contracttesting/broker/internal/builder"
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/validator"
 	"github.com/gofiber/fiber/v3"
 )
 
 type PublishContractHandler struct {
 	contractRepository    *repository.ContractRepository
 	participantRepository *repository.ParticipantRepository
-	validator             validator.Validator
 }
 
 func NewPublishContractHandler(
 	contractRepository *repository.ContractRepository,
 	participantRepository *repository.ParticipantRepository,
-	contractValidator validator.Validator,
 ) *PublishContractHandler {
 	return &PublishContractHandler{
 		contractRepository:    contractRepository,
 		participantRepository: participantRepository,
-		validator:             contractValidator,
 	}
 }
 
@@ -35,45 +33,41 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	participantName := strings.TrimSpace(requestBody.Participant)
+	serviceName := strings.TrimSpace(requestBody.ServiceName)
 	version := strings.TrimSpace(requestBody.Version)
-	if participantName == "" || version == "" || len(requestBody.Contracts) == 0 {
+	if serviceName == "" || version == "" || len(requestBody.Contracts) == 0 {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	fragments := make([]dsl.Fragment, 0, len(requestBody.Contracts))
+	contractFragments := make([]dsl.Fragment, 0, len(requestBody.Contracts))
 	for _, uploaded := range requestBody.Contracts {
 		if strings.TrimSpace(uploaded.Source) == "" {
 			return ctr.respondInvalidInput(ctx)
 		}
 
-		parsed, err := parseFragment(uploaded)
+		contractDsl, err := parseFragmentContentToContractDsl(uploaded)
 		if err != nil {
 			return ctr.respondBadRequest(ctx, err)
 		}
 
-		fragments = append(fragments, dsl.Fragment{Source: uploaded.Source, Contract: parsed})
+		contractFragments = append(contractFragments, dsl.Fragment{Source: uploaded.Source, Contract: contractDsl})
 	}
 
-	participant, exists := ctr.participantRepository.FindByName(ctx.Context(), participantName)
+	participant, exists := ctr.participantRepository.FindByName(ctx.Context(), serviceName)
 	if !exists {
 		return ctr.respondParticipantNotFound(ctx)
 	}
 
-	if violations := ctr.validator.Validate(fragments); len(violations) > 0 {
+	if violations := validator.NewContextualValidator().Validate(contractFragments); len(violations) > 0 {
 		return ctr.respondValidationFailed(ctx, violations)
 	}
 
-	dsl.Normalize(fragments)
+	dsl.Normalize(contractFragments)
 
-	// the uploaded files are stamped on the version verbatim, so a version reconstructs
-	// letter by letter what was published under it
 	contractContent, _ := json.Marshal(requestBody.Contracts)
 
 	contract := model.NewUploadedContract(participant.ID, participant.Name, version, string(contractContent))
-	// the fragments are valid by now, so the build only transforms: an error here is a
-	// broken invariant, not something the publisher can fix
-	if err := dsl.HydrateFragments(fragments, contract); err != nil {
+	if err := builder.Hydrate(contractFragments, contract); err != nil {
 		return ctr.respondPublishFailed(ctx)
 	}
 
@@ -84,8 +78,6 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondVersionConflict(ctx)
 	}
 
-	// identical content already published under another version: the new version
-	// becomes an alias of that snapshot rather than a snapshot of its own
 	if ctr.contractRepository.AliasVersionToSnapshot(ctx.Context(), contract) {
 		return ctr.respondSuccess(ctx)
 	}
@@ -117,15 +109,10 @@ func (ctr *PublishContractHandler) respondBadRequest(ctx fiber.Ctx, err error) e
 	})
 }
 
-func (ctr *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []error) error {
-	messages := make([]string, 0, len(violations))
-	for _, violation := range violations {
-		messages = append(messages, violation.Error())
-	}
-
+func (ctr *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []string) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractValidationResponseBody{
-		Message: ContractValidationFailed,
-		Errors:  messages,
+		Message:    ContractValidationFailed,
+		Violations: violations,
 	})
 }
 

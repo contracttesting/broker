@@ -1,0 +1,257 @@
+package builder
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/model"
+)
+
+func Hydrate(fragments []dsl.Fragment, contract *model.UploadedContract) error {
+	hydrator := newHydrator(fragments)
+
+	for _, fragment := range fragments {
+		if err := hydrator.hydrateResources(
+			contract,
+			fragment.Source,
+			dsl.NewResourcePath(""),
+			*fragment.Contract,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type hydrator struct {
+	schemas dsl.SchemasMap
+}
+
+func newHydrator(fragments []dsl.Fragment) *hydrator {
+	h := &hydrator{schemas: make(dsl.SchemasMap)}
+
+	for _, fragment := range fragments {
+		for name, schema := range fragment.Contract.Schemas {
+			h.schemas[name] = schema
+		}
+	}
+
+	return h
+}
+
+func (h *hydrator) hydrateResources(
+	contract *model.UploadedContract,
+	source string,
+	resourcePath dsl.ResourcePath,
+	unknown any,
+) error {
+	switch unknown := unknown.(type) {
+	case dsl.Contract:
+		for serviceName, consumes := range unknown.ConsumesServices {
+			consumerResourcePath := resourcePath.Append("consumes", serviceName)
+			if err := h.hydrateResources(contract, source, consumerResourcePath, consumes); err != nil {
+				return err
+			}
+		}
+
+		return h.hydrateResources(
+			contract,
+			source,
+			resourcePath.Append("provides"),
+			unknown.Provides,
+		)
+
+	case dsl.Consumes:
+		return h.hydrateResources(contract, source, resourcePath, unknown.Rest)
+
+	case dsl.Provides:
+		return h.hydrateResources(contract, source, resourcePath, unknown.Rest)
+
+	case dsl.Rest:
+		for endpoint, methods := range unknown {
+			endpointPath := resourcePath.Append("rest", endpoint)
+
+			if methods.Get.IsNonZero() {
+				if err := h.hydrateResources(contract, source, endpointPath, methods.Get); err != nil {
+					return err
+				}
+			}
+
+			if methods.Post.IsNonZero() {
+				if err := h.hydrateResources(contract, source, endpointPath, methods.Post); err != nil {
+					return err
+				}
+			}
+
+			if methods.Put.IsNonZero() {
+				if err := h.hydrateResources(contract, source, endpointPath, methods.Put); err != nil {
+					return err
+				}
+			}
+
+			if methods.Delete.IsNonZero() {
+				if err := h.hydrateResources(contract, source, endpointPath, methods.Delete); err != nil {
+					return err
+				}
+			}
+		}
+
+	case dsl.GetMethod:
+		return h.hydrateResources(
+			contract,
+			source,
+			resourcePath.Append("get", "responses"),
+			unknown.Responses,
+		)
+
+	case dsl.PostMethod:
+		if unknown.HasRequestBody() {
+			requestResourcePath := resourcePath.Append("post", "request")
+			if err := h.addResource(contract, source, requestResourcePath, unknown.RequestBody); err != nil {
+				return err
+			}
+		}
+
+		return h.hydrateResources(
+			contract,
+			source,
+			resourcePath.Append("post", "responses"),
+			unknown.Responses,
+		)
+
+	case dsl.PutMethod:
+		if unknown.HasRequestBody() {
+			requestResourcePath := resourcePath.Append("put", "request")
+			if err := h.addResource(contract, source, requestResourcePath, unknown.RequestBody); err != nil {
+				return err
+			}
+		}
+
+		return h.hydrateResources(
+			contract,
+			source,
+			resourcePath.Append("put", "responses"),
+			unknown.Responses,
+		)
+
+	case dsl.DeleteMethod:
+		return h.hydrateResources(
+			contract,
+			source,
+			resourcePath.Append("delete", "responses"),
+			unknown.Responses,
+		)
+
+	case dsl.Responses:
+		for statusCode, schemaName := range unknown {
+			responseResourcePath := resourcePath.Append(strconv.Itoa(statusCode))
+			if err := h.addResource(contract, source, responseResourcePath, schemaName); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (h *hydrator) addResource(
+	contract *model.UploadedContract,
+	source string,
+	resourcePath dsl.ResourcePath,
+	schemaName string,
+) error {
+	properties := make(map[string]model.Property)
+	resource := resourcePath.ToResource(properties)
+
+	if err := buildSchema(
+		h.schemas,
+		properties,
+		dsl.NewPropertyPath("$"),
+		h.schemas[schemaName],
+	); err != nil {
+		return err
+	}
+
+	return contract.AddResource(resource, source)
+}
+
+// buildSchema fills properties by walking the schema, following refs through the
+// namespace. Validation has already ruled out the cycles and the missing pieces that
+// would keep this walk from terminating.
+func buildSchema(
+	schemas dsl.SchemasMap,
+	properties map[string]model.Property,
+	propertyPath dsl.PropertyPath,
+	unknown any,
+) error {
+	switch unknown := unknown.(type) {
+	case dsl.Schema:
+		if unknown.IsObject() {
+			properties[propertyPath.String()] = model.NewProperty(
+				propertyPath.String(),
+				"object",
+				unknown.Optional,
+			)
+
+			for name, schemaProperties := range unknown.Properties {
+				if err := buildSchema(
+					schemas,
+					properties,
+					propertyPath.Append(name),
+					schemaProperties,
+				); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}
+
+		if unknown.IsArray() {
+			properties[propertyPath.String()] = model.NewProperty(
+				propertyPath.String(),
+				"array",
+				unknown.Optional,
+			)
+
+			return buildSchema(
+				schemas,
+				properties,
+				propertyPath.AppendArray(),
+				unknown.Items,
+			)
+		}
+
+		if unknown.IsPrimitive() {
+			properties[propertyPath.String()] = model.NewProperty(
+				propertyPath.String(),
+				unknown.Type,
+				unknown.Optional,
+			)
+
+			return nil
+		}
+
+		if unknown.IsRef() {
+			return buildSchema(
+				schemas,
+				properties,
+				propertyPath,
+				schemas[unknown.Ref],
+			)
+		}
+
+		return fmt.Errorf("unknown schema type %q at %s", unknown.Type, propertyPath)
+	case *dsl.Schema:
+		return buildSchema(
+			schemas,
+			properties,
+			propertyPath,
+			*unknown,
+		)
+	default:
+		return fmt.Errorf("unknown schema type %T", unknown)
+	}
+}

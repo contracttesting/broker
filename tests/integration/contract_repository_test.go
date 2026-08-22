@@ -9,7 +9,7 @@ import (
 	"github.com/contracttesting/broker/internal/repository"
 )
 
-const ordersParticipantBody = `{"participant":"orders-service"}`
+const ordersParticipantBody = `{"participant":"orders_service"}`
 
 const ordersContractBody = `{
   "provides": {
@@ -37,14 +37,14 @@ func (s *IntegrationSuite) publishOrdersContract() {
 	status, _ := s.post("/api/participants", ordersParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/contracts", s.publishBody("orders-service", "1", contractFragment{"api.json", ordersContractBody}))
+	status, _ = s.post("/api/contracts", s.publishBody("orders_service", "1", contractFragment{"api.json", ordersContractBody}))
 	s.Require().Equal(http.StatusOK, status)
 }
 
 func (s *IntegrationSuite) loadOrdersResource() model.PersistedResource {
 	repo := repository.NewContractRepository(s.Pool)
 
-	contract, found := repo.GetContractByNameAndVersion(context.Background(), "orders-service", "1")
+	contract, found := repo.GetContractByNameAndVersion(context.Background(), "orders_service", "1")
 	s.Require().True(found)
 	s.Require().Len(contract.Resources, 1)
 

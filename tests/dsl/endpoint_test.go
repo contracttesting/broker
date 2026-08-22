@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/contracttesting/broker/internal/builder"
 	"github.com/contracttesting/broker/internal/dsl"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ func endpointContract(t *testing.T, raw string) *model.UploadedContract {
 	dsl.Normalize(fragments)
 
 	contract := model.NewUploadedContract(0, "things-app", "1", raw)
-	require.NoError(t, dsl.HydrateFragments(fragments, contract))
+	require.NoError(t, builder.Hydrate(fragments, contract))
 
 	return contract
 }

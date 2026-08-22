@@ -356,7 +356,7 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 	s.Equal("app", got.Participant)
 	s.Equal("v1", got.Version)
 
-	// a never-published provider has no version to report
+	// a never_published provider has no version to report
 	s.Contains(body, `"participantVersion":null`)
 
 	s.Require().Len(got.Results, 3)

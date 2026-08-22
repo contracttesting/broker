@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const limitParticipantBody = `{"participant":"limit-service"}`
+const limitParticipantBody = `{"participant":"limit_service"}`
 
 const limitEndpointCount = 200
 
@@ -35,7 +35,7 @@ func (s *IntegrationSuite) TestPublish_BodyOverFiberDefaultLimit_IsAccepted() {
 	status, _ := s.post("/api/participants", limitParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
-	body := s.publishBody("limit-service", "v1", largeContractFragments(5*1024*1024)...)
+	body := s.publishBody("limit_service", "v1", largeContractFragments(5*1024*1024)...)
 	s.Require().Greater(len(body), 4*1024*1024)
 	s.Require().Less(len(body), 8*1024*1024)
 

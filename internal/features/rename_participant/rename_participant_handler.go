@@ -2,6 +2,7 @@ package rename_participant
 
 import (
 	"github.com/contracttesting/broker/internal/repository"
+	"github.com/contracttesting/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -23,6 +24,12 @@ func (h *RenameParticipantHandler) Handle(ctx fiber.Ctx) error {
 		return h.respondInvalidInput(ctx)
 	}
 
+	// only the new name is judged: a legacy participant whose name predates the
+	// spelling rule must still be renameable into a valid one
+	if validations.ParticipantName(requestBody.NewName) != nil {
+		return h.respondInvalidName(ctx)
+	}
+
 	found, conflict := h.participantRepository.Rename(ctx.Context(), requestBody.OldName, requestBody.NewName)
 	if conflict {
 		return h.respondAlreadyExists(ctx)
@@ -40,6 +47,12 @@ func (h *RenameParticipantHandler) Handle(ctx fiber.Ctx) error {
 func (h *RenameParticipantHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(RenameParticipantResponseBody{
 		Message: ParticipantInvalidInput,
+	})
+}
+
+func (h *RenameParticipantHandler) respondInvalidName(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusBadRequest).JSON(RenameParticipantResponseBody{
+		Message: ParticipantNameNotSnakeCase,
 	})
 }
 
