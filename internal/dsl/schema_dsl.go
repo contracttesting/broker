@@ -32,7 +32,6 @@ func (s *Schema) IsPrimitive() bool {
 		return s.Type == "string" ||
 			s.Type == "integer" ||
 			s.Type == "float" ||
-			s.Type == "number" ||
 			s.Type == "boolean"
 	}
 
