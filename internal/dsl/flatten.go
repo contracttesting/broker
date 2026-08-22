@@ -53,7 +53,12 @@ func flattenSchema(
 		properties[propertyPath.String()] = FlatProperty{Type: schema.Type, Optional: schema.Optional}
 
 	case schema.IsRef():
-		flattenSchema(schemas, properties, propertyPath, schemas[schema.Ref], depth+1)
+		// The site carries an optional of its own; the target knows nothing about it.
+		// Either side declaring the node optional makes it optional.
+		target := schemas[schema.Ref]
+		target.Optional = target.Optional || schema.Optional
+
+		flattenSchema(schemas, properties, propertyPath, target, depth+1)
 
 	default:
 		properties[propertyPath.String()] = FlatProperty{Type: schema.Type, Optional: schema.Optional}
