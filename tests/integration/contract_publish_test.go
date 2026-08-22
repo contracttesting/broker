@@ -466,7 +466,7 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateRequestResource_Rejected
 	s.Equal(0, s.countRows("contracts"))
 }
 
-func (s *IntegrationSuite) TestPublishContract_DuplicateConsumedResource_Rejected() {
+func (s *IntegrationSuite) TestPublishContract_IdenticalConsumedResourceInTwoFiles_MergesQuietly() {
 	status, _ := s.post("/api/participants", `{"participant":"front"}`)
 	s.Require().Equal(http.StatusOK, status)
 
@@ -475,10 +475,11 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateConsumedResource_Rejecte
 		contractFragment{"b.yaml", invoicesConsumerYAML},
 		contractFragment{"schemas.yaml", invoicesSchemasYAML},
 	))
-	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: consumes payments GET /invoices 200 declared in a.yaml and b.yaml"]}`, body)
+	s.Equal(http.StatusOK, status)
+	s.JSONEq(`{"message":"contract publish successful"}`, body)
 
-	s.Equal(0, s.countRows("contracts"))
+	s.Equal(1, s.countRows("contracts"))
+	s.Equal(1, s.countRows("resources"))
 }
 
 func (s *IntegrationSuite) TestPublishContract_TrailingSlashCountsAsDuplicate() {
@@ -547,9 +548,9 @@ const duplicateEndpointYAML = `provides:
         responses:
           200: Pets
     /pets/:
-      post:
+      get:
         responses:
-          201: Pets
+          200: Pets
 `
 
 const duplicateEndpointSchemasYAML = `schemas:
@@ -651,7 +652,7 @@ func (s *IntegrationSuite) TestPublishContract_ArrayWithoutItems_RejectedBrokerS
 	s.Equal(http.StatusOK, status)
 }
 
-func (s *IntegrationSuite) TestPublishContract_BothEndpointSpellingsInOneFile_Rejected() {
+func (s *IntegrationSuite) TestPublishContract_BothProvidedSpellingsInOneFile_Rejected() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
@@ -660,7 +661,7 @@ func (s *IntegrationSuite) TestPublishContract_BothEndpointSpellingsInOneFile_Re
 		contractFragment{"schemas.yaml", duplicateEndpointSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate endpoint: /pets declared twice in api.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: provides GET /pets 200 declared twice in api.yaml"]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }

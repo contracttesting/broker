@@ -331,14 +331,12 @@ func TestValidate_DuplicateSchema_NamesBothSources(t *testing.T) {
 	}, messages)
 }
 
-func TestValidate_DuplicateResources_NameTheResourceAndBothSources(t *testing.T) {
+func TestValidate_DuplicateProvidedResources_NameTheResourceAndBothSources(t *testing.T) {
 	messages := validateFiles(t,
 		validatedFile{"a.json", petsResponseFragment},
 		validatedFile{"b.json", petsResponseFragment},
 		validatedFile{"c.json", petsRequestFragment},
 		validatedFile{"d.json", petsRequestFragment},
-		validatedFile{"e.json", invoicesConsumerFragment},
-		validatedFile{"f.json", invoicesConsumerFragment},
 		validatedFile{"schemas.json", validSchemasJSON},
 	)
 
@@ -346,11 +344,22 @@ func TestValidate_DuplicateResources_NameTheResourceAndBothSources(t *testing.T)
 		"duplicate resource: provides GET /pets 200 declared in a.json and b.json",
 		"duplicate resource: provides POST /pets request declared in c.json and d.json",
 		"duplicate resource: provides POST /pets 201 declared in c.json and d.json",
-		"duplicate resource: consumes payments GET /invoices 200 declared in e.json and f.json",
 	}, messages)
 }
 
-func TestValidate_BothSpellingsInOneFile_ReportsDuplicateEndpointOnly(t *testing.T) {
+// a consumed resource declared twice is merged by union at build time, so validation
+// has nothing to say about it
+func TestValidate_DuplicateConsumedResource_ReportsNothing(t *testing.T) {
+	messages := validateFiles(t,
+		validatedFile{"e.json", invoicesConsumerFragment},
+		validatedFile{"f.json", invoicesConsumerFragment},
+		validatedFile{"schemas.json", validSchemasJSON},
+	)
+
+	assert.Empty(t, messages)
+}
+
+func TestValidate_BothProvidedSpellingsInOneFile_ReportsDuplicateResource(t *testing.T) {
 	bothSpellings := `{
   "provides": {
     "rest": {
@@ -373,7 +382,114 @@ func TestValidate_BothSpellingsInOneFile_ReportsDuplicateEndpointOnly(t *testing
 	messages := validateFiles(t, validatedFile{"pets.json", bothSpellings})
 
 	assert.Equal(t, []string{
-		"duplicate endpoint: /pets declared twice in pets.json",
+		"duplicate resource: provides GET /pets 200 declared twice in pets.json",
+	}, messages)
+}
+
+func TestValidate_BothConsumedSpellingsInOneFile_ReportsNothing(t *testing.T) {
+	bothSpellings := `{
+  "consumes": {
+    "payments": {
+      "rest": {
+        "/invoices": {
+          "get": { "responses": { "200": "Invoice" } }
+        },
+        "/invoices/": {
+          "get": { "responses": { "200": "Invoice" } }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Invoice": {
+      "type": "object",
+      "properties": { "total": { "type": "integer" } }
+    }
+  }
+}`
+
+	messages := validateFiles(t, validatedFile{"invoices.json", bothSpellings})
+
+	assert.Empty(t, messages)
+}
+
+func TestValidate_ConsumedResourceWithConflictingTypes_NamesBothDeclarations(t *testing.T) {
+	stringID := `{
+  "consumes": {
+    "payments": {
+      "rest": {
+        "/invoices": {
+          "get": { "responses": { "200": "InvoiceString" } }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "InvoiceString": {
+      "type": "object",
+      "properties": { "id": { "type": "string" } }
+    }
+  }
+}`
+
+	integerID := `{
+  "consumes": {
+    "payments": {
+      "rest": {
+        "/invoices": {
+          "get": { "responses": { "200": "InvoiceInteger" } }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "InvoiceInteger": {
+      "type": "object",
+      "properties": { "id": { "type": "integer" } }
+    }
+  }
+}`
+
+	messages := validateFiles(t,
+		validatedFile{"b.json", integerID},
+		validatedFile{"a.json", stringID},
+	)
+
+	assert.Equal(t, []string{
+		"conflicting property type for $.id at consumes payments GET /invoices 200: string (a.json) and integer (b.json)",
+	}, messages)
+}
+
+func TestValidate_ConsumedResourceWithConflictingTypesInOneFile_NamesTheFileTwice(t *testing.T) {
+	bothSpellings := `{
+  "consumes": {
+    "payments": {
+      "rest": {
+        "/invoices": {
+          "get": { "responses": { "200": "InvoiceString" } }
+        },
+        "/invoices/": {
+          "get": { "responses": { "200": "InvoiceInteger" } }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "InvoiceString": {
+      "type": "object",
+      "properties": { "id": { "type": "string" } }
+    },
+    "InvoiceInteger": {
+      "type": "object",
+      "properties": { "id": { "type": "integer" } }
+    }
+  }
+}`
+
+	messages := validateFiles(t, validatedFile{"invoices.json", bothSpellings})
+
+	assert.Equal(t, []string{
+		"conflicting property type for $.id at consumes payments GET /invoices 200: string (invoices.json) and integer (invoices.json)",
 	}, messages)
 }
 

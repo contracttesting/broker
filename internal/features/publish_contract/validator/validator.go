@@ -29,8 +29,9 @@ func NewContextualValidator() *ContextualValidator {
 	return &ContextualValidator{
 		rules: map[string][]Rule{
 			SegmentServiceName:       {serviceNameRule{}},
-			SegmentEndpoint:          {endpointSyntaxRule{}, &endpointDuplicateRule{seen: map[string]bool{}}},
+			SegmentEndpoint:          {endpointSyntaxRule{}},
 			SegmentResource:          {&resourceDuplicateRule{seen: map[string]string{}}},
+			SegmentResourceSchema:    {&resourceTypeConflictRule{seen: map[string]map[string]typedProperty{}}},
 			SegmentSchemaName:        {schemaUnresolvedNameRule{}},
 			SegmentSchemaDeclaration: {&schemaDuplicateRule{seen: map[string]string{}}},
 			SegmentSchema:            {schemaUnresolvedRefRule{}, schemaTooDeepRule{}, schemaArrayWithoutItemsRule{}, schemaInvalidTypeRule{}},
@@ -84,8 +85,6 @@ func (v *ContextualValidator) validateContract(fragment dsl.Fragment) {
 }
 
 func (v *ContextualValidator) validateRest(rest dsl.Rest, where string, resourcePath dsl.ResourcePath) {
-	visited := map[string]bool{}
-
 	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
 		v.where = where
 		v.validateBySegment(SegmentEndpoint, endpoint)
@@ -96,13 +95,6 @@ func (v *ContextualValidator) validateRest(rest dsl.Rest, where string, resource
 		if validations.Endpoint(normalized) != nil {
 			continue
 		}
-
-		// the second spelling of a same-file duplicate: the first one won, and
-		// descending again would only pile resource noise on the same problem
-		if visited[normalized] {
-			continue
-		}
-		visited[normalized] = true
 
 		v.validateMethod(rest[endpoint], where, normalized, resourcePath.Append("rest", normalized))
 	}
@@ -146,6 +138,7 @@ func (v *ContextualValidator) validateRequestBody(schemaName string, where strin
 	v.where = joinWhere(where, "request")
 	v.validateBySegment(SegmentResource, requestPath.String())
 	v.validateBySegment(SegmentSchemaName, schemaName)
+	v.validateBySegment(SegmentResourceSchema, ResourceSchema{requestPath.String(), schemaName})
 }
 
 func (v *ContextualValidator) validateResponses(responses dsl.Responses, where string, resourcePath dsl.ResourcePath) {
@@ -159,6 +152,7 @@ func (v *ContextualValidator) validateResponses(responses dsl.Responses, where s
 		v.where = joinWhere(where, status)
 		v.validateBySegment(SegmentResource, statusPath.String())
 		v.validateBySegment(SegmentSchemaName, responses[statusCode])
+		v.validateBySegment(SegmentResourceSchema, ResourceSchema{statusPath.String(), responses[statusCode]})
 	}
 }
 

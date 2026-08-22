@@ -62,8 +62,6 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondValidationFailed(ctx, violations)
 	}
 
-	dsl.Normalize(contractFragments)
-
 	contractContent, _ := json.Marshal(requestBody.Contracts)
 
 	contract := model.NewUploadedContract(participant.ID, participant.Name, version, string(contractContent))
