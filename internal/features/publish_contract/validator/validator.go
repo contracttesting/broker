@@ -6,49 +6,42 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/contracttesting/broker/internal/common"
 	"github.com/contracttesting/broker/internal/dsl"
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/contracttesting/broker/internal/validations"
 )
 
 type DslValidator struct {
-	ruleEntries []ruleEntry
-}
-
-type ruleEntry struct {
-	segment string
-	rule    Rule
+	rules map[string][]Rule
 }
 
 func NewDslValidator() *DslValidator {
-	return &DslValidator{ruleEntries: []ruleEntry{
-		{segment: SegmentService, rule: serviceNameRule{}},
-		{segment: SegmentEndpoint, rule: endpointSyntaxRule{}},
-		{segment: SegmentRest, rule: endpointDuplicateRule{}},
-		{segment: SegmentSchemas, rule: &schemaDuplicateRule{}},
-		{segment: SegmentResource, rule: &resourceDuplicateRule{}},
-		{segment: SegmentSchemaName, rule: schemaUnresolvedNameRule{}},
-		{segment: SegmentSchema, rule: schemaUnresolvedRefRule{}},
-		{segment: SegmentSchema, rule: schemaTooDeepRule{}},
-		{segment: SegmentSchema, rule: schemaArrayWithoutItemsRule{}},
-		{segment: SegmentSchema, rule: schemaInvalidTypeRule{}},
-		{segment: SegmentResponses, rule: statusCodeRangeRule{}},
+	return &DslValidator{rules: map[string][]Rule{
+		SegmentServiceName:       {serviceNameRule{}},
+		SegmentEndpoint:          {endpointSyntaxRule{}, &endpointDuplicateRule{}},
+		SegmentResource:          {&resourceDuplicateRule{}},
+		SegmentSchemaName:        {schemaUnresolvedNameRule{}},
+		SegmentSchemaDeclaration: {&schemaDuplicateRule{}},
+		SegmentSchema:            {schemaUnresolvedRefRule{}, schemaTooDeepRule{}, schemaArrayWithoutItemsRule{}, schemaInvalidTypeRule{}},
+		SegmentStatusCode:        {statusCodeRangeRule{}},
 	}}
 }
 
-// freshRules builds the execution's rule set, indexed by the segment each entry is
-// registered at. Stateful rules enter through Fresh(): one instance per execution,
-// never shared across concurrent publishes.
 func (v *DslValidator) freshRules() map[string][]Rule {
-	rules := make(map[string][]Rule, len(v.ruleEntries))
+	rules := make(map[string][]Rule, len(v.rules))
 
-	for _, entry := range v.ruleEntries {
-		rule := entry.rule
+	for segment, segmentRules := range v.rules {
+		fresh := make([]Rule, len(segmentRules))
 
-		if stateful, ok := rule.(StatefulRule); ok {
-			rule = stateful.Fresh()
+		for position, rule := range segmentRules {
+			if stateful, ok := rule.(StatefulRule); ok {
+				rule = stateful.Fresh()
+			}
+
+			fresh[position] = rule
 		}
 
-		rules[entry.segment] = append(rules[entry.segment], rule)
+		rules[segment] = fresh
 	}
 
 	return rules
@@ -73,18 +66,17 @@ func (v *DslValidator) validateContract(fragment dsl.Fragment, validationContext
 
 	v.validateRest(fragment.Contract.Provides.Rest, "provides", root.Append("provides"), validationContext)
 
-	for _, service := range slices.Sorted(maps.Keys(fragment.Contract.ConsumesServices)) {
-		dispatch(validationContext, SegmentService, service)
+	for _, serviceName := range slices.Sorted(maps.Keys(fragment.Contract.ConsumesServices)) {
+		validationContext.Validate(SegmentServiceName, serviceName)
 
-		// what an invalid service name declares is unreachable anyway
-		if model.ParticipantNameViolation(service) != "" {
+		if validations.ParticipantName(serviceName) != nil {
 			continue
 		}
 
 		v.validateRest(
-			fragment.Contract.ConsumesServices[service].Rest,
-			joinWhere("consumes", service),
-			root.Append("consumes", service),
+			fragment.Contract.ConsumesServices[serviceName].Rest,
+			joinWhere("consumes", serviceName),
+			root.Append("consumes", serviceName),
 			validationContext,
 		)
 	}
@@ -93,19 +85,16 @@ func (v *DslValidator) validateContract(fragment dsl.Fragment, validationContext
 }
 
 func (v *DslValidator) validateRest(rest dsl.Rest, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
-	validationContext.Where = where
-	dispatch(validationContext, SegmentRest, rest)
-
 	visited := map[string]bool{}
 
 	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
 		validationContext.Where = where
-		dispatch(validationContext, SegmentEndpoint, endpoint)
+		validationContext.Validate(SegmentEndpoint, endpoint)
 
-		normalized := dsl.NormalizeEndpoint(endpoint)
+		normalized := common.NormalizeEndpoint(endpoint)
 
 		// what an invalid endpoint declares is unreachable anyway
-		if endpointViolation(normalized) != "" {
+		if validations.Endpoint(normalized) != nil {
 			continue
 		}
 
@@ -156,29 +145,29 @@ func (v *DslValidator) validateRequestBody(schemaName string, where string, reso
 	requestPath := resourcePath.Append("request")
 
 	validationContext.Where = joinWhere(where, "request")
-	dispatch(validationContext, SegmentResource, requestPath.String())
-	dispatch(validationContext, SegmentSchemaName, schemaName)
+	validationContext.Validate(SegmentResource, requestPath.String())
+	validationContext.Validate(SegmentSchemaName, schemaName)
 }
 
 func (v *DslValidator) validateResponses(responses dsl.Responses, where string, resourcePath dsl.ResourcePath, validationContext *ValidationContext) {
-	validationContext.Where = where
-	dispatch(validationContext, SegmentResponses, responses)
-
 	for _, statusCode := range slices.Sorted(maps.Keys(responses)) {
 		status := strconv.Itoa(statusCode)
 		statusPath := resourcePath.Append(status)
 
+		validationContext.Where = where
+		validationContext.Validate(SegmentStatusCode, statusCode)
+
 		validationContext.Where = joinWhere(where, status)
-		dispatch(validationContext, SegmentResource, statusPath.String())
-		dispatch(validationContext, SegmentSchemaName, responses[statusCode])
+		validationContext.Validate(SegmentResource, statusPath.String())
+		validationContext.Validate(SegmentSchemaName, responses[statusCode])
 	}
 }
 
 func (v *DslValidator) validateSchemas(schemas dsl.SchemasMap, validationContext *ValidationContext) {
-	validationContext.Where = ""
-	dispatch(validationContext, SegmentSchemas, schemas)
-
 	for _, name := range slices.Sorted(maps.Keys(schemas)) {
+		validationContext.Where = ""
+		validationContext.Validate(SegmentSchemaDeclaration, name)
+
 		validationContext.RootSchema = name
 		v.validateSchema(schemas[name], name, DepthCounter{}, validationContext)
 	}
@@ -187,7 +176,7 @@ func (v *DslValidator) validateSchemas(schemas dsl.SchemasMap, validationContext
 func (v *DslValidator) validateSchema(schema dsl.Schema, path string, depth DepthCounter, validationContext *ValidationContext) {
 	validationContext.Where = path
 	validationContext.Depth = depth
-	dispatch(validationContext, SegmentSchema, schema)
+	validationContext.Validate(SegmentSchema, schema)
 
 	// the descent stops where there is nothing sound to descend into; the message,
 	// when one is due, came from the rules above

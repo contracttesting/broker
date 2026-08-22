@@ -11,7 +11,7 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-func parseFragment(fragment ContractFragment) (*dsl.Contract, error) {
+func parseFragmentContentToContractDsl(fragment ContractFragment) (*dsl.Contract, error) {
 	extension := strings.ToLower(filepath.Ext(fragment.Source))
 	if extension != ".yaml" && extension != ".yml" && extension != ".json" {
 		return nil, fmt.Errorf(

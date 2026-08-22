@@ -3,6 +3,7 @@ package create_participant
 import (
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
+	"github.com/contracttesting/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -28,7 +29,7 @@ func (ctr *CreateParticipantHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	if model.ParticipantNameViolation(requestBody.Participant) != "" {
+	if validations.ParticipantName(requestBody.Participant) != nil {
 		return ctr.respondInvalidName(ctx)
 	}
 

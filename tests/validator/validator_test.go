@@ -83,10 +83,10 @@ func TestValidator_EveryCatalogRule_FiresAtItsRegisteredSegment(t *testing.T) {
 	})
 
 	assert.Equal(t, []string{
-		"duplicate endpoint: /dup declared twice in a.json",
 		`invalid endpoint "/bad//x": malformed path (a.json)`,
-		"invalid status code 600 at provides GET /pets (a.json)",
+		"duplicate endpoint: /dup declared twice in a.json",
 		"unresolved schema name: Missing referenced at provides GET /pets 200 (a.json)",
+		"invalid status code 600 at provides GET /pets (a.json)",
 		`invalid service name "Bad;Svc": must be snake_case (a.json)`,
 		"schema Loop is too deep with more than 10 levels (a.json)",
 		`invalid schema type "auid" at Pet.kind (a.json)`,

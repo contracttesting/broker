@@ -3,6 +3,8 @@ package dsl
 import (
 	"maps"
 	"slices"
+
+	"github.com/contracttesting/broker/internal/common"
 )
 
 func Normalize(fragments []Fragment) {
@@ -17,7 +19,7 @@ func Normalize(fragments []Fragment) {
 
 func normalizeRest(rest Rest) {
 	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
-		normalized := NormalizeEndpoint(endpoint)
+		normalized := common.NormalizeEndpoint(endpoint)
 		if normalized == endpoint {
 			continue
 		}

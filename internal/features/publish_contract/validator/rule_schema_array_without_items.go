@@ -10,8 +10,8 @@ type schemaArrayWithoutItemsRule struct{}
 
 func (schemaArrayWithoutItemsRule) Code() string { return "schema.array_without_items" }
 
-func (schemaArrayWithoutItemsRule) Validate(segment any, validationContext *ValidationContext) {
-	schema, ok := segment.(dsl.Schema)
+func (schemaArrayWithoutItemsRule) Validate(value any, validationContext *ValidationContext) {
+	schema, ok := value.(dsl.Schema)
 	if !ok {
 		return
 	}

@@ -2,32 +2,37 @@ package validator
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 
-	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/common"
 )
 
-type endpointDuplicateRule struct{}
+type endpointDuplicateRule struct {
+	seen map[string]bool
+}
 
 func (endpointDuplicateRule) Code() string { return "endpoint.duplicate" }
 
-func (endpointDuplicateRule) Validate(segment any, validationContext *ValidationContext) {
-	rest, ok := segment.(dsl.Rest)
+func (endpointDuplicateRule) Fresh() StatefulRule {
+	return &endpointDuplicateRule{seen: map[string]bool{}}
+}
+
+func (r *endpointDuplicateRule) Validate(value any, validationContext *ValidationContext) {
+	endpoint, ok := value.(string)
 	if !ok {
 		return
 	}
 
-	seen := make(map[string]bool)
+	normalized := common.NormalizeEndpoint(endpoint)
 
-	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
-		normalized := dsl.NormalizeEndpoint(endpoint)
-		if seen[normalized] {
-			validationContext.AddViolation(fmt.Sprintf("duplicate endpoint: %s declared twice in %s", normalized, validationContext.Source))
+	// duplicates only exist within one rest block of one file: the same endpoint in
+	// another file or block is the resource duplicate rule's business
+	scope := validationContext.Source + "|" + validationContext.Where + "|" + normalized
 
-			continue
-		}
+	if r.seen[scope] {
+		validationContext.AddViolation(fmt.Sprintf("duplicate endpoint: %s declared twice in %s", normalized, validationContext.Source))
 
-		seen[normalized] = true
+		return
 	}
+
+	r.seen[scope] = true
 }

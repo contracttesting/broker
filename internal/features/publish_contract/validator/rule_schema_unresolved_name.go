@@ -6,8 +6,8 @@ type schemaUnresolvedNameRule struct{}
 
 func (schemaUnresolvedNameRule) Code() string { return "schema.unresolved_name" }
 
-func (schemaUnresolvedNameRule) Validate(segment any, validationContext *ValidationContext) {
-	name, ok := segment.(string)
+func (schemaUnresolvedNameRule) Validate(value any, validationContext *ValidationContext) {
+	name, ok := value.(string)
 	if !ok {
 		return
 	}

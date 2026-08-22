@@ -10,8 +10,8 @@ type schemaTooDeepRule struct{}
 
 func (schemaTooDeepRule) Code() string { return "schema.too_deep" }
 
-func (schemaTooDeepRule) Validate(segment any, validationContext *ValidationContext) {
-	if _, ok := segment.(dsl.Schema); !ok {
+func (schemaTooDeepRule) Validate(value any, validationContext *ValidationContext) {
+	if _, ok := value.(dsl.Schema); !ok {
 		return
 	}
 

@@ -15,7 +15,7 @@ type ContractFragment struct {
 }
 
 type PublishContractRequestBody struct {
-	Participant string             `json:"participant"`
+	ServiceName string             `json:"participant"`
 	Version     string             `json:"version"`
 	Contracts   []ContractFragment `json:"contracts"`
 }

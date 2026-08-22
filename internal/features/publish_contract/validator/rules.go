@@ -1,19 +1,18 @@
 package validator
 
 const (
-	SegmentService    = "service"
-	SegmentRest       = "rest"
-	SegmentEndpoint   = "endpoint"
-	SegmentResource   = "resource"
-	SegmentSchemaName = "schema_name"
-	SegmentSchemas    = "schemas"
-	SegmentSchema     = "schema"
-	SegmentResponses  = "responses"
+	SegmentServiceName       = "service_name"
+	SegmentEndpoint          = "endpoint"
+	SegmentResource          = "resource"
+	SegmentSchemaName        = "schema_name"
+	SegmentSchemaDeclaration = "schema_declaration"
+	SegmentSchema            = "schema"
+	SegmentStatusCode        = "status_code"
 )
 
 type Rule interface {
 	Code() string
-	Validate(segment any, validationContext *ValidationContext)
+	Validate(value any, validationContext *ValidationContext)
 }
 
 type StatefulRule interface {

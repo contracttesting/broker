@@ -10,8 +10,8 @@ type schemaUnresolvedRefRule struct{}
 
 func (schemaUnresolvedRefRule) Code() string { return "schema.unresolved_ref" }
 
-func (schemaUnresolvedRefRule) Validate(segment any, validationContext *ValidationContext) {
-	schema, ok := segment.(dsl.Schema)
+func (schemaUnresolvedRefRule) Validate(value any, validationContext *ValidationContext) {
+	schema, ok := value.(dsl.Schema)
 	if !ok {
 		return
 	}

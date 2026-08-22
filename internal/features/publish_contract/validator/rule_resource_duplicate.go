@@ -16,8 +16,8 @@ func (resourceDuplicateRule) Fresh() StatefulRule {
 	return &resourceDuplicateRule{seen: map[string]string{}}
 }
 
-func (r *resourceDuplicateRule) Validate(segment any, validationContext *ValidationContext) {
-	resource, ok := segment.(string)
+func (r *resourceDuplicateRule) Validate(value any, validationContext *ValidationContext) {
+	resource, ok := value.(string)
 	if !ok {
 		return
 	}

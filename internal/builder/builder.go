@@ -8,13 +8,6 @@ import (
 	"github.com/contracttesting/broker/internal/model"
 )
 
-// Hydrate merges the fragments into a single contract: the schemas of every fragment
-// form one namespace, and each fragment is hydrated against that namespace, so refs
-// cross files and resources accumulate into one contract.
-//
-// It transforms, it does not validate: the fragments have already been through the
-// contract validator and dsl.Normalize, so an error here is a broken invariant, not
-// bad input.
 func Hydrate(fragments []dsl.Fragment, contract *model.UploadedContract) error {
 	hydrator := newHydrator(fragments)
 

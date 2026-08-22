@@ -3,7 +3,7 @@ package validator
 import (
 	"fmt"
 
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/contracttesting/broker/internal/validations"
 )
 
 // A consumed service names the participant it expects on the other side, so the name
@@ -12,13 +12,13 @@ type serviceNameRule struct{}
 
 func (serviceNameRule) Code() string { return "service.name_syntax" }
 
-func (serviceNameRule) Validate(segment any, validationContext *ValidationContext) {
-	service, ok := segment.(string)
+func (serviceNameRule) Validate(value any, validationContext *ValidationContext) {
+	serviceName, ok := value.(string)
 	if !ok {
 		return
 	}
 
-	if reason := model.ParticipantNameViolation(service); reason != "" {
-		validationContext.AddViolation(fmt.Sprintf("invalid service name %q: %s (%s)", service, reason, validationContext.Source))
+	if err := validations.ParticipantName(serviceName); err != nil {
+		validationContext.AddViolation(fmt.Sprintf("invalid service name %q: %s (%s)", serviceName, err, validationContext.Source))
 	}
 }

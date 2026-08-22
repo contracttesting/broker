@@ -7,8 +7,6 @@ import (
 	"github.com/contracttesting/broker/internal/dsl"
 )
 
-// ContractIndex is the schema namespace every fragment shares, built once before the
-// walk. It merges silently, first source winning — duplicate detection is a rule's job.
 type ContractIndex struct {
 	schemas dsl.SchemasMap
 }

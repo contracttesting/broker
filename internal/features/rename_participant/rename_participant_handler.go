@@ -1,8 +1,8 @@
 package rename_participant
 
 import (
-	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
+	"github.com/contracttesting/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -26,7 +26,7 @@ func (h *RenameParticipantHandler) Handle(ctx fiber.Ctx) error {
 
 	// only the new name is judged: a legacy participant whose name predates the
 	// spelling rule must still be renameable into a valid one
-	if model.ParticipantNameViolation(requestBody.NewName) != "" {
+	if validations.ParticipantName(requestBody.NewName) != nil {
 		return h.respondInvalidName(ctx)
 	}
 

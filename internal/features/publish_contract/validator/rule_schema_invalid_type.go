@@ -10,8 +10,8 @@ type schemaInvalidTypeRule struct{}
 
 func (schemaInvalidTypeRule) Code() string { return "schema.invalid_type" }
 
-func (schemaInvalidTypeRule) Validate(segment any, validationContext *ValidationContext) {
-	schema, ok := segment.(dsl.Schema)
+func (schemaInvalidTypeRule) Validate(value any, validationContext *ValidationContext) {
+	schema, ok := value.(dsl.Schema)
 	if !ok {
 		return
 	}
