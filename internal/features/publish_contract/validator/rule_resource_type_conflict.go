@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/resourcepathmapper"
 	"github.com/contracttesting/broker/internal/mapper/schemamapper"
 )
 
@@ -29,7 +29,8 @@ func (r *resourceTypeConflictRule) Validate(value any, contextualValidator *Cont
 
 	// only consumed resources are merged, so only they can disagree with themselves; a
 	// provider redeclaration is already rejected as a duplicate
-	if !strings.HasPrefix(resourceSchema.Path, "consumes;") {
+	resourcePath := dsl.NewResourcePath(resourceSchema.Path)
+	if !resourcePath.IsConsumer() {
 		return
 	}
 
@@ -60,11 +61,11 @@ func (r *resourceTypeConflictRule) Validate(value any, contextualValidator *Cont
 			continue
 		}
 
-		resourcePath := dsl.NewResourcePath(resourceSchema.Path)
+		resource := resourcepathmapper.ToResourceModel(resourcePath, nil)
 		contextualValidator.addViolation(fmt.Sprintf(
 			"conflicting property type for %s at %s: %s (%s) and %s (%s)",
 			path,
-			resourcePath.ToResource(nil).Describe(),
+			resource.Describe(),
 			previous.propertyType,
 			previous.source,
 			current.propertyType,

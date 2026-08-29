@@ -9,6 +9,7 @@ import (
 
 	"github.com/contracttesting/broker/internal/common"
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/resourcepathmapper"
 	"github.com/contracttesting/broker/internal/mapper/schemamapper"
 	"github.com/contracttesting/broker/internal/model"
 )
@@ -195,9 +196,9 @@ func (h *hydrator) entryFor(resourcePath dsl.ResourcePath, source string) *colle
 
 func (h *hydrator) materialize(contract *model.UploadedContract) error {
 	for _, collected := range h.collected {
-		resource := collected.resourcePath.ToResource(collected.properties())
+		resource := resourcepathmapper.ToResourceModel(collected.resourcePath, collected.properties())
 
-		if err := contract.AddResource(resource, collected.source); err != nil {
+		if err := contract.AddResource(&resource, collected.source); err != nil {
 			return err
 		}
 	}
