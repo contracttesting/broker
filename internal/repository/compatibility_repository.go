@@ -75,7 +75,7 @@ func (r *CompatibilityRepository) RecordCheck(
 		panic(fmt.Errorf("error starting transaction: %w", err))
 	}
 
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	r.insertCheck(ctx, tx, check)
 

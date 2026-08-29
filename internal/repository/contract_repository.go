@@ -404,7 +404,7 @@ func (r *ContractRepository) Create(
 		panic(fmt.Errorf("error starting transaction: %w", err))
 	}
 
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	r.insertContract(ctx, tx, contract)
 	r.insertContractVersion(ctx, tx, contract)
@@ -433,7 +433,7 @@ func (r *ContractRepository) Update(
 		panic(fmt.Errorf("error starting transaction: %w", err))
 	}
 
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	current, existing := r.GetLatestContractByName(ctx, next.ParticipantName)
 	if !existing {

@@ -98,7 +98,7 @@ func (s *IntegrationSuite) post(path, body string) (status int, response string)
 
 	resp, err := s.Components.Server.Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
 	s.Require().NoError(err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bytes, err := io.ReadAll(resp.Body)
 	s.Require().NoError(err)

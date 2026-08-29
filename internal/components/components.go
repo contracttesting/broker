@@ -18,11 +18,11 @@ type Components struct {
 func createDatabasePool() *pgxpool.Pool {
 	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
-		panic(fmt.Errorf("Failed to create database pool: %v", err))
+		panic(fmt.Errorf("failed to create database pool: %w", err))
 	}
 
 	if err := pool.Ping(context.Background()); err != nil {
-		panic(fmt.Errorf("Failed to ping database: %v", err))
+		panic(fmt.Errorf("failed to ping database: %w", err))
 	}
 
 	return pool
@@ -51,7 +51,7 @@ func runMigrations(pool *pgxpool.Pool) {
 	)
 
 	if err := m.Migrate(); err != nil {
-		panic(fmt.Errorf("Failed to run migrations: %v", err))
+		panic(fmt.Errorf("failed to run migrations: %w", err))
 	}
 }
 

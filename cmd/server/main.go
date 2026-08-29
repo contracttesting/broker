@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	godotenv.Load()
+	_ = godotenv.Load()
 	components := internal.Run()
 	addr := os.Getenv("BROKER_LISTEN_ADDR")
 	if addr == "" {
