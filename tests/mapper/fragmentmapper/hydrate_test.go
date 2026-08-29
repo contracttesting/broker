@@ -1,11 +1,11 @@
-package builder_test
+package fragmentmapper_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/contracttesting/broker/internal/builder"
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,22 +36,29 @@ const happyContractJSON = `{
   }
 }`
 
-func TestHydrateContract_Happy_MaterializesResources(t *testing.T) {
+func singleFragment(t *testing.T, raw string) []dsl.Fragment {
+	t.Helper()
+
 	var dslContract dsl.Contract
-	require.NoError(t, json.Unmarshal([]byte(happyContractJSON), &dslContract))
+	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
-	contract := model.NewUploadedContract(0, "petstore-app", "1", happyContractJSON)
-	require.NoError(t, builder.Hydrate(
-		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
-		contract,
-	))
+	return []dsl.Fragment{{Source: "api.json", Contract: &dslContract}}
+}
 
-	require.Len(t, contract.Resources, 1)
+func toResourceModels(t *testing.T, raw string) []model.UploadedResource {
+	t.Helper()
 
-	var resource model.UploadedResource
-	for _, r := range contract.Resources {
-		resource = r
-	}
+	resources, err := fragmentmapper.ToResourceModels(singleFragment(t, raw))
+	require.NoError(t, err)
+
+	return resources
+}
+
+func TestToResourceModels_Happy_MaterializesResources(t *testing.T) {
+	resources := toResourceModels(t, happyContractJSON)
+
+	require.Len(t, resources, 1)
+	resource := resources[0]
 
 	assert.Equal(t, model.Consumes, resource.Direction)
 	assert.Equal(t, model.RestResponse, resource.Interaction)
@@ -165,27 +172,13 @@ const refResolvesJSON = `{
   }
 }`
 
-func hydrate(t *testing.T, raw string) *model.UploadedContract {
-	t.Helper()
+func TestToResourceModels_PostWithRequestBody_EmitsRequestAndResponses(t *testing.T) {
+	resources := toResourceModels(t, postWithRequestBodyJSON)
 
-	var dslContract dsl.Contract
-	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
-
-	contract := model.NewUploadedContract(0, "petstore-app", "1", raw)
-	require.NoError(t, builder.Hydrate(
-		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
-		contract,
-	))
-	return contract
-}
-
-func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing.T) {
-	contract := hydrate(t, postWithRequestBodyJSON)
-
-	require.Len(t, contract.Resources, 2)
+	require.Len(t, resources, 2)
 
 	var request, response model.UploadedResource
-	for _, r := range contract.Resources {
+	for _, r := range resources {
 		switch r.Interaction {
 		case model.RestRequest:
 			request = r
@@ -207,15 +200,11 @@ func TestHydrateContract_PostWithRequestBody_EmitsRequestAndResponses(t *testing
 	assert.Contains(t, response.Properties, "$.name")
 }
 
-func TestHydrateContract_ProvidesSide_EmitsProvidedResource(t *testing.T) {
-	contract := hydrate(t, provideRestResponseJSON)
+func TestToResourceModels_ProvidesSide_EmitsProvidedResource(t *testing.T) {
+	resources := toResourceModels(t, provideRestResponseJSON)
 
-	require.Len(t, contract.Resources, 1)
-
-	var resource model.UploadedResource
-	for _, r := range contract.Resources {
-		resource = r
-	}
+	require.Len(t, resources, 1)
+	resource := resources[0]
 
 	assert.Equal(t, model.Provides, resource.Direction)
 	assert.Equal(t, model.RestResponse, resource.Interaction)
@@ -226,30 +215,22 @@ func TestHydrateContract_ProvidesSide_EmitsProvidedResource(t *testing.T) {
 	assert.Contains(t, resource.Properties, "$.id")
 }
 
-func TestHydrateContract_PrimitiveTopLevel_EmitsRootPrimitive(t *testing.T) {
-	contract := hydrate(t, primitiveTopLevelJSON)
+func TestToResourceModels_PrimitiveTopLevel_EmitsRootPrimitive(t *testing.T) {
+	resources := toResourceModels(t, primitiveTopLevelJSON)
 
-	require.Len(t, contract.Resources, 1)
-
-	var resource model.UploadedResource
-	for _, r := range contract.Resources {
-		resource = r
-	}
+	require.Len(t, resources, 1)
+	resource := resources[0]
 
 	require.Contains(t, resource.Properties, "$")
 	assert.Equal(t, "string", resource.Properties["$"].Type)
 	assert.Len(t, resource.Properties, 1)
 }
 
-func TestHydrateContract_ArrayOfObjects_WalksItemsViaSchemaPointer(t *testing.T) {
-	contract := hydrate(t, arrayOfObjectsJSON)
+func TestToResourceModels_ArrayOfObjects_WalksItemsViaSchemaPointer(t *testing.T) {
+	resources := toResourceModels(t, arrayOfObjectsJSON)
 
-	require.Len(t, contract.Resources, 1)
-
-	var resource model.UploadedResource
-	for _, r := range contract.Resources {
-		resource = r
-	}
+	require.Len(t, resources, 1)
+	resource := resources[0]
 
 	require.Contains(t, resource.Properties, "$")
 	require.Contains(t, resource.Properties, "$[]")
@@ -259,15 +240,11 @@ func TestHydrateContract_ArrayOfObjects_WalksItemsViaSchemaPointer(t *testing.T)
 	assert.Equal(t, "string", resource.Properties["$[].id"].Type)
 }
 
-func TestHydrateContract_RefResolves_SubstitutesReferencedSchema(t *testing.T) {
-	contract := hydrate(t, refResolvesJSON)
+func TestToResourceModels_RefResolves_SubstitutesReferencedSchema(t *testing.T) {
+	resources := toResourceModels(t, refResolvesJSON)
 
-	require.Len(t, contract.Resources, 1)
-
-	var resource model.UploadedResource
-	for _, r := range contract.Resources {
-		resource = r
-	}
+	require.Len(t, resources, 1)
+	resource := resources[0]
 
 	require.Contains(t, resource.Properties, "$")
 	require.Contains(t, resource.Properties, "$.id")
@@ -321,15 +298,11 @@ const wideShallowContractJSON = `{
   }
 }`
 
-func TestHydrateContract_WideShallowSchema_MaterializesEveryBranch(t *testing.T) {
-	contract := hydrate(t, wideShallowContractJSON)
+func TestToResourceModels_WideShallowSchema_MaterializesEveryBranch(t *testing.T) {
+	resources := toResourceModels(t, wideShallowContractJSON)
 
-	require.Len(t, contract.Resources, 1)
-
-	var resource model.UploadedResource
-	for _, r := range contract.Resources {
-		resource = r
-	}
+	require.Len(t, resources, 1)
+	resource := resources[0]
 
 	require.Contains(t, resource.Properties, "$.users[].list[].list[]")
 	assert.Equal(t, "array", resource.Properties["$.users[].list[].list"].Type)
@@ -358,15 +331,8 @@ const unknownTypeContractJSON = `{
   }
 }`
 
-func TestHydrateContract_UnknownSchemaType_ReturnsError(t *testing.T) {
-	var dslContract dsl.Contract
-	require.NoError(t, json.Unmarshal([]byte(unknownTypeContractJSON), &dslContract))
-
-	contract := model.NewUploadedContract(0, "petstore-app", "1", unknownTypeContractJSON)
-	err := builder.Hydrate(
-		[]dsl.Fragment{{Source: "api.json", Contract: &dslContract}},
-		contract,
-	)
+func TestToResourceModels_UnknownSchemaType_ReturnsError(t *testing.T) {
+	_, err := fragmentmapper.ToResourceModels(singleFragment(t, unknownTypeContractJSON))
 
 	require.EqualError(t, err, `unknown schema type "auid" at $.id`)
 }

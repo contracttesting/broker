@@ -2,9 +2,9 @@ package validator
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/resourcepathmapper"
 )
 
 type resourceDuplicateRule struct {
@@ -14,21 +14,21 @@ type resourceDuplicateRule struct {
 func (resourceDuplicateRule) Code() string { return "resource.duplicate" }
 
 func (r *resourceDuplicateRule) Validate(value any, contextualValidator *ContextualValidator) {
-	resource, ok := value.(string)
+	path, ok := value.(string)
 	if !ok {
 		return
 	}
 
-	// a consumed resource declared twice is merged by union at build time; a provider
-	// has no second source of truth for the same interaction
-	if !strings.HasPrefix(resource, "provides;") {
+	// only a provider redeclaration is an error: consumers merge by union in the mapper
+	resourcePath := dsl.NewResourcePath(path)
+	if !resourcePath.IsProvider() {
 		return
 	}
 
-	if declaredIn, taken := r.seen[resource]; taken {
-		resourcePath := dsl.NewResourcePath(resource)
+	if declaredIn, taken := r.seen[path]; taken {
+		resource := resourcepathmapper.ToResourceModel(resourcePath, nil)
 		contextualValidator.addViolation(r.message(
-			resourcePath.ToResource(nil).Describe(),
+			resource.Describe(),
 			declaredIn,
 			contextualValidator.source,
 		))
@@ -36,7 +36,7 @@ func (r *resourceDuplicateRule) Validate(value any, contextualValidator *Context
 		return
 	}
 
-	r.seen[resource] = contextualValidator.source
+	r.seen[path] = contextualValidator.source
 }
 
 func (resourceDuplicateRule) message(resource, declaredIn, source string) string {

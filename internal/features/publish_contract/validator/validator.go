@@ -11,9 +11,6 @@ import (
 	"github.com/contracttesting/broker/internal/validations"
 )
 
-// ContextualValidator carries the state of a single validation run — the rules with
-// their duplicate tracking and the walk cursor — so build one per Validate call: a
-// reused instance would remember the previous run's duplicates.
 type ContextualValidator struct {
 	rules map[string][]Rule
 
@@ -91,7 +88,6 @@ func (v *ContextualValidator) validateRest(rest dsl.Rest, where string, resource
 
 		normalized := common.NormalizeEndpoint(endpoint)
 
-		// what an invalid endpoint declares is unreachable anyway
 		if validations.Endpoint(normalized) != nil {
 			continue
 		}
@@ -101,7 +97,6 @@ func (v *ContextualValidator) validateRest(rest dsl.Rest, where string, resource
 }
 
 func (v *ContextualValidator) validateMethod(methods dsl.HttpMethods, where string, endpoint string, resourcePath dsl.ResourcePath) {
-	// the pinned breadcrumb order is verb before endpoint: "provides GET /pets 200"
 	v.validateGet(methods.Get, joinWhere(joinWhere(where, "GET"), endpoint), resourcePath.Append("get"))
 	v.validatePost(methods.Post, joinWhere(joinWhere(where, "POST"), endpoint), resourcePath.Append("post"))
 	v.validatePut(methods.Put, joinWhere(joinWhere(where, "PUT"), endpoint), resourcePath.Append("put"))
@@ -171,8 +166,6 @@ func (v *ContextualValidator) validateSchema(schema dsl.Schema, path string, dep
 	v.depth = depth
 	v.validateBySegment(SegmentSchema, schema)
 
-	// the descent stops where there is nothing sound to descend into; the message,
-	// when one is due, came from the rules above
 	if depth.Exceeded() {
 		return
 	}

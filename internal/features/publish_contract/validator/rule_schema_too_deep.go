@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/schemamapper"
 )
 
 type schemaTooDeepRule struct{}
@@ -22,7 +23,7 @@ func (schemaTooDeepRule) Validate(value any, contextualValidator *ContextualVali
 	contextualValidator.addViolation(fmt.Sprintf(
 		"schema %s is too deep with more than %d levels (%s)",
 		contextualValidator.rootSchema,
-		dsl.MAX_DEPTH,
+		schemamapper.MaxDepth,
 		contextualValidator.source,
 	))
 }
