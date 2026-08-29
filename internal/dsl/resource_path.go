@@ -1,26 +1,8 @@
 package dsl
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
-
-	"github.com/contracttesting/broker/internal/model"
-)
-
-var (
-	consumerRestRequestRegex = regexp.MustCompile(
-		`^consumes;(?P<provider>[^;]*);rest;(?P<endpoint>[^;]+);(?P<method>[^;]+);request$`,
-	)
-	consumerRestResponseRegex = regexp.MustCompile(
-		`^consumes;(?P<provider>[^;]*);rest;(?P<endpoint>[^;]+);(?P<method>[^;]+);responses;(?P<status>\d+)$`,
-	)
-	providerRestRequestRegex = regexp.MustCompile(
-		`^provides;rest;(?P<endpoint>[^;]+);(?P<method>[^;]+);request$`,
-	)
-	providerRestResponseRegex = regexp.MustCompile(
-		`^provides;rest;(?P<endpoint>[^;]+);(?P<method>[^;]+);responses;(?P<status>\d+)$`,
-	)
 )
 
 type ResourcePath string
@@ -50,11 +32,11 @@ func (rp *ResourcePath) Split() []string {
 }
 
 func (rp *ResourcePath) IsConsumer() bool {
-	return strings.Contains(rp.String(), "consumes")
+	return rp.Split()[0] == "consumes"
 }
 
 func (rp *ResourcePath) IsProvider() bool {
-	return strings.Contains(rp.String(), "provides")
+	return rp.Split()[0] == "provides"
 }
 
 func (rp *ResourcePath) ExtractNamedArgs(regex *regexp.Regexp) (map[string]string, bool) {
@@ -73,44 +55,4 @@ func (rp *ResourcePath) ExtractNamedArgs(regex *regexp.Regexp) (map[string]strin
 	}
 
 	return args, true
-}
-
-func (rp *ResourcePath) ToResource(properties map[string]model.Property) *model.UploadedResource {
-	if args, ok := rp.ExtractNamedArgs(consumerRestRequestRegex); ok {
-		return model.NewRestRequestConsumer(
-			args["provider"],
-			args["endpoint"],
-			args["method"],
-			properties,
-		)
-	}
-
-	if args, ok := rp.ExtractNamedArgs(consumerRestResponseRegex); ok {
-		return model.NewRestResponseConsumer(
-			args["provider"],
-			args["endpoint"],
-			args["method"],
-			args["status"],
-			properties,
-		)
-	}
-
-	if args, ok := rp.ExtractNamedArgs(providerRestRequestRegex); ok {
-		return model.NewRestRequestProvider(
-			args["endpoint"],
-			args["method"],
-			properties,
-		)
-	}
-
-	if args, ok := rp.ExtractNamedArgs(providerRestResponseRegex); ok {
-		return model.NewRestResponseProvider(
-			args["endpoint"],
-			args["method"],
-			args["status"],
-			properties,
-		)
-	}
-
-	panic(fmt.Errorf("unrecognized resource path: %q", rp.String()))
 }

@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/resourcepathmapper"
+	"github.com/contracttesting/broker/internal/mapper/schemamapper"
 )
 
 type resourceTypeConflictRule struct {
@@ -26,9 +27,9 @@ func (r *resourceTypeConflictRule) Validate(value any, contextualValidator *Cont
 		return
 	}
 
-	// only consumed resources are merged, so only they can disagree with themselves; a
-	// provider redeclaration is already rejected as a duplicate
-	if !strings.HasPrefix(resourceSchema.Path, "consumes;") {
+	// only consumed resources merge, so only they can disagree with themselves
+	resourcePath := dsl.NewResourcePath(resourceSchema.Path)
+	if !resourcePath.IsConsumer() {
 		return
 	}
 
@@ -43,10 +44,10 @@ func (r *resourceTypeConflictRule) Validate(value any, contextualValidator *Cont
 		r.seen[resourceSchema.Path] = declaredTypes
 	}
 
-	flattened := dsl.FlattenSchema(contextualValidator.contractIndex.schemas, schema)
+	properties := schemamapper.ToPropertyModels(contextualValidator.contractIndex.schemas, schema)
 
-	for _, path := range slices.Sorted(maps.Keys(flattened)) {
-		current := typedProperty{propertyType: flattened[path].Type, source: contextualValidator.source}
+	for _, path := range slices.Sorted(maps.Keys(properties)) {
+		current := typedProperty{propertyType: properties[path].Type, source: contextualValidator.source}
 
 		previous, taken := declaredTypes[path]
 		if !taken {
@@ -59,11 +60,11 @@ func (r *resourceTypeConflictRule) Validate(value any, contextualValidator *Cont
 			continue
 		}
 
-		resourcePath := dsl.NewResourcePath(resourceSchema.Path)
+		resource := resourcepathmapper.ToResourceModel(resourcePath, nil)
 		contextualValidator.addViolation(fmt.Sprintf(
 			"conflicting property type for %s at %s: %s (%s) and %s (%s)",
 			path,
-			resourcePath.ToResource(nil).Describe(),
+			resource.Describe(),
 			previous.propertyType,
 			previous.source,
 			current.propertyType,
