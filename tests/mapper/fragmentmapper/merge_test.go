@@ -224,8 +224,6 @@ const providedPetsSchemalessJSON = `{
   }
 }`
 
-// fourModulesChecksum is the Checksum() the builder of the base commit 216034c produced
-// for list+detail+create+import under participant front_app; the mapper must match it.
 const fourModulesChecksum = "d55e2d0621975b40535271dc6fa098aa237646bb87924674e6b700a5fef23563"
 
 type mergedFile struct {

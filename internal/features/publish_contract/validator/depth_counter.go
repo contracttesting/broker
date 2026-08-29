@@ -2,8 +2,7 @@ package validator
 
 import "github.com/contracttesting/broker/internal/mapper/schemamapper"
 
-// DepthCounter is the budget one schema branch carries. It travels by value: every
-// level gets a copy, so a deep branch never charges the branches beside it.
+// DepthCounter is the depth budget one schema branch carries.
 type DepthCounter struct {
 	levels int
 }

@@ -7,18 +7,14 @@ import (
 	"github.com/contracttesting/broker/internal/model"
 )
 
-// resourceDeclaration is one leaf of one fragment: the resource it declares, keyed by
-// the path that names it, and the file it came from, which the merge error quotes.
+// resourceDeclaration is the resource one fragment leaf declares, with its path key and source file.
 type resourceDeclaration struct {
 	source       string
 	resourcePath dsl.ResourcePath
 	resource     model.UploadedResource
 }
 
-// mergeDeclarationsByResourcePath folds every declaration of the same resource path
-// into one, in first-appearance order. A consumer declared by several modules is the
-// union of what they declare; a provider is declared once, and a second declaration
-// is an error naming both files.
+// mergeDeclarationsByResourcePath folds the declarations of each resource path into one, in first-appearance order.
 func mergeDeclarationsByResourcePath(declarations []resourceDeclaration) ([]resourceDeclaration, error) {
 	merged := make([]resourceDeclaration, 0, len(declarations))
 	indexByPath := make(map[string]int, len(declarations))
@@ -51,9 +47,7 @@ func mergeDeclarationsByResourcePath(declarations []resourceDeclaration) ([]reso
 	return merged, nil
 }
 
-// unionResourceModels joins two declarations of the same resource. Identity comes from
-// the first (equal by construction); the properties are read the way the compatibility
-// check will, by the resource's interaction.
+// unionResourceModels joins two declarations of the same resource by its interaction.
 func unionResourceModels(a, b model.UploadedResource) model.UploadedResource {
 	union := a
 
@@ -67,8 +61,7 @@ func unionResourceModels(a, b model.UploadedResource) model.UploadedResource {
 	return union
 }
 
-// unionRequestProperties: the app only sends what every module sends, so a path
-// missing from — or optional in — one declaration is optional for all.
+// unionRequestProperties merges what two senders send: a path is required only if both require it.
 func unionRequestProperties(a, b map[string]model.Property) map[string]model.Property {
 	union := make(map[string]model.Property, len(a)+len(b))
 
@@ -90,8 +83,7 @@ func unionRequestProperties(a, b map[string]model.Property) map[string]model.Pro
 	return union
 }
 
-// unionResponseProperties: the strongest reader wins, and a module that never mentions
-// the path has no say in it.
+// unionResponseProperties merges what two readers need: a path is optional only if every reader that mentions it allows it.
 func unionResponseProperties(a, b map[string]model.Property) map[string]model.Property {
 	union := make(map[string]model.Property, len(a)+len(b))
 

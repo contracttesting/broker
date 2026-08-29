@@ -30,9 +30,7 @@ func NewUploadedContract(
 	}
 }
 
-// AddResource rejects a resource whose hash is already taken: two resources with the
-// same hash are the same resource. Publish validation rejects a redeclaration before
-// the build starts, so a hit here is a broken invariant rather than bad input.
+// AddResource keys the resource by its hash and rejects a hash already taken.
 func (contract *UploadedContract) AddResource(resource *UploadedResource) error {
 	if contract.Resources == nil {
 		contract.Resources = make(map[string]UploadedResource)

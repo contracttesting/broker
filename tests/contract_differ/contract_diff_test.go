@@ -19,8 +19,7 @@ func newContractWithOnePetsResource() *model.UploadedContract {
 	return contract
 }
 
-// props projects a contract's resources to the properties-by-hash shape the
-// differ consumes.
+// props projects a contract's resources to the properties-by-hash shape the differ consumes.
 func props(contract *model.UploadedContract) map[string]contract_differ.ResourceProperties {
 	out := make(map[string]contract_differ.ResourceProperties, len(contract.Resources))
 	for key, resource := range contract.Resources {

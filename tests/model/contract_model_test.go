@@ -35,8 +35,6 @@ func TestContract_Checksum_DiffersWhenResourceAdded(t *testing.T) {
 	assert.NotEqual(t, a.Checksum(), b.Checksum())
 }
 
-// Locks in the JSON-marshal invariant: identical content added in a different
-// order must yield the same checksum (encoding/json sorts map keys recursively).
 func TestContract_Checksum_IsOrderIndependent(t *testing.T) {
 	first := model.NewRestResponseProvider("/pets", "get", "200", map[string]model.Property{
 		"$":    model.NewProperty("$", "object", false),

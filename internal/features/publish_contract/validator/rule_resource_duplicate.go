@@ -19,8 +19,7 @@ func (r *resourceDuplicateRule) Validate(value any, contextualValidator *Context
 		return
 	}
 
-	// a consumed resource declared twice is merged by union at build time; a provider
-	// has no second source of truth for the same interaction
+	// only a provider redeclaration is an error: consumers merge by union in the mapper
 	resourcePath := dsl.NewResourcePath(path)
 	if !resourcePath.IsProvider() {
 		return

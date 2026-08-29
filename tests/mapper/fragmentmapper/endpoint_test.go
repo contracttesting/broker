@@ -29,9 +29,7 @@ func endpointProvidesJSON(endpoint string) string {
 }`
 }
 
-// singleEndpointResource runs the transformation half of the publish pipeline over one
-// valid file: the mapping, which normalizes each endpoint as it keys the resource.
-// Rejection is the validator's business, tested there.
+// singleEndpointResource maps one valid single-endpoint file to its resource.
 func singleEndpointResource(t *testing.T, raw string) model.UploadedResource {
 	t.Helper()
 

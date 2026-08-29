@@ -23,9 +23,6 @@ var (
 	)
 )
 
-// ToResourceModel reads the identity a resource path spells out — side, endpoint,
-// method, status — and builds the resource model carrying the given properties. A path
-// no shape recognizes is a programming error, not input, so it panics.
 func ToResourceModel(path dsl.ResourcePath, properties map[string]model.Property) model.UploadedResource {
 	if args, ok := path.ExtractNamedArgs(consumerRestRequestRegex); ok {
 		return *model.NewRestRequestConsumer(

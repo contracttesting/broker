@@ -27,8 +27,7 @@ func (r *resourceTypeConflictRule) Validate(value any, contextualValidator *Cont
 		return
 	}
 
-	// only consumed resources are merged, so only they can disagree with themselves; a
-	// provider redeclaration is already rejected as a duplicate
+	// only consumed resources merge, so only they can disagree with themselves
 	resourcePath := dsl.NewResourcePath(resourceSchema.Path)
 	if !resourcePath.IsConsumer() {
 		return

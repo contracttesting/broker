@@ -5,14 +5,10 @@ import (
 	"github.com/contracttesting/broker/internal/model"
 )
 
-// MaxDepth is the budget every descent through a schema carries. Validation runs it
-// over contracts whose refs may still cycle, so the walk has to stop on its own.
+// MaxDepth bounds the schema descent so cyclic refs still terminate.
 const MaxDepth = 10
 
-// ToPropertyModels resolves a schema into the property models it declares — `$` for
-// the root, `$.x` for a property, `$.x[]` for an array item — following refs through
-// the namespace. A node whose type is none of the supported ones keeps its declared
-// type verbatim, so the caller can quote it back.
+// ToPropertyModels resolves a schema into its property models keyed by $-rooted path.
 func ToPropertyModels(schemas dsl.SchemasMap, root dsl.Schema) map[string]model.Property {
 	properties := map[string]model.Property{}
 
@@ -53,8 +49,6 @@ func propertyModelsFromSchema(
 		properties[path.String()] = model.NewProperty(path.String(), schema.Type, schema.Optional)
 
 	case schema.IsRef():
-		// The site carries an optional of its own; the target knows nothing about it.
-		// Either side declaring the node optional makes it optional.
 		target := schemas[schema.Ref]
 		target.Optional = target.Optional || schema.Optional
 

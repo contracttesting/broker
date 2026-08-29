@@ -1,5 +1,3 @@
-// Package fragmentmapper turns the uploaded fragments of a contract into its resource
-// models: one per resource key, with every declaration of that key folded in.
 package fragmentmapper
 
 import (
@@ -41,8 +39,6 @@ func ToResourceModels(fragments []dsl.Fragment) ([]model.UploadedResource, error
 	return resources, nil
 }
 
-// schemasFromFragments is the union of every fragment's schemas, first wins; a name
-// declared twice was already rejected by validation.
 func schemasFromFragments(fragments []dsl.Fragment) dsl.SchemasMap {
 	schemas := make(dsl.SchemasMap)
 
@@ -91,8 +87,6 @@ func declarationsFromFragment(fragment dsl.Fragment, schemas dsl.SchemasMap) ([]
 func declarationsFromRest(source string, rest dsl.Rest, resourcePath dsl.ResourcePath, schemas dsl.SchemasMap) ([]resourceDeclaration, error) {
 	var declarations []resourceDeclaration
 	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
-		// both spellings of an endpoint reach here alive, and normalizing the key
-		// is what lands them on the same resource
 		endpointPath := resourcePath.Append("rest", common.NormalizeEndpoint(endpoint))
 
 		fromMethods, err := declarationsFromMethods(source, rest[endpoint], endpointPath, schemas)
@@ -184,8 +178,6 @@ func declarationsFromResponses(source string, responses dsl.Responses, resourceP
 	return declarations, nil
 }
 
-// declarationFromSchema is the leaf: the descent lives in schemamapper.ToPropertyModels;
-// what is left here is the rejection of a type validation would already have caught.
 func declarationFromSchema(source, schemaName string, resourcePath dsl.ResourcePath, schemas dsl.SchemasMap) (resourceDeclaration, error) {
 	properties := schemamapper.ToPropertyModels(schemas, schemas[schemaName])
 
