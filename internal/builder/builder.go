@@ -9,6 +9,7 @@ import (
 
 	"github.com/contracttesting/broker/internal/common"
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/schemamapper"
 	"github.com/contracttesting/broker/internal/model"
 )
 
@@ -162,8 +163,6 @@ func (h *hydrator) hydrateResources(
 	return nil
 }
 
-// collectResource records one declaration of a resource; what the declarations add up
-// to is decided once they are all in.
 func (h *hydrator) collectResource(
 	source string,
 	resourcePath dsl.ResourcePath,
@@ -187,9 +186,6 @@ func (h *hydrator) entryFor(resourcePath dsl.ResourcePath, source string) *colle
 	entry := newCollectedResource(resourcePath, source)
 	h.collected = append(h.collected, entry)
 
-	// only a consumed resource merges: a provider has no second source of truth for the
-	// same interaction, so each declaration stands alone and a redeclaration reaches
-	// AddResource as the broken invariant it is
 	if resourcePath.IsConsumer() {
 		h.merging[resourcePath.String()] = entry
 	}
@@ -232,7 +228,7 @@ func newCollectedResource(resourcePath dsl.ResourcePath, source string) *collect
 	}
 }
 
-func (c *collectedResource) declare(flattened map[string]dsl.FlatProperty) {
+func (c *collectedResource) declare(flattened map[string]model.Property) {
 	c.declarations++
 
 	for path, flat := range flattened {
@@ -276,10 +272,10 @@ func (c *collectedResource) isRequest() bool {
 }
 
 // flattenResourceSchema resolves the paths a schema declares. The descent itself lives
-// in dsl.FlattenSchema; what is left here is the rejection of a type validation would
-// already have caught.
-func flattenResourceSchema(schemas dsl.SchemasMap, schemaName string) (map[string]dsl.FlatProperty, error) {
-	flattened := dsl.FlattenSchema(schemas, schemas[schemaName])
+// in schemamapper.ToPropertyModels; what is left here is the rejection of a type
+// validation would already have caught.
+func flattenResourceSchema(schemas dsl.SchemasMap, schemaName string) (map[string]model.Property, error) {
+	flattened := schemamapper.ToPropertyModels(schemas, schemas[schemaName])
 
 	for _, path := range slices.Sorted(maps.Keys(flattened)) {
 		if !dsl.IsSupportedType(flattened[path].Type) {

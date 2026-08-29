@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/schemamapper"
 )
 
 type resourceTypeConflictRule struct {
@@ -43,10 +44,10 @@ func (r *resourceTypeConflictRule) Validate(value any, contextualValidator *Cont
 		r.seen[resourceSchema.Path] = declaredTypes
 	}
 
-	flattened := dsl.FlattenSchema(contextualValidator.contractIndex.schemas, schema)
+	properties := schemamapper.ToPropertyModels(contextualValidator.contractIndex.schemas, schema)
 
-	for _, path := range slices.Sorted(maps.Keys(flattened)) {
-		current := typedProperty{propertyType: flattened[path].Type, source: contextualValidator.source}
+	for _, path := range slices.Sorted(maps.Keys(properties)) {
+		current := typedProperty{propertyType: properties[path].Type, source: contextualValidator.source}
 
 		previous, taken := declaredTypes[path]
 		if !taken {

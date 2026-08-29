@@ -1,6 +1,6 @@
 package validator
 
-import "github.com/contracttesting/broker/internal/dsl"
+import "github.com/contracttesting/broker/internal/mapper/schemamapper"
 
 // DepthCounter is the budget one schema branch carries. It travels by value: every
 // level gets a copy, so a deep branch never charges the branches beside it.
@@ -13,5 +13,5 @@ func (dc DepthCounter) Deeper() DepthCounter {
 }
 
 func (dc DepthCounter) Exceeded() bool {
-	return dc.levels >= dsl.MAX_DEPTH
+	return dc.levels >= schemamapper.MaxDepth
 }
