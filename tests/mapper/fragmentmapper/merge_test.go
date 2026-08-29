@@ -1,11 +1,11 @@
-package builder_test
+package fragmentmapper_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/contracttesting/broker/internal/builder"
 	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -136,6 +136,26 @@ const requiredReaderJSON = `{
   }
 }`
 
+const otherOptionalReaderJSON = `{
+  "consumes": {
+    "payments": {
+      "rest": {
+        "/invoices": {
+          "get": { "responses": { "200": "InvoiceOtherOptional" } }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "InvoiceOtherOptional": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "integer", "optional": true }
+      }
+    }
+  }
+}`
+
 const optionalSenderJSON = `{
   "consumes": {
     "payments": {
@@ -204,6 +224,10 @@ const providedPetsSchemalessJSON = `{
   }
 }`
 
+// fourModulesChecksum is the Checksum() the builder of the base commit 216034c produced
+// for list+detail+create+import under participant front_app; the mapper must match it.
+const fourModulesChecksum = "d55e2d0621975b40535271dc6fa098aa237646bb87924674e6b700a5fef23563"
+
 type mergedFile struct {
 	source string
 	raw    string
@@ -223,19 +247,30 @@ func mergeFragments(t *testing.T, files ...mergedFile) []dsl.Fragment {
 	return fragments
 }
 
+func mergeResources(t *testing.T, files ...mergedFile) []model.UploadedResource {
+	t.Helper()
+
+	resources, err := fragmentmapper.ToResourceModels(mergeFragments(t, files...))
+	require.NoError(t, err)
+
+	return resources
+}
+
 func mergeContract(t *testing.T, files ...mergedFile) *model.UploadedContract {
 	t.Helper()
 
 	contract := model.NewUploadedContract(0, "front_app", "1", "")
-	require.NoError(t, builder.Hydrate(mergeFragments(t, files...), contract))
+	for _, resource := range mergeResources(t, files...) {
+		require.NoError(t, contract.AddResource(&resource))
+	}
 
 	return contract
 }
 
-func mergedResource(t *testing.T, contract *model.UploadedContract, interaction model.Interaction) model.UploadedResource {
+func mergedResource(t *testing.T, resources []model.UploadedResource, interaction model.Interaction) model.UploadedResource {
 	t.Helper()
 
-	for _, resource := range contract.Resources {
+	for _, resource := range resources {
 		if resource.Interaction == interaction {
 			return resource
 		}
@@ -247,14 +282,14 @@ func mergedResource(t *testing.T, contract *model.UploadedContract, interaction 
 }
 
 func TestMerge_TwoConsumerModulesReadingOneResponse_UnionOfProperties(t *testing.T) {
-	contract := mergeContract(t,
+	resources := mergeResources(t,
 		mergedFile{"list.json", listModuleJSON},
 		mergedFile{"detail.json", detailModuleJSON},
 	)
 
-	require.Len(t, contract.Resources, 1)
+	require.Len(t, resources, 1)
 
-	resource := mergedResource(t, contract, model.RestResponse)
+	resource := mergedResource(t, resources, model.RestResponse)
 	assert.Equal(t, "/invoices", resource.Endpoint)
 	assert.Equal(t, "200", resource.ResponseStatusCode.String)
 
@@ -267,12 +302,12 @@ func TestMerge_TwoConsumerModulesReadingOneResponse_UnionOfProperties(t *testing
 }
 
 func TestMerge_TwoConsumerModulesSendingOneRequest_FieldSentByOneIsOptional(t *testing.T) {
-	contract := mergeContract(t,
+	resources := mergeResources(t,
 		mergedFile{"create.json", createModuleJSON},
 		mergedFile{"import.json", importModuleJSON},
 	)
 
-	request := mergedResource(t, contract, model.RestRequest)
+	request := mergedResource(t, resources, model.RestRequest)
 
 	assert.Equal(t, map[string]model.Property{
 		"$":       {Path: "$", Type: "object"},
@@ -283,39 +318,50 @@ func TestMerge_TwoConsumerModulesSendingOneRequest_FieldSentByOneIsOptional(t *t
 }
 
 func TestMerge_ResponseRequiredByOneReader_StaysRequired(t *testing.T) {
-	contract := mergeContract(t,
+	resources := mergeResources(t,
 		mergedFile{"optional.json", optionalReaderJSON},
 		mergedFile{"required.json", requiredReaderJSON},
 	)
 
-	resource := mergedResource(t, contract, model.RestResponse)
+	resource := mergedResource(t, resources, model.RestResponse)
 
 	assert.False(t, resource.Properties["$.total"].Optional)
 	assert.True(t, resource.Properties["$.status"].Optional)
 }
 
+func TestMerge_ResponseOptionalForEveryReader_StaysOptional(t *testing.T) {
+	resources := mergeResources(t,
+		mergedFile{"optional.json", optionalReaderJSON},
+		mergedFile{"other_optional.json", otherOptionalReaderJSON},
+	)
+
+	resource := mergedResource(t, resources, model.RestResponse)
+
+	assert.True(t, resource.Properties["$.total"].Optional)
+	assert.True(t, resource.Properties["$.status"].Optional)
+}
+
 func TestMerge_RequestOptionalForOneSender_IsOptionalForAll(t *testing.T) {
-	contract := mergeContract(t,
+	resources := mergeResources(t,
 		mergedFile{"optional.json", optionalSenderJSON},
 		mergedFile{"required.json", requiredSenderJSON},
 	)
 
-	request := mergedResource(t, contract, model.RestRequest)
+	request := mergedResource(t, resources, model.RestRequest)
 
 	assert.False(t, request.Properties["$.id"].Optional)
 	assert.True(t, request.Properties["$.note"].Optional)
 }
 
 func TestMerge_IdenticalDeclarationInTwoFiles_BuildsOneResource(t *testing.T) {
-	merged := mergeContract(t,
+	merged := mergeResources(t,
 		mergedFile{"a.json", listModuleJSON},
 		mergedFile{"b.json", listModuleJSON},
 	)
-	single := mergeContract(t, mergedFile{"a.json", listModuleJSON})
+	single := mergeResources(t, mergedFile{"a.json", listModuleJSON})
 
-	require.Len(t, merged.Resources, 1)
-	assert.Equal(t, single.Resources, merged.Resources)
-	assert.Equal(t, single.Checksum(), merged.Checksum())
+	require.Len(t, merged, 1)
+	assert.Equal(t, single, merged)
 }
 
 func TestMerge_FragmentOrderReversed_ProducesTheSameContract(t *testing.T) {
@@ -333,16 +379,15 @@ func TestMerge_FragmentOrderReversed_ProducesTheSameContract(t *testing.T) {
 	)
 
 	assert.Equal(t, forward.Resources, backward.Resources)
-	assert.Equal(t, forward.Checksum(), backward.Checksum())
+	assert.Equal(t, fourModulesChecksum, forward.Checksum())
+	assert.Equal(t, fourModulesChecksum, backward.Checksum())
 }
 
 func TestMerge_ProvidedResourceDeclaredTwice_BreaksTheInvariant(t *testing.T) {
-	contract := model.NewUploadedContract(0, "pets_service", "1", "")
-
-	err := builder.Hydrate(mergeFragments(t,
+	_, err := fragmentmapper.ToResourceModels(mergeFragments(t,
 		mergedFile{"a.json", providedPetsJSON},
 		mergedFile{"b.json", providedPetsSchemalessJSON},
-	), contract)
+	))
 
 	require.EqualError(t, err, "resource already added: provides GET /pets 200 from a.json and b.json")
 }

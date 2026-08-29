@@ -14,8 +14,6 @@ type UploadedContract struct {
 	Resources       map[string]UploadedResource
 	ParticipantID   int64
 	ParticipantName string
-
-	resourceSources map[string]string
 }
 
 func NewUploadedContract(
@@ -35,26 +33,19 @@ func NewUploadedContract(
 // AddResource rejects a resource whose hash is already taken: two resources with the
 // same hash are the same resource. Publish validation rejects a redeclaration before
 // the build starts, so a hit here is a broken invariant rather than bad input.
-func (contract *UploadedContract) AddResource(resource *UploadedResource, source string) error {
+func (contract *UploadedContract) AddResource(resource *UploadedResource) error {
 	if contract.Resources == nil {
 		contract.Resources = make(map[string]UploadedResource)
-		contract.resourceSources = make(map[string]string)
 	}
 
 	resource.ParticipantName = contract.ParticipantName
 	hash := resource.PrimaryHash()
 
-	if declaredIn, taken := contract.resourceSources[hash]; taken {
-		return fmt.Errorf(
-			"resource already added: %s from %s and %s",
-			resource.Describe(),
-			declaredIn,
-			source,
-		)
+	if _, taken := contract.Resources[hash]; taken {
+		return fmt.Errorf("resource already added: %s", resource.Describe())
 	}
 
 	contract.Resources[hash] = *resource
-	contract.resourceSources[hash] = source
 
 	return nil
 }

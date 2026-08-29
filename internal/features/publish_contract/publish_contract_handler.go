@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/contracttesting/broker/internal/builder"
 	"github.com/contracttesting/broker/internal/dsl"
 	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
+	"github.com/contracttesting/broker/internal/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
@@ -62,11 +62,18 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondValidationFailed(ctx, violations)
 	}
 
+	resources, err := fragmentmapper.ToResourceModels(contractFragments)
+	if err != nil {
+		return ctr.respondPublishFailed(ctx)
+	}
+
 	contractContent, _ := json.Marshal(requestBody.Contracts)
 
 	contract := model.NewUploadedContract(participant.ID, participant.Name, version, string(contractContent))
-	if err := builder.Hydrate(contractFragments, contract); err != nil {
-		return ctr.respondPublishFailed(ctx)
+	for _, resource := range resources {
+		if err := contract.AddResource(&resource); err != nil {
+			return ctr.respondPublishFailed(ctx)
+		}
 	}
 
 	if existing, found := ctr.contractRepository.LoadChecksumForVersion(ctx.Context(), contract.ParticipantID, version); found {
