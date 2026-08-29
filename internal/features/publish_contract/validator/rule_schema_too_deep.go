@@ -22,7 +22,7 @@ func (schemaTooDeepRule) Validate(value any, contextualValidator *ContextualVali
 	contextualValidator.addViolation(fmt.Sprintf(
 		"schema %s is too deep with more than %d levels (%s)",
 		contextualValidator.rootSchema,
-		MAX_DEPTH,
+		dsl.MAX_DEPTH,
 		contextualValidator.source,
 	))
 }

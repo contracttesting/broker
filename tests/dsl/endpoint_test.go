@@ -30,7 +30,8 @@ func endpointProvidesJSON(endpoint string) string {
 }
 
 // endpointContract runs the transformation half of the publish pipeline over one valid
-// file: normalize, then build. Rejection is the validator's business, tested there.
+// file: the build, which normalizes each endpoint as it keys the resource. Rejection is
+// the validator's business, tested there.
 func endpointContract(t *testing.T, raw string) *model.UploadedContract {
 	t.Helper()
 
@@ -38,8 +39,6 @@ func endpointContract(t *testing.T, raw string) *model.UploadedContract {
 	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
 
 	fragments := []dsl.Fragment{{Source: "things.yaml", Contract: &dslContract}}
-
-	dsl.Normalize(fragments)
 
 	contract := model.NewUploadedContract(0, "things-app", "1", raw)
 	require.NoError(t, builder.Hydrate(fragments, contract))

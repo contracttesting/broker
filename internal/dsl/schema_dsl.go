@@ -29,13 +29,23 @@ func (s *Schema) IsArray() bool {
 
 func (s *Schema) IsPrimitive() bool {
 	if s.Type != "" {
-		return s.Type == "string" ||
-			s.Type == "integer" ||
-			s.Type == "float" ||
-			s.Type == "boolean"
+		return isPrimitiveType(s.Type)
 	}
 
 	return false
+}
+
+// IsSupportedType answers for a resolved type name what IsObject/IsArray/IsPrimitive
+// answer for a schema node.
+func IsSupportedType(schemaType string) bool {
+	return schemaType == "object" || schemaType == "array" || isPrimitiveType(schemaType)
+}
+
+func isPrimitiveType(schemaType string) bool {
+	return schemaType == "string" ||
+		schemaType == "integer" ||
+		schemaType == "float" ||
+		schemaType == "boolean"
 }
 
 func (s *Schema) IsRef() bool {
