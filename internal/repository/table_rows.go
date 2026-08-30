@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/contracttesting/broker/internal/contract_differ"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/guregu/null"
 )
@@ -70,7 +69,7 @@ func (c *tableRow) toResourceModel() model.PersistedResource {
 		ParticipantID:    c.ParticipantID,
 		ContractID:       c.ContractID,
 		ProviderHash:     c.ResourceProviderHash,
-		Removed:          c.ResourceVersionChangeType == string(contract_differ.ChangeRemoved),
+		Removed:          c.ResourceVersionChangeType == string(model.ChangeRemoved),
 	}
 
 	if c.ResourceVersion != "" {
@@ -110,18 +109,18 @@ type insertPropertyVersionRow struct {
 }
 
 func newInsertPropertyVersionRowAdded(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(contractID, propertyID, p, contract_differ.ChangeAdded)
+	return newInsertPropertyVersionRow(contractID, propertyID, p, model.ChangeAdded)
 }
 
 func newInsertPropertyVersionRowModified(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(contractID, propertyID, p, contract_differ.ChangeModified)
+	return newInsertPropertyVersionRow(contractID, propertyID, p, model.ChangeModified)
 }
 
 func newInsertPropertyVersionRowRemoved(contractID, propertyID int64, p model.Property) *insertPropertyVersionRow {
-	return newInsertPropertyVersionRow(contractID, propertyID, p, contract_differ.ChangeRemoved)
+	return newInsertPropertyVersionRow(contractID, propertyID, p, model.ChangeRemoved)
 }
 
-func newInsertPropertyVersionRow(contractID, propertyID int64, p model.Property, change contract_differ.ChangeKind) *insertPropertyVersionRow {
+func newInsertPropertyVersionRow(contractID, propertyID int64, p model.Property, change model.ChangeKind) *insertPropertyVersionRow {
 	return &insertPropertyVersionRow{
 		PropertyID: propertyID,
 		ContractID: contractID,
@@ -141,7 +140,7 @@ func newInsertResourceVersionRowAdded(contractID, resourceID int64) *insertResou
 	return &insertResourceVersionRow{
 		ResourceID: resourceID,
 		ContractID: contractID,
-		ChangeType: string(contract_differ.ChangeAdded),
+		ChangeType: string(model.ChangeAdded),
 	}
 }
 
@@ -149,6 +148,6 @@ func newInsertResourceVersionRowRemoved(contractID, resourceID int64) *insertRes
 	return &insertResourceVersionRow{
 		ResourceID: resourceID,
 		ContractID: contractID,
-		ChangeType: string(contract_differ.ChangeRemoved),
+		ChangeType: string(model.ChangeRemoved),
 	}
 }

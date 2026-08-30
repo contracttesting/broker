@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/contracttesting/broker/internal/model"
-	"github.com/contracttesting/broker/internal/repository"
 )
 
 type VerdictReader interface {
@@ -12,24 +11,18 @@ type VerdictReader interface {
 }
 
 type CompatibilityChecker struct {
-	repository *repository.ContractRepository
-	verdicts   VerdictReader
+	verdicts VerdictReader
 }
 
-func NewCompatibilityChecker(
-	repository *repository.ContractRepository,
-	verdicts VerdictReader,
-) *CompatibilityChecker {
-	return &CompatibilityChecker{
-		repository: repository,
-		verdicts:   verdicts,
-	}
+func NewCompatibilityChecker(verdicts VerdictReader) *CompatibilityChecker {
+	return &CompatibilityChecker{verdicts: verdicts}
 }
 
 func (c *CompatibilityChecker) Check(
 	ctx context.Context,
 	contract *model.PersistedContract,
 	environment *model.Environment,
+	counterparts model.ResourceCounterparts,
 ) *ContractCompatibilityReport {
 	report := NewContractCompatibilityReport(
 		contract.ParticipantName,
@@ -46,7 +39,7 @@ func (c *CompatibilityChecker) Check(
 	for _, resource := range contract.Resources {
 		if resource.Removed {
 			if resource.Direction == model.Provides {
-				c.checkRemovedProvider(ctx, resource, environment, report)
+				c.checkRemovedProvider(resource, counterparts, report)
 			}
 
 			continue
@@ -54,9 +47,9 @@ func (c *CompatibilityChecker) Check(
 
 		switch resource.Direction {
 		case model.Consumes:
-			c.checkConsumer(ctx, resource, environment, pairs, report)
+			c.checkConsumer(ctx, resource, environment, counterparts, pairs, report)
 		case model.Provides:
-			c.checkProvider(ctx, resource, environment, pairs, report)
+			c.checkProvider(ctx, resource, counterparts, pairs, report)
 		}
 	}
 
@@ -78,7 +71,7 @@ type pairState struct {
 }
 
 func (p *checkedPairs) resolve(ctx context.Context, counterpartContractID int64) *pairState {
-	one, two := repository.OrderPair(p.contractID, counterpartContractID)
+	one, two := model.OrderContractPair(p.contractID, counterpartContractID)
 
 	state, seen := p.states[[2]int64{one, two}]
 	if seen {

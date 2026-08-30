@@ -47,15 +47,6 @@ const (
 	`
 )
 
-// OrderPair is the single canonicalization of a snapshot pair: the lower id first.
-func OrderPair(a, b int64) (int64, int64) {
-	if a <= b {
-		return a, b
-	}
-
-	return b, a
-}
-
 type CompatibilityRepository struct {
 	pool *pgxpool.Pool
 }
@@ -97,7 +88,7 @@ func (r *CompatibilityRepository) GetVerdict(
 	ctx context.Context,
 	one, two int64,
 ) (*model.CompatibilityVerdict, bool) {
-	contractIDOne, contractIDTwo := OrderPair(one, two)
+	contractIDOne, contractIDTwo := model.OrderContractPair(one, two)
 
 	verdict := &model.CompatibilityVerdict{}
 	var breaks []byte
@@ -166,7 +157,7 @@ func (r *CompatibilityRepository) insertVerdict(
 	tx pgx.Tx,
 	verdict *model.CompatibilityVerdict,
 ) {
-	contractIDOne, contractIDTwo := OrderPair(verdict.ContractIDOne, verdict.ContractIDTwo)
+	contractIDOne, contractIDTwo := model.OrderContractPair(verdict.ContractIDOne, verdict.ContractIDTwo)
 
 	breaks, err := json.Marshal(verdict.Breaks)
 	if err != nil {
