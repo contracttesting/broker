@@ -9,15 +9,11 @@ import (
 func (c *CompatibilityChecker) checkProvider(
 	ctx context.Context,
 	providerResource model.PersistedResource,
-	environment *model.Environment,
+	counterparts model.ResourceCounterparts,
 	pairs *checkedPairs,
 	report *ContractCompatibilityReport,
 ) {
-	consumers := c.repository.GetConsumersResourcesByProviderHashAndEnvironmentID(
-		ctx,
-		providerResource.ProviderHash,
-		environment.ID,
-	)
+	consumers := counterparts.Consumers[providerResource.ProviderHash]
 
 	for _, consumerResource := range consumers {
 		result := NewIncompatibleItem()

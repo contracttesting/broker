@@ -1,24 +1,15 @@
 package compatibility_checker
 
-import (
-	"context"
-
-	"github.com/contracttesting/broker/internal/model"
-)
+import "github.com/contracttesting/broker/internal/model"
 
 // checkRemovedProvider runs outside the pair cache: the pair verdict may have been stored by
 // the consumer's own check, which never sees the removal, so it is always resolved live.
 func (c *CompatibilityChecker) checkRemovedProvider(
-	ctx context.Context,
 	removedResource model.PersistedResource,
-	environment *model.Environment,
+	counterparts model.ResourceCounterparts,
 	report *ContractCompatibilityReport,
 ) {
-	consumers := c.repository.GetConsumersResourcesByProviderHashAndEnvironmentID(
-		ctx,
-		removedResource.ProviderHash,
-		environment.ID,
-	)
+	consumers := counterparts.Consumers[removedResource.ProviderHash]
 
 	for _, result := range CheckRemovedProviderResource(&removedResource, consumers) {
 		report.AppendResult(result.IncompatibleCounterpart.ParticipantName, result)

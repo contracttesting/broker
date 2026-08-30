@@ -64,10 +64,13 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 		return h.respondInvalidInput(ctx)
 	}
 
+	counterparts := h.contractRepository.LoadCounterparts(ctx.Context(), contract, environment.ID)
+
 	compatibilityReport := h.compatibilityChecker.Check(
 		ctx.Context(),
 		contract,
 		environment,
+		counterparts,
 	)
 
 	deployable := true
@@ -119,7 +122,7 @@ func (h *CanIDeployHandler) recordCheck(
 		}
 
 		if counterpart.ContractID > 0 {
-			contractIDOne, contractIDTwo := repository.OrderPair(contract.ID, counterpart.ContractID)
+			contractIDOne, contractIDTwo := model.OrderContractPair(contract.ID, counterpart.ContractID)
 			pair := [2]int64{contractIDOne, contractIDTwo}
 
 			result.VerdictContractIDOne = null.IntFrom(contractIDOne)

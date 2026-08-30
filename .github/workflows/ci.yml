@@ -51,3 +51,13 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  arch-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go run github.com/fe3dback/go-arch-lint@v1.18.0 check --project-path .

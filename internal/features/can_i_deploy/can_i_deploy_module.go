@@ -10,10 +10,7 @@ func Register(components *components.Components) {
 	contractRepository := repository.NewContractRepository(components.Pool)
 	participantRepository := repository.NewParticipantRepository(components.Pool)
 	compatibilityRepository := repository.NewCompatibilityRepository(components.Pool)
-	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(
-		contractRepository,
-		compatibilityRepository,
-	)
+	compatibilityChecker := compatibility_checker.NewCompatibilityChecker(compatibilityRepository)
 	environmentRepository := repository.NewEnvironmentRepository(components.Pool)
 
 	handler := NewCanIDeployHandler(

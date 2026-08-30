@@ -230,7 +230,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_CompatiblePairIsStoredWi
 
 	frontContractID := s.contractIDForPersistence("front", "v1")
 	widgetsContractID := s.contractIDForPersistence("widgets", "v1")
-	expectedOne, expectedTwo := repository.OrderPair(frontContractID, widgetsContractID)
+	expectedOne, expectedTwo := model.OrderContractPair(frontContractID, widgetsContractID)
 
 	var contractIDOne, contractIDTwo int64
 	var breaks string
@@ -359,7 +359,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_RecordingTheSamePairTwic
 
 	frontContractID := s.contractIDForPersistence("front", "v1")
 	widgetsContractID := s.contractIDForPersistence("widgets", "v1")
-	contractIDOne, contractIDTwo := repository.OrderPair(frontContractID, widgetsContractID)
+	contractIDOne, contractIDTwo := model.OrderContractPair(frontContractID, widgetsContractID)
 
 	recordCheck := func() {
 		check := &model.CompatibilityCheck{

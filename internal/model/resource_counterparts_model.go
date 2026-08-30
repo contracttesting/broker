@@ -1,0 +1,6 @@
+package model
+
+type ResourceCounterparts struct {
+	Providers map[string]PersistedResource   // provider hash → the provider deployed in the environment
+	Consumers map[string][]PersistedResource // provider hash → the consumers of that hash in the environment
+}

@@ -2,10 +2,8 @@ package compatibility_checker
 
 import (
 	"context"
-	"errors"
 
 	"github.com/contracttesting/broker/internal/model"
-	"github.com/contracttesting/broker/internal/repository"
 	"github.com/guregu/null"
 )
 
@@ -13,18 +11,15 @@ func (c *CompatibilityChecker) checkConsumer(
 	ctx context.Context,
 	consumerResource model.PersistedResource,
 	environment *model.Environment,
+	counterparts model.ResourceCounterparts,
 	pairs *checkedPairs,
 	report *ContractCompatibilityReport,
 ) {
-	providerResource, err := c.repository.GetProviderResourceByConsumerResource(
-		ctx,
-		consumerResource.ProviderHash,
-		environment.ID,
-	)
+	providerResource, found := counterparts.Providers[consumerResource.ProviderHash]
 
 	incompatibleItem := NewIncompatibleItem()
 
-	if errors.Is(err, repository.ErrProviderResourceNotFound) {
+	if !found {
 		incompatibleItem.AppendContractBreakChange(
 			NewProviderResourceNotFound(&consumerResource),
 		)

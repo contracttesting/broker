@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/contracttesting/broker/internal/contract_differ"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,10 +16,6 @@ var (
 )
 
 const (
-	hasContractsForParticipantQuery = `
-		SELECT EXISTS(SELECT 1 FROM contracts WHERE participant_id = $1)
-	`
-
 	hasContractForVersionQuery = `
 		SELECT EXISTS(SELECT 1 FROM contract_versions WHERE participant_id = $1 AND version = $2)
 	`
@@ -362,16 +357,6 @@ func NewContractRepository(pool *pgxpool.Pool) *ContractRepository {
 	return &ContractRepository{pool: pool}
 }
 
-func (r *ContractRepository) HasContractsForParticipant(ctx context.Context, participantID int64) bool {
-	var exists bool
-
-	if err := r.pool.QueryRow(ctx, hasContractsForParticipantQuery, participantID).Scan(&exists); err != nil {
-		panic(fmt.Errorf("error checking contracts for participant: %w", err))
-	}
-
-	return exists
-}
-
 func (r *ContractRepository) HasContractForVersion(ctx context.Context, participantID int64, version string) bool {
 	var exists bool
 
@@ -427,6 +412,8 @@ func (r *ContractRepository) Create(
 func (r *ContractRepository) Update(
 	ctx context.Context,
 	next *model.UploadedContract,
+	current *model.PersistedContract,
+	diff model.ContractDiff,
 ) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -435,19 +422,12 @@ func (r *ContractRepository) Update(
 
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	current, existing := r.GetLatestContractByName(ctx, next.ParticipantName)
-	if !existing {
-		panic("contract cannot be updated: contract not found")
-	}
-
-	diffResourceProperties := contract_differ.DiffResourceProperties(loadedProperties(current), uploadedProperties(next))
-
 	r.insertContract(ctx, tx, next)
 	r.insertContractVersion(ctx, tx, next)
 
-	for key, resourceChange := range diffResourceProperties.Resources {
+	for key, resourceChange := range diff.Resources {
 		switch resourceChange.Kind {
-		case contract_differ.ChangeAdded:
+		case model.ChangeAdded:
 			resource := next.Resources[key]
 			resourceID := r.insertResource(ctx, tx, next.ParticipantID, &resource)
 			r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowAdded(next.ID, resourceID))
@@ -457,30 +437,30 @@ func (r *ContractRepository) Update(
 				r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
 			}
 
-		case contract_differ.ChangeModified:
+		case model.ChangeModified:
 			resource := next.Resources[key]
 			resourceID, _ := r.findResourceIDByHash(ctx, tx, key, resource.Direction)
 
 			for _, propertyChange := range resourceChange.Properties {
 				switch propertyChange.Kind {
-				case contract_differ.ChangeAdded:
+				case model.ChangeAdded:
 					property := propertyChange.After
 					propertyID := r.insertNewProperty(ctx, tx, resourceID, &property)
 					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowAdded(next.ID, propertyID, property))
 
-				case contract_differ.ChangeModified:
+				case model.ChangeModified:
 					property := propertyChange.After
 					propertyID, _ := r.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
 					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowModified(next.ID, propertyID, property))
 
-				case contract_differ.ChangeRemoved:
+				case model.ChangeRemoved:
 					property := propertyChange.Before
 					propertyID, _ := r.getPropertyIDByResourceIDAndPropertyPath(ctx, tx, resourceID, property.Path)
 					r.insertPropertyVersion(ctx, tx, newInsertPropertyVersionRowRemoved(next.ID, propertyID, property))
 				}
 			}
 
-		case contract_differ.ChangeRemoved:
+		case model.ChangeRemoved:
 			resource := current.Resources[key]
 			resourceID, _ := r.findResourceIDByHash(ctx, tx, key, resource.Direction)
 			r.insertResourceVersion(ctx, tx, newInsertResourceVersionRowRemoved(next.ID, resourceID))
@@ -496,23 +476,6 @@ func (r *ContractRepository) Update(
 	if err := tx.Commit(ctx); err != nil {
 		panic(fmt.Errorf("error committing transaction: %w", err))
 	}
-}
-
-func loadedProperties(contract *model.PersistedContract) map[string]contract_differ.ResourceProperties {
-	properties := make(map[string]contract_differ.ResourceProperties, len(contract.Resources))
-	for key, resource := range contract.Resources {
-		properties[key] = resource.Properties
-	}
-
-	return properties
-}
-
-func uploadedProperties(contract *model.UploadedContract) map[string]contract_differ.ResourceProperties {
-	out := make(map[string]contract_differ.ResourceProperties, len(contract.Resources))
-	for key, resource := range contract.Resources {
-		out[key] = resource.Properties
-	}
-	return out
 }
 
 // AliasVersionToSnapshot points a new version at an existing snapshot with the same
@@ -783,9 +746,9 @@ func scanPersistedContractTree(rows pgx.Rows) (*model.PersistedContract, bool) {
 
 		// A removed resource has all its properties removed too, so it has to be taken
 		// before the property skip: only its existence matters, no property is attached.
-		removedResource := row.ResourceVersionChangeType == string(contract_differ.ChangeRemoved)
+		removedResource := row.ResourceVersionChangeType == string(model.ChangeRemoved)
 
-		if !removedResource && row.PropertyVersionChangeType == string(contract_differ.ChangeRemoved) {
+		if !removedResource && row.PropertyVersionChangeType == string(model.ChangeRemoved) {
 			continue
 		}
 

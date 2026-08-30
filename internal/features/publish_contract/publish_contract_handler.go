@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/contracttesting/broker/internal/contract_differ"
 	"github.com/contracttesting/broker/internal/dsl"
 	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
 	"github.com/contracttesting/broker/internal/mapper/fragmentmapper"
@@ -99,13 +100,14 @@ func (ctr *PublishContractHandler) respondParticipantNotFound(ctx fiber.Ctx) err
 }
 
 func (ctr *PublishContractHandler) upsert(ctx fiber.Ctx, contract *model.UploadedContract) {
-	if ctr.contractRepository.HasContractsForParticipant(ctx.Context(), contract.ParticipantID) {
-		ctr.contractRepository.Update(ctx.Context(), contract)
+	current, existing := ctr.contractRepository.GetLatestContractByName(ctx.Context(), contract.ParticipantName)
+	if !existing {
+		ctr.contractRepository.Create(ctx.Context(), contract)
 
 		return
 	}
 
-	ctr.contractRepository.Create(ctx.Context(), contract)
+	ctr.contractRepository.Update(ctx.Context(), contract, current, contract_differ.DiffContracts(current, contract))
 }
 
 func (ctr *PublishContractHandler) respondBadRequest(ctx fiber.Ctx, err error) error {
