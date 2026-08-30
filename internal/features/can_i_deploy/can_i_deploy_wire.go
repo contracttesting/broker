@@ -1,7 +1,7 @@
 package can_i_deploy
 
 import (
-	"github.com/contracttesting/broker/internal/compatibility_checker"
+	"github.com/contracttesting/broker/internal/features/can_i_deploy/compatibility_checker"
 )
 
 const ContractNotFound = "contract not found"

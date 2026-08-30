@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
 	"github.com/goccy/go-yaml"
 )
 

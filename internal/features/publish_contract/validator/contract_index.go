@@ -4,7 +4,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
 )
 
 type ContractIndex struct {

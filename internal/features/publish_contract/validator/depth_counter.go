@@ -1,6 +1,6 @@
 package validator
 
-import "github.com/contracttesting/broker/internal/mapper/schemamapper"
+import "github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
 
 // DepthCounter is the depth budget one schema branch carries.
 type DepthCounter struct {
