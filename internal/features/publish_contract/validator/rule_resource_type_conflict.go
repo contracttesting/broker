@@ -5,9 +5,9 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/contracttesting/broker/internal/dsl"
-	"github.com/contracttesting/broker/internal/mapper/resourcepathmapper"
-	"github.com/contracttesting/broker/internal/mapper/schemamapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/resourcepathmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
 )
 
 type resourceTypeConflictRule struct {

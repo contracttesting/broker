@@ -3,7 +3,7 @@ package can_i_deploy
 import (
 	"context"
 
-	"github.com/contracttesting/broker/internal/compatibility_checker"
+	"github.com/contracttesting/broker/internal/features/can_i_deploy/compatibility_checker"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"

@@ -3,7 +3,7 @@ package validator
 import (
 	"fmt"
 
-	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
 )
 
 type schemaInvalidTypeRule struct{}

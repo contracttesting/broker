@@ -3,8 +3,8 @@ package validator
 import (
 	"fmt"
 
-	"github.com/contracttesting/broker/internal/dsl"
-	"github.com/contracttesting/broker/internal/mapper/schemamapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
 )
 
 type schemaTooDeepRule struct{}

@@ -6,8 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/contracttesting/broker/internal/common"
-	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
 	"github.com/contracttesting/broker/internal/validations"
 )
 
@@ -86,7 +85,7 @@ func (v *ContextualValidator) validateRest(rest dsl.Rest, where string, resource
 		v.where = where
 		v.validateBySegment(SegmentEndpoint, endpoint)
 
-		normalized := common.NormalizeEndpoint(endpoint)
+		normalized := dsl.NormalizeEndpoint(endpoint)
 
 		if validations.Endpoint(normalized) != nil {
 			continue

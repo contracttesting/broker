@@ -3,7 +3,7 @@ package validator
 import (
 	"fmt"
 
-	"github.com/contracttesting/broker/internal/common"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
 	"github.com/contracttesting/broker/internal/validations"
 )
 
@@ -17,7 +17,7 @@ func (endpointSyntaxRule) Validate(value any, contextualValidator *ContextualVal
 		return
 	}
 
-	if err := validations.Endpoint(common.NormalizeEndpoint(endpoint)); err != nil {
+	if err := validations.Endpoint(dsl.NormalizeEndpoint(endpoint)); err != nil {
 		contextualValidator.addViolation(fmt.Sprintf("invalid endpoint %q: %s (%s)", endpoint, err, contextualValidator.source))
 	}
 }

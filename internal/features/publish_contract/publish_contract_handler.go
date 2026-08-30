@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/contracttesting/broker/internal/contract_differ"
-	"github.com/contracttesting/broker/internal/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract_differ"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
-	"github.com/contracttesting/broker/internal/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"

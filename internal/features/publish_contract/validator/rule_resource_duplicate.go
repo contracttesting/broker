@@ -3,8 +3,8 @@ package validator
 import (
 	"fmt"
 
-	"github.com/contracttesting/broker/internal/dsl"
-	"github.com/contracttesting/broker/internal/mapper/resourcepathmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/resourcepathmapper"
 )
 
 type resourceDuplicateRule struct {
