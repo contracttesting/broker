@@ -82,14 +82,20 @@ Licensor.
 ## How to sign
 
 Open your pull request as usual. A bot will comment asking you to sign, and you
-sign by replying to it with:
+sign by posting a new comment whose entire text is:
 
 ```
 I have read the CLA Document and I hereby sign the CLA
 ```
 
+The comment must contain nothing else — no greeting, and no quote of the bot's
+message. A comment with anything before or after the phrase does not sign.
+
 Your signature is recorded in this repository and covers all your future
 contributions to it. You only sign once.
+
+If the check does not go green shortly after you sign, comment `recheck` to run
+it again.
 
 ## Questions
 
