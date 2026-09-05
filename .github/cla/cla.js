@@ -4,7 +4,6 @@ const DOCUMENT_PATH = 'CLA.md';
 const COMMENT_MARKER = '<!-- cla-check -->';
 const GITHUB_ACTIONS_BOT = 'github-actions[bot]';
 const GITHUB_ACTIONS_BOT_ID = 41898282;
-const RECHECK = 'recheck';
 
 module.exports = async ({ github, context, core }) => {
   if (context.eventName === 'pull_request_target') {
@@ -64,7 +63,8 @@ async function handleIssueComment(github, context, core) {
 
   const body = comment.body.trim().toLowerCase();
   const phrase = process.env.CLA_SIGNATURE_PHRASE.trim().toLowerCase();
-  if (body !== phrase && body !== RECHECK) {
+  const recheck = process.env.CLA_RECHECK_KEYWORD.trim().toLowerCase();
+  if (body !== phrase && body !== recheck) {
     return;
   }
 
@@ -246,7 +246,7 @@ function commentBody(context, pending, unidentifiable) {
     );
   }
 
-  lines.push(`Comment \`${RECHECK}\` to run this check again.`);
+  lines.push(`Comment \`${process.env.CLA_RECHECK_KEYWORD}\` to run this check again.`);
   return lines.join('\n');
 }
 

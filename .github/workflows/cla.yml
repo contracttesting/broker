@@ -21,6 +21,7 @@ jobs:
         env:
           CLA_ALLOWLIST: alefcastelo,dependabot[bot]
           CLA_SIGNATURE_PHRASE: I have read the CLA Document and I hereby sign the CLA
+          CLA_RECHECK_KEYWORD: recheck
         with:
           script: |
             const cla = require('./.github/cla/cla.js')
