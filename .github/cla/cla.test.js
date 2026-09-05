@@ -24,17 +24,29 @@ function makeWorld(options) {
     ledgerSha: options.ledger ? 'ledgersha' : undefined,
     comments: options.comments ?? [],
     calls: [],
+    commitPages: [],
     conflictsLeft: options.conflictsLeft ?? 0,
     nextCommentId: 900,
   };
 
   const github = {
-    paginate: async (route, parameters) => route(parameters).then((response) => response.data),
+    // Follows pages until one comes back shorter than per_page, like Octokit's paginate.
+    paginate: async (route, parameters) => {
+      const items = [];
+      for (let page = 1; ; page += 1) {
+        const { data } = await route({ ...parameters, page });
+        items.push(...data);
+        if (data.length < parameters.per_page) {
+          return items;
+        }
+      }
+    },
     rest: {
       pulls: {
         listCommits: async (p) => {
           world.calls.push(['listCommits', p.per_page]);
-          return { data: world.commits };
+          world.commitPages.push(p.page);
+          return { data: world.commits.slice((p.page - 1) * p.per_page, p.page * p.per_page) };
         },
         get: async (p) => ({
           data: { number: p.pull_number, head: { sha: 'headsha' } },
@@ -161,6 +173,22 @@ test('pending + unidentifiable fails with one comment naming both', async () => 
   assert.strictEqual(world.comments.length, 1, 'three runs must leave exactly one comment');
   assert.deepStrictEqual(world.calls.filter((c) => c[0] === 'createComment'), []);
   assert.deepStrictEqual(world.calls.filter((c) => c[0] === 'updateComment'), [], 'identical body is not rewritten');
+});
+
+test('authors past the first page are gated', async () => {
+  const commits = Array.from({ length: 250 }, () => identified('octo', 2));
+  commits[249] = identified('lastpage', 42);
+  const { world, github, core } = makeWorld({
+    commits,
+    ledger: { signedContributors: [{ login: 'octo', id: 2 }] },
+  });
+  await cla({ github, context: prContext, core });
+  const failed = world.calls.filter((c) => c[0] === 'setFailed');
+  assert.strictEqual(failed.length, 1, 'the author found only on the last page must fail the check');
+  assert.match(failed[0][1], /@lastpage/);
+  assert.strictEqual(world.comments.length, 1);
+  assert.match(world.comments[0].body, /@lastpage/);
+  assert.deepStrictEqual(world.commitPages, [1, 2, 3]);
 });
 
 test('signed author passes and the existing comment flips to the all-signed state', async () => {
