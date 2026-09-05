@@ -1,0 +1,1 @@
+# CLA signatures\n\nThis branch is the signature ledger for the Contributor License Agreement in\n on . The CLA workflow appends to \nhere when a contributor signs by commenting on their pull request.\n\nIt carries no source code on purpose, and must never be protected by a\nruleset -- the action needs to push to it.\n
