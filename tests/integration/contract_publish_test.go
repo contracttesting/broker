@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"net/http"
+	"strings"
 )
 
 const contractBody = `{
@@ -316,7 +317,7 @@ func (s *IntegrationSuite) TestPublishContract_MalformedJSON() {
 
 	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"broken.json", `{"provides":`}))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"malformed contract file: broken.json: unexpected end of JSON input"}`, body)
+	s.JSONEq(`{"message":"malformed contract file: broken.json: [1:12] could not find map value\n>  1 | {\"provides\":\n                  ^\n"}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -343,7 +344,9 @@ func (s *IntegrationSuite) TestPublishContract_ParamEndpoint_RejectedNothingStor
 
 	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBodyParamEndpoint}))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["invalid endpoint \"/users/{userId}\": dynamic path segments must use * (api.json)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.json","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -354,7 +357,9 @@ func (s *IntegrationSuite) TestPublishContract_BadServiceName_RejectedNothingSto
 
 	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1", contractFragment{"api.json", contractBodyBadServiceName}))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["invalid service name \"Payments-API\": must be snake_case (api.json)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"service.name_syntax","path":"consumes;Payments-API","source":"api.json","details":{"key":"Payments-API","error":"must be snake_case"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -445,7 +450,9 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateResponseResource_Rejecte
 		contractFragment{"schemas.yaml", petsSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: provides GET /pets 200 declared in pets.yaml and store.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"resource.duplicate","path":"provides;rest;/pets;get;responses;200","source":"store.yaml","details":{"resource":"provides GET /pets 200","declaredIn":"pets.yaml"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 	s.Equal(0, s.countRows("resources"))
@@ -461,7 +468,10 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateRequestResource_Rejected
 		contractFragment{"schemas.yaml", petsSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: provides POST /pets request declared in pets.yaml and store.yaml","duplicate resource: provides POST /pets 201 declared in pets.yaml and store.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"resource.duplicate","path":"provides;rest;/pets;post;request","source":"store.yaml","details":{"resource":"provides POST /pets request","declaredIn":"pets.yaml"}},`+
+		`{"code":"resource.duplicate","path":"provides;rest;/pets;post;responses;201","source":"store.yaml","details":{"resource":"provides POST /pets 201","declaredIn":"pets.yaml"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -492,7 +502,9 @@ func (s *IntegrationSuite) TestPublishContract_TrailingSlashCountsAsDuplicate() 
 		contractFragment{"schemas.yaml", petsSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: provides GET /pets 200 declared in pets.yaml and store.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"resource.duplicate","path":"provides;rest;/pets;get;responses;200","source":"store.yaml","details":{"resource":"provides GET /pets 200","declaredIn":"pets.yaml"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -507,7 +519,9 @@ func (s *IntegrationSuite) TestPublishContract_DuplicateSchema_Rejected() {
 		contractFragment{"billing.yaml", billingSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate schema: Pet declared in billing.yaml and schemas.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.duplicate","path":"schemas;Pet","source":"schemas.yaml","details":{"schema":"Pet","declaredIn":"billing.yaml"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -613,8 +627,8 @@ func (s *IntegrationSuite) TestPublishContract_InvalidSchemaType_Rejected() {
 	))
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`"invalid schema type \"strng\" at Pet.id (api.yaml)",`+
-		`"invalid schema type \"\" at Pet.tags[] (api.yaml)"`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.yaml","details":{"value":"strng","allowed":"object, array, string, integer, float, boolean"}},`+
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;tags;items","source":"api.yaml","details":{"value":"","allowed":"object, array, string, integer, float, boolean"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
@@ -629,8 +643,8 @@ func (s *IntegrationSuite) TestPublishContract_StatusCodeOutOfRange_Rejected() {
 	))
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`"invalid status code -1 at provides GET /pets (api.yaml)",`+
-		`"invalid status code 999 at provides GET /pets (api.yaml)"`+
+		`{"code":"status.out_of_range","path":"provides;rest;/pets;get;responses;-1","source":"api.yaml","details":{"key":"-1","error":"must be between 100 and 599"}},`+
+		`{"code":"status.out_of_range","path":"provides;rest;/pets;get;responses;999","source":"api.yaml","details":{"key":"999","error":"must be between 100 and 599"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
@@ -644,7 +658,9 @@ func (s *IntegrationSuite) TestPublishContract_ArrayWithoutItems_RejectedBrokerS
 		contractFragment{"api.yaml", arrayWithoutItemsYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["array schema without items at Pets (api.yaml)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.array_without_items","path":"schemas;Pets","source":"api.yaml","details":null}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 
@@ -661,12 +677,14 @@ func (s *IntegrationSuite) TestPublishContract_BothProvidedSpellingsInOneFile_Re
 		contractFragment{"schemas.yaml", duplicateEndpointSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["duplicate resource: provides GET /pets 200 declared twice in api.yaml"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"resource.duplicate","path":"provides;rest;/pets;get;responses;200","source":"api.yaml","details":{"resource":"provides GET /pets 200","declaredIn":"api.yaml"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
 
-func (s *IntegrationSuite) TestPublishContract_ManyViolations_ReportedInOneResponse() {
+func (s *IntegrationSuite) TestPublishContract_ShapeViolation_ReportedBeforeContextualRules() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
 
@@ -675,9 +693,187 @@ func (s *IntegrationSuite) TestPublishContract_ManyViolations_ReportedInOneRespo
 	))
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`"unresolved schema name: Missing referenced at provides GET /pets 200 (api.yaml)",`+
-		`"invalid endpoint \"/users/*/{orderId}\": dynamic path segments must use * (api.yaml)"`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/users/*/{orderId}","source":"api.yaml","details":{"key":"/users/*/{orderId}","error":"dynamic path segments must use *"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
+}
+
+const unknownMethodYAML = `provides:
+  rest:
+    /pets:
+      patch:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+const messageBlockYAML = `provides:
+  message:
+    pets.created:
+      payload: Pet
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+const anchoredSchemasYAML = `schemas:
+  Pet: &pet
+    type: object
+    properties:
+      id:
+        type: string
+  Owner: *pet
+`
+
+const multiDocumentYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+---
+schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+const equivalentContractJSON = `{
+  "provides": {
+    "rest": {
+      "/pets": {
+        "get": {
+          "responses": { "999": "Pet" }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Pet": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "strng" }
+      }
+    }
+  }
+}`
+
+const equivalentContractYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          999: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: strng
+`
+
+func (s *IntegrationSuite) TestPublishContract_UnknownMethod_Rejected() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", unknownMethodYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"key.unknown","path":"provides;rest;/pets;patch","source":"api.yaml","details":{"key":"patch"}}`+
+		`]}`, body)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_MessageBlock_Rejected() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", messageBlockYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"key.unknown","path":"provides;message","source":"api.yaml","details":{"key":"message"}}`+
+		`]}`, body)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_AnchorsAndAliases_Rejected() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1",
+		contractFragment{"schemas.yaml", anchoredSchemasYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"malformed contract file: schemas.yaml: anchors and aliases are not supported"}`, body)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_MultipleDocuments_Rejected() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", multiDocumentYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"malformed contract file: api.yaml: multiple documents are not supported"}`, body)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_JSONAndYAML_YieldTheSameViolations() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, jsonBody := s.post("/api/contracts", s.publishBody("pets_service", "1",
+		contractFragment{"api.json", equivalentContractJSON},
+	))
+	s.Equal(http.StatusBadRequest, status)
+
+	status, yamlBody := s.post("/api/contracts", s.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", equivalentContractYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+
+	violations := `{"message":"contract validation failed","violations":[` +
+		`{"code":"status.out_of_range","path":"provides;rest;/pets;get;responses;999","source":"api.json","details":{"key":"999","error":"must be between 100 and 599"}},` +
+		`{"code":"schema.invalid_type","path":"schemas;Pet;properties;id;type","source":"api.json","details":{"value":"strng","allowed":"object, array, string, integer, float, boolean"}}` +
+		`]}`
+	s.JSONEq(violations, jsonBody)
+	s.JSONEq(strings.ReplaceAll(violations, "api.json", "api.yaml"), yamlBody)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_ShapeViolation_ReportedBeforeParticipantLookup() {
+	status, body := s.post("/api/contracts", s.publishBody("ghost_service", "1", contractFragment{"api.json", contractBodyParamEndpoint}))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"endpoint.syntax","path":"provides;rest;/users/{userId}","source":"api.json","details":{"key":"/users/{userId}","error":"dynamic path segments must use *"}}`+
+		`]}`, body)
+
+	s.Equal(0, s.countRows("participants"))
 }

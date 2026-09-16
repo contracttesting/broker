@@ -1,148 +1,243 @@
 package validator_test
 
 import (
-	"encoding/json"
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
-	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
 
-const petsProviderJSON = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": { "responses": { "200": "Pet" } }
-      }
-    }
-  }
-}`
+const everyRuleYAMLA = `provides:
+  rest:
+    /dup:
+      get:
+        responses:
+          200: Pet
+    /dup/:
+      get:
+        responses:
+          200: Pet
+    /pets:
+      get:
+        responses:
+          200: Missing
+consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: Invoice
+schemas:
+  Invoice:
+    type: object
+    properties:
+      id:
+        type: string
+  Loop:
+    ref: Loop
+  Pet:
+    type: object
+    properties:
+      owner:
+        ref: Ghost
+`
 
-const petSchemaJSON = `{
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": { "id": { "type": "string" } }
-    }
-  }
-}`
+const everyRuleYAMLB = `provides:
+  rest:
+    /pets/:
+      get:
+        responses:
+          200: Pet
+consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: Charge
+schemas:
+  Charge:
+    type: object
+    properties:
+      id:
+        type: integer
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
 
-// everyRuleJSONA and everyRuleJSONB together violate all eleven catalog rules: a wrong
-// registration segment would silence its rule's message, so this list is the catalog.
-const everyRuleJSONA = `{
-  "provides": {
-    "rest": {
-      "/dup": { "get": { "responses": { "200": "Pet" } } },
-      "/dup/": { "get": { "responses": { "200": "Pet" } } },
-      "/bad//x": { "get": { "responses": { "200": "Pet" } } },
-      "/pets": { "get": { "responses": { "200": "Missing", "600": "Pet" } } }
-    }
-  },
-  "consumes": {
-    "Bad;Svc": { "rest": { "/c": { "get": { "responses": { "200": "Pet" } } } } },
-    "payments": { "rest": { "/invoices": { "get": { "responses": { "200": "Invoice" } } } } }
-  },
-  "schemas": {
-    "Invoice": {
-      "type": "object",
-      "properties": { "id": { "type": "string" } }
-    },
-    "Loop": { "ref": "Loop" },
-    "Pet": {
-      "type": "object",
-      "properties": {
-        "kind": { "type": "auid" },
-        "owner": { "ref": "Ghost" },
-        "tags": { "type": "array" }
-      }
-    }
-  }
-}`
+const petsProviderYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+`
 
-const everyRuleJSONB = `{
-  "provides": {
-    "rest": {
-      "/pets/": { "get": { "responses": { "200": "Pet" } } }
-    }
-  },
-  "consumes": {
-    "payments": { "rest": { "/invoices": { "get": { "responses": { "200": "Charge" } } } } }
-  },
-  "schemas": {
-    "Charge": { "type": "object", "properties": { "id": { "type": "integer" } } },
-    "Pet": { "type": "object", "properties": { "id": { "type": "string" } } }
-  }
-}`
+const petSchemaYAML = `schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+const stringIDConsumerYAML = `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceString
+schemas:
+  InvoiceString:
+    type: object
+    properties:
+      id:
+        type: string
+`
+
+const integerIDConsumerYAML = `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceInteger
+schemas:
+  InvoiceInteger:
+    type: object
+    properties:
+      id:
+        type: integer
+`
 
 func validatorFragment(t *testing.T, source, raw string) dsl.Fragment {
 	t.Helper()
 
-	contract := &dsl.Contract{}
-	require.NoError(t, json.Unmarshal([]byte(raw), contract))
+	var document any
+	require.NoError(t, yaml.Unmarshal([]byte(raw), &document))
 
-	return dsl.Fragment{Source: source, Contract: contract}
+	return dsl.Fragment{Source: source, Document: document}
 }
 
-func TestValidator_EveryCatalogRule_FiresAtItsRegisteredSegment(t *testing.T) {
-	violations := validator.NewContextualValidator().Validate([]dsl.Fragment{
-		validatorFragment(t, "b.json", everyRuleJSONB),
-		validatorFragment(t, "a.json", everyRuleJSONA),
-	})
+func validateFragments(fragments ...dsl.Fragment) []violation.Violation {
+	return validator.Validate(fragmentmapper.ToDeclarations(fragments))
+}
 
-	assert.Equal(t, []string{
-		`invalid endpoint "/bad//x": malformed path (a.json)`,
-		"duplicate resource: provides GET /dup 200 declared twice in a.json",
-		"unresolved schema name: Missing referenced at provides GET /pets 200 (a.json)",
-		"invalid status code 600 at provides GET /pets (a.json)",
-		`invalid service name "Bad;Svc": must be snake_case (a.json)`,
-		"schema Loop is too deep with more than 10 levels (a.json)",
-		`invalid schema type "auid" at Pet.kind (a.json)`,
-		"unresolved schema name: Ghost referenced at Pet.owner (a.json)",
-		"array schema without items at Pet.tags (a.json)",
-		"duplicate resource: provides GET /pets 200 declared in a.json and b.json",
-		"conflicting property type for $.id at consumes payments GET /invoices 200: string (a.json) and integer (b.json)",
-		"duplicate schema: Pet declared in a.json and b.json",
+func TestValidator_NoFragments_ReportsNothing(t *testing.T) {
+	assert.Empty(t, validateFragments())
+}
+
+func TestValidator_EveryRule_FiresAtItsLocationSortedBySourceThenPath(t *testing.T) {
+	violations := validateFragments(
+		validatorFragment(t, "b.yaml", everyRuleYAMLB),
+		validatorFragment(t, "a.yaml", everyRuleYAMLA),
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			Code:    "resource.duplicate",
+			Path:    "provides;rest;/dup;get;responses;200",
+			Source:  "a.yaml",
+			Details: map[string]string{"resource": "provides GET /dup 200", "declaredIn": "a.yaml"},
+		},
+		{
+			Code:    "schema.unresolved_name",
+			Path:    "provides;rest;/pets;get;responses;200",
+			Source:  "a.yaml",
+			Details: map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
+		},
+		{
+			Code:    "schema.too_deep",
+			Path:    "schemas;Loop",
+			Source:  "a.yaml",
+			Details: map[string]string{"schema": "Loop", "maxDepth": "10"},
+		},
+		{
+			Code:    "schema.unresolved_ref",
+			Path:    "schemas;Pet;properties;owner",
+			Source:  "a.yaml",
+			Details: map[string]string{"schema": "Ghost", "property": "Pet.owner"},
+		},
+		{
+			Code:   "resource.type_conflict",
+			Path:   "consumes;payments;rest;/invoices;get;responses;200",
+			Source: "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.id",
+				"type":         "integer",
+				"declaredIn":   "a.yaml",
+				"declaredType": "string",
+			},
+		},
+		{
+			Code:    "resource.duplicate",
+			Path:    "provides;rest;/pets;get;responses;200",
+			Source:  "b.yaml",
+			Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
+		},
+		{
+			Code:    "schema.duplicate",
+			Path:    "schemas;Pet",
+			Source:  "b.yaml",
+			Details: map[string]string{"schema": "Pet", "declaredIn": "a.yaml"},
+		},
 	}, violations)
 }
 
-const stringIDConsumerJSON = `{
-  "consumes": {
-    "payments": { "rest": { "/invoices": { "get": { "responses": { "200": "InvoiceString" } } } } }
-  },
-  "schemas": {
-    "InvoiceString": { "type": "object", "properties": { "id": { "type": "string" } } }
-  }
-}`
-
-const integerIDConsumerJSON = `{
-  "consumes": {
-    "payments": { "rest": { "/invoices": { "get": { "responses": { "200": "InvoiceInteger" } } } } }
-  },
-  "schemas": {
-    "InvoiceInteger": { "type": "object", "properties": { "id": { "type": "integer" } } }
-  }
-}`
-
-// a ContextualValidator is one run: consecutive publishes each build their own, so
-// what one run remembered must never surface in the next
-func TestValidator_EachRunStartsWithFreshDuplicateTracking(t *testing.T) {
+func TestValidator_FragmentOrder_DoesNotChangeTheReport(t *testing.T) {
 	fragments := []dsl.Fragment{
-		validatorFragment(t, "a.json", petsProviderJSON),
-		validatorFragment(t, "b.json", petsProviderJSON),
-		validatorFragment(t, "c.json", petSchemaJSON),
-		validatorFragment(t, "d.json", petSchemaJSON),
-		validatorFragment(t, "e.json", stringIDConsumerJSON),
-		validatorFragment(t, "f.json", integerIDConsumerJSON),
+		validatorFragment(t, "a.yaml", petsProviderYAML),
+		validatorFragment(t, "b.yaml", petsProviderYAML),
+		validatorFragment(t, "c.yaml", petSchemaYAML),
+		validatorFragment(t, "d.yaml", petSchemaYAML),
+		validatorFragment(t, "e.yaml", stringIDConsumerYAML),
+		validatorFragment(t, "f.yaml", integerIDConsumerYAML),
 	}
 
-	expected := []string{
-		"duplicate resource: provides GET /pets 200 declared in a.json and b.json",
-		"duplicate schema: Pet declared in c.json and d.json",
-		"conflicting property type for $.id at consumes payments GET /invoices 200: string (e.json) and integer (f.json)",
+	reversed := make([]dsl.Fragment, 0, len(fragments))
+	for index := len(fragments) - 1; index >= 0; index-- {
+		reversed = append(reversed, fragments[index])
 	}
 
-	assert.Equal(t, expected, validator.NewContextualValidator().Validate(fragments))
-	assert.Equal(t, expected, validator.NewContextualValidator().Validate(fragments))
+	expected := []violation.Violation{
+		{
+			Code:    "resource.duplicate",
+			Path:    "provides;rest;/pets;get;responses;200",
+			Source:  "b.yaml",
+			Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
+		},
+		{
+			Code:    "schema.duplicate",
+			Path:    "schemas;Pet",
+			Source:  "d.yaml",
+			Details: map[string]string{"schema": "Pet", "declaredIn": "c.yaml"},
+		},
+		{
+			Code:   "resource.type_conflict",
+			Path:   "consumes;payments;rest;/invoices;get;responses;200",
+			Source: "f.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.id",
+				"type":         "integer",
+				"declaredIn":   "e.yaml",
+				"declaredType": "string",
+			},
+		},
+	}
+
+	assert.Equal(t, expected, validateFragments(fragments...))
+	assert.Equal(t, expected, validateFragments(reversed...))
 }

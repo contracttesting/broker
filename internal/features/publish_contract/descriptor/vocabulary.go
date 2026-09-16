@@ -35,7 +35,7 @@ const (
 )
 
 func statusCodeInRange(key string) error {
-	status, err := strconv.Atoi(key)
+	status, err := strconv.ParseUint(key, 10, 0)
 	if err != nil || status < minStatusCode || status > maxStatusCode {
 		return fmt.Errorf("must be between %d and %d", minStatusCode, maxStatusCode)
 	}

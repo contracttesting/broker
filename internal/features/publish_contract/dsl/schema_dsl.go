@@ -3,12 +3,36 @@ package dsl
 type SchemasMap map[string]Schema
 
 type Schema struct {
-	Type        string            `json:"type,omitzero"`
-	Description string            `json:"description,omitzero"`
-	Properties  map[string]Schema `json:"properties,omitzero"`
-	Items       *Schema           `json:"items,omitzero"`
-	Ref         string            `json:"ref,omitzero"`
-	Optional    bool              `json:"optional,omitzero"`
+	Type        string
+	Description string
+	Properties  map[string]Schema
+	Items       *Schema
+	Ref         string
+	Optional    bool
+}
+
+func SchemaFromDocument(document Document) Schema {
+	schema := Schema{
+		Type:        document.Text("type"),
+		Description: document.Text("description"),
+		Ref:         document.Text("ref"),
+		Optional:    document.Flag("optional"),
+	}
+
+	if properties, written := document["properties"].(map[string]any); written {
+		schema.Properties = make(map[string]Schema, len(properties))
+
+		for name := range properties {
+			schema.Properties[name] = SchemaFromDocument(Document(properties).Mapping(name))
+		}
+	}
+
+	if items, written := document["items"].(map[string]any); written {
+		itemsSchema := SchemaFromDocument(items)
+		schema.Items = &itemsSchema
+	}
+
+	return schema
 }
 
 func (s *Schema) IsObject() bool {
@@ -33,12 +57,6 @@ func (s *Schema) IsPrimitive() bool {
 	}
 
 	return false
-}
-
-// IsSupportedType answers for a resolved type name what IsObject/IsArray/IsPrimitive
-// answer for a schema node.
-func IsSupportedType(schemaType string) bool {
-	return schemaType == "object" || schemaType == "array" || isPrimitiveType(schemaType)
 }
 
 func isPrimitiveType(schemaType string) bool {

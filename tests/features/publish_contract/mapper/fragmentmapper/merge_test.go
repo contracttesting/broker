@@ -1,12 +1,12 @@
 package fragmentmapper_test
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -214,11 +214,20 @@ const providedPetsJSON = `{
   }
 }`
 
-const providedPetsSchemalessJSON = `{
+const providedPetsDetailJSON = `{
   "provides": {
     "rest": {
       "/pets": {
-        "get": { "responses": { "200": "Pet" } }
+        "get": { "responses": { "200": "PetDetail" } }
+      }
+    }
+  },
+  "schemas": {
+    "PetDetail": {
+      "type": "object",
+      "properties": {
+        "id":   { "type": "string" },
+        "name": { "type": "string" }
       }
     }
   }
@@ -236,10 +245,10 @@ func mergeFragments(t *testing.T, files ...mergedFile) []dsl.Fragment {
 
 	fragments := make([]dsl.Fragment, 0, len(files))
 	for _, file := range files {
-		contract := &dsl.Contract{}
-		require.NoError(t, json.Unmarshal([]byte(file.raw), contract))
+		var document any
+		require.NoError(t, yaml.Unmarshal([]byte(file.raw), &document))
 
-		fragments = append(fragments, dsl.Fragment{Source: file.source, Contract: contract})
+		fragments = append(fragments, dsl.Fragment{Source: file.source, Document: document})
 	}
 
 	return fragments
@@ -248,10 +257,7 @@ func mergeFragments(t *testing.T, files ...mergedFile) []dsl.Fragment {
 func mergeResources(t *testing.T, files ...mergedFile) []model.UploadedResource {
 	t.Helper()
 
-	resources, err := fragmentmapper.ToResourceModels(mergeFragments(t, files...))
-	require.NoError(t, err)
-
-	return resources
+	return fragmentmapper.ToResourceModels(fragmentmapper.ToDeclarations(mergeFragments(t, files...)))
 }
 
 func mergeContract(t *testing.T, files ...mergedFile) *model.UploadedContract {
@@ -381,11 +387,15 @@ func TestMerge_FragmentOrderReversed_ProducesTheSameContract(t *testing.T) {
 	assert.Equal(t, fourModulesChecksum, backward.Checksum())
 }
 
-func TestMerge_ProvidedResourceDeclaredTwice_BreaksTheInvariant(t *testing.T) {
-	_, err := fragmentmapper.ToResourceModels(mergeFragments(t,
+func TestMerge_ProvidedResourceDeclaredTwice_FirstSourceWins(t *testing.T) {
+	resources := mergeResources(t,
+		mergedFile{"b.json", providedPetsDetailJSON},
 		mergedFile{"a.json", providedPetsJSON},
-		mergedFile{"b.json", providedPetsSchemalessJSON},
-	))
+	)
 
-	require.EqualError(t, err, "resource already added: provides GET /pets 200 from a.json and b.json")
+	require.Len(t, resources, 1)
+	assert.Equal(t, map[string]model.Property{
+		"$":    {Path: "$", Type: "object"},
+		"$.id": {Path: "$.id", Type: "string"},
+	}, resources[0].Properties)
 }

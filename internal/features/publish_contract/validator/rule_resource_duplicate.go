@@ -1,48 +1,40 @@
 package validator
 
 import (
-	"fmt"
-
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
-	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/resourcepathmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
 
-type resourceDuplicateRule struct {
-	seen map[string]string
-}
+// Only a provider redeclaration is a violation: consumers merge by union in the mapper.
+func duplicateResources(declarations fragmentmapper.Declarations) []violation.Violation {
+	var violations []violation.Violation
 
-func (resourceDuplicateRule) Code() string { return "resource.duplicate" }
+	declaredIn := map[string]string{}
 
-func (r *resourceDuplicateRule) Validate(value any, contextualValidator *ContextualValidator) {
-	path, ok := value.(string)
-	if !ok {
-		return
+	for _, declaration := range declarations.Resources {
+		if !declaration.Resource.IsProvider() {
+			continue
+		}
+
+		path := declaration.Path.String()
+
+		first, taken := declaredIn[path]
+		if !taken {
+			declaredIn[path] = declaration.Source
+
+			continue
+		}
+
+		violations = append(violations, violation.Violation{
+			Code:   "resource.duplicate",
+			Path:   path,
+			Source: declaration.Source,
+			Details: map[string]string{
+				"resource":   declaration.Resource.Describe(),
+				"declaredIn": first,
+			},
+		})
 	}
 
-	// only a provider redeclaration is an error: consumers merge by union in the mapper
-	resourcePath := dsl.NewResourcePath(path)
-	if !resourcePath.IsProvider() {
-		return
-	}
-
-	if declaredIn, taken := r.seen[path]; taken {
-		resource := resourcepathmapper.ToResourceModel(resourcePath, nil)
-		contextualValidator.addViolation(r.message(
-			resource.Describe(),
-			declaredIn,
-			contextualValidator.source,
-		))
-
-		return
-	}
-
-	r.seen[path] = contextualValidator.source
-}
-
-func (resourceDuplicateRule) message(resource, declaredIn, source string) string {
-	if declaredIn == source {
-		return fmt.Sprintf("duplicate resource: %s declared twice in %s", resource, source)
-	}
-
-	return fmt.Sprintf("duplicate resource: %s declared in %s and %s", resource, declaredIn, source)
+	return violations
 }

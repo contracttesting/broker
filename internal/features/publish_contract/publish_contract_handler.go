@@ -5,9 +5,11 @@ import (
 	"strings"
 
 	"github.com/contracttesting/broker/internal/features/publish_contract/contract_differ"
+	"github.com/contracttesting/broker/internal/features/publish_contract/descriptor"
 	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/contracttesting/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
@@ -40,18 +42,25 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondInvalidInput(ctx)
 	}
 
-	contractFragments := make([]dsl.Fragment, 0, len(requestBody.Contracts))
+	fragments := make([]dsl.Fragment, 0, len(requestBody.Contracts))
+	var shapeViolations []violation.Violation
+
 	for _, uploaded := range requestBody.Contracts {
 		if strings.TrimSpace(uploaded.Source) == "" {
 			return ctr.respondInvalidInput(ctx)
 		}
 
-		contractDsl, err := parseFragmentContentToContractDsl(uploaded)
+		fragment, err := decodeFragment(uploaded)
 		if err != nil {
 			return ctr.respondBadRequest(ctx, err)
 		}
 
-		contractFragments = append(contractFragments, dsl.Fragment{Source: uploaded.Source, Contract: contractDsl})
+		fragments = append(fragments, fragment)
+		shapeViolations = append(shapeViolations, descriptor.Validate(descriptor.Contract, fragment.Document, fragment.Source)...)
+	}
+
+	if len(shapeViolations) > 0 {
+		return ctr.respondValidationFailed(ctx, violation.SortedByLocation(shapeViolations))
 	}
 
 	participant, exists := ctr.participantRepository.FindByName(ctx.Context(), serviceName)
@@ -59,14 +68,13 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		return ctr.respondParticipantNotFound(ctx)
 	}
 
-	if violations := validator.NewContextualValidator().Validate(contractFragments); len(violations) > 0 {
+	declarations := fragmentmapper.ToDeclarations(fragments)
+
+	if violations := validator.Validate(declarations); len(violations) > 0 {
 		return ctr.respondValidationFailed(ctx, violations)
 	}
 
-	resources, err := fragmentmapper.ToResourceModels(contractFragments)
-	if err != nil {
-		return ctr.respondPublishFailed(ctx)
-	}
+	resources := fragmentmapper.ToResourceModels(declarations)
 
 	contractContent, _ := json.Marshal(requestBody.Contracts)
 
@@ -116,7 +124,7 @@ func (ctr *PublishContractHandler) respondBadRequest(ctx fiber.Ctx, err error) e
 	})
 }
 
-func (ctr *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []string) error {
+func (ctr *PublishContractHandler) respondValidationFailed(ctx fiber.Ctx, violations []violation.Violation) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(PublishContractValidationResponseBody{
 		Message:    ContractValidationFailed,
 		Violations: violations,
