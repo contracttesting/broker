@@ -1,29 +1,66 @@
 package validator
 
 import (
-	"fmt"
+	"maps"
+	"slices"
+	"strconv"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
 
-type schemaTooDeepRule struct{}
+func schemasTooDeep(declarations fragmentmapper.Declarations) []violation.Violation {
+	var violations []violation.Violation
 
-func (schemaTooDeepRule) Code() string { return "schema.too_deep" }
+	for _, declaration := range declarations.Schemas {
+		if !exceedsDepth(declaration.Schema, declarations.Catalog, DepthCounter{}) {
+			continue
+		}
 
-func (schemaTooDeepRule) Validate(value any, contextualValidator *ContextualValidator) {
-	if _, ok := value.(dsl.Schema); !ok {
-		return
+		violations = append(violations, violation.Violation{
+			Code:   "schema.too_deep",
+			Path:   schemaPath(declaration.Name),
+			Source: declaration.Source,
+			Details: map[string]string{
+				"schema":   declaration.Name,
+				"maxDepth": strconv.Itoa(schemamapper.MaxDepth),
+			},
+		})
 	}
 
-	if !contextualValidator.depth.Exceeded() {
-		return
+	return violations
+}
+
+func exceedsDepth(schema contract.Schema, catalog contract.SchemasMap, depth DepthCounter) bool {
+	if depth.Exceeded() {
+		return true
 	}
 
-	contextualValidator.addViolation(fmt.Sprintf(
-		"schema %s is too deep with more than %d levels (%s)",
-		contextualValidator.rootSchema,
-		schemamapper.MaxDepth,
-		contextualValidator.source,
-	))
+	switch {
+	case schema.IsRef():
+		target, declared := catalog[schema.Ref]
+		if !declared {
+			return false
+		}
+
+		return exceedsDepth(target, catalog, depth.Deeper())
+
+	case schema.IsArray():
+		if schema.Items == nil {
+			return false
+		}
+
+		return exceedsDepth(*schema.Items, catalog, depth.Deeper())
+
+	case schema.IsObject():
+		for _, name := range slices.Sorted(maps.Keys(schema.Properties)) {
+			if exceedsDepth(schema.Properties[name], catalog, depth.Deeper()) {
+				return true
+			}
+		}
+	}
+
+	return false
 }

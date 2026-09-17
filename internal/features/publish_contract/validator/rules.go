@@ -1,24 +1,21 @@
 package validator
 
-const (
-	SegmentServiceName       = "service_name"
-	SegmentEndpoint          = "endpoint"
-	SegmentResource          = "resource"
-	SegmentResourceSchema    = "resource_schema"
-	SegmentSchemaName        = "schema_name"
-	SegmentSchemaDeclaration = "schema_declaration"
-	SegmentSchema            = "schema"
-	SegmentStatusCode        = "status_code"
+import (
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
 
-// ResourceSchema pairs a resource with the schema it answers with, the two halves a
-// rule needs to compare one declaration of a resource against another.
-type ResourceSchema struct {
-	Path       string
-	SchemaName string
+type rule func(declarations fragmentmapper.Declarations) []violation.Violation
+
+var rules = []rule{
+	duplicateResources,
+	conflictingPropertyTypes,
+	duplicateSchemas,
+	unresolvedSchemaNames,
+	unresolvedSchemaRefs,
+	schemasTooDeep,
 }
 
-type Rule interface {
-	Code() string
-	Validate(value any, contextualValidator *ContextualValidator)
+func schemaPath(name string) string {
+	return "schemas;" + name
 }

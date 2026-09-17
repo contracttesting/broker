@@ -1,194 +1,124 @@
 package fragmentmapper
 
 import (
-	"fmt"
-	"maps"
-	"slices"
-	"strconv"
-
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/resourcepathmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
 	"github.com/contracttesting/broker/internal/model"
 )
 
-func ToResourceModels(fragments []dsl.Fragment) ([]model.UploadedResource, error) {
-	schemas := schemasFromFragments(fragments)
+type Declarations struct {
+	Resources []ResourceDeclaration
+	Schemas   []SchemaDeclaration
+	Catalog   contract.SchemasMap
+}
 
-	var declarations []resourceDeclaration
-	for _, fragment := range fragments {
-		fragmentDeclarations, err := declarationsFromFragment(fragment, schemas)
-		if err != nil {
-			return nil, err
+type ResourceDeclaration struct {
+	Source     string
+	Path       contract.ResourcePath
+	SchemaName string
+	Resource   model.UploadedResource
+}
+
+type SchemaDeclaration struct {
+	Source string
+	Name   string
+	Schema contract.Schema
+}
+
+var methodsInOrder = []string{"get", "post", "put", "delete"}
+
+func ToDeclarations(fragments []contract.Fragment) Declarations {
+	sorted := contract.SortedBySource(fragments)
+	declarations := Declarations{Catalog: contract.SchemasMap{}}
+
+	for _, fragment := range sorted {
+		schemas := fragment.Root().Mapping("schemas")
+
+		for _, name := range schemas.Keys() {
+			schema := contract.SchemaFromDocument(schemas.Mapping(name))
+			declarations.Schemas = append(declarations.Schemas, SchemaDeclaration{Source: fragment.Source, Name: name, Schema: schema})
+
+			if _, declared := declarations.Catalog[name]; !declared {
+				declarations.Catalog[name] = schema
+			}
 		}
-
-		declarations = append(declarations, fragmentDeclarations...)
 	}
 
-	merged, err := mergeDeclarationsByResourcePath(declarations)
-	if err != nil {
-		return nil, err
+	for _, fragment := range sorted {
+		declarations.Resources = append(declarations.Resources, resourceDeclarationsFromFragment(fragment, declarations.Catalog)...)
 	}
+
+	return declarations
+}
+
+func ToResourceModels(declarations Declarations) []model.UploadedResource {
+	merged := mergeByResourcePath(declarations.Resources)
 
 	resources := make([]model.UploadedResource, 0, len(merged))
 	for _, declaration := range merged {
-		resources = append(resources, declaration.resource)
+		resources = append(resources, declaration.Resource)
 	}
 
-	return resources, nil
+	return resources
 }
 
-func schemasFromFragments(fragments []dsl.Fragment) dsl.SchemasMap {
-	schemas := make(dsl.SchemasMap)
+func resourceDeclarationsFromFragment(fragment contract.Fragment, catalog contract.SchemasMap) []ResourceDeclaration {
+	document := fragment.Root()
+	root := contract.NewResourcePath("")
 
-	for _, fragment := range fragments {
-		for name, schema := range fragment.Contract.Schemas {
-			if _, declared := schemas[name]; !declared {
-				schemas[name] = schema
-			}
-		}
-	}
+	var declarations []ResourceDeclaration
 
-	return schemas
-}
-
-func declarationsFromFragment(fragment dsl.Fragment, schemas dsl.SchemasMap) ([]resourceDeclaration, error) {
-	root := dsl.NewResourcePath("")
-
-	var declarations []resourceDeclaration
-	for _, serviceName := range slices.Sorted(maps.Keys(fragment.Contract.ConsumesServices)) {
-		consumed, err := declarationsFromRest(
+	consumes := document.Mapping("consumes")
+	for _, serviceName := range consumes.Keys() {
+		declarations = append(declarations, resourceDeclarationsFromRest(
 			fragment.Source,
-			fragment.Contract.ConsumesServices[serviceName].Rest,
+			consumes.Mapping(serviceName).Mapping("rest"),
 			root.Append("consumes", serviceName),
-			schemas,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		declarations = append(declarations, consumed...)
+			catalog,
+		)...)
 	}
 
-	provided, err := declarationsFromRest(
+	return append(declarations, resourceDeclarationsFromRest(
 		fragment.Source,
-		fragment.Contract.Provides.Rest,
+		document.Mapping("provides").Mapping("rest"),
 		root.Append("provides"),
-		schemas,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(declarations, provided...), nil
+		catalog,
+	)...)
 }
 
-func declarationsFromRest(source string, rest dsl.Rest, resourcePath dsl.ResourcePath, schemas dsl.SchemasMap) ([]resourceDeclaration, error) {
-	var declarations []resourceDeclaration
-	for _, endpoint := range slices.Sorted(maps.Keys(rest)) {
-		endpointPath := resourcePath.Append("rest", dsl.NormalizeEndpoint(endpoint))
+func resourceDeclarationsFromRest(source string, rest contract.Document, resourcePath contract.ResourcePath, catalog contract.SchemasMap) []ResourceDeclaration {
+	var declarations []ResourceDeclaration
 
-		fromMethods, err := declarationsFromMethods(source, rest[endpoint], endpointPath, schemas)
-		if err != nil {
-			return nil, err
-		}
+	for _, endpoint := range rest.Keys() {
+		endpointPath := resourcePath.Append("rest", contract.NormalizeEndpoint(endpoint))
+		methods := rest.Mapping(endpoint)
 
-		declarations = append(declarations, fromMethods...)
-	}
+		for _, method := range methodsInOrder {
+			operation := methods.Mapping(method)
+			methodPath := endpointPath.Append(method)
 
-	return declarations, nil
-}
-
-func declarationsFromMethods(source string, methods dsl.HttpMethods, resourcePath dsl.ResourcePath, schemas dsl.SchemasMap) ([]resourceDeclaration, error) {
-	var declarations []resourceDeclaration
-
-	if methods.Get.IsNonZero() {
-		responses, err := declarationsFromResponses(source, methods.Get.Responses, resourcePath.Append("get", "responses"), schemas)
-		if err != nil {
-			return nil, err
-		}
-
-		declarations = append(declarations, responses...)
-	}
-
-	if methods.Post.IsNonZero() {
-		if methods.Post.HasRequestBody() {
-			request, err := declarationFromRequestBody(source, methods.Post.RequestBody, resourcePath.Append("post", "request"), schemas)
-			if err != nil {
-				return nil, err
+			if request := operation.Text("request"); request != "" {
+				declarations = append(declarations, resourceDeclaration(source, request, methodPath.Append("request"), catalog))
 			}
 
-			declarations = append(declarations, request)
-		}
-
-		responses, err := declarationsFromResponses(source, methods.Post.Responses, resourcePath.Append("post", "responses"), schemas)
-		if err != nil {
-			return nil, err
-		}
-
-		declarations = append(declarations, responses...)
-	}
-
-	if methods.Put.IsNonZero() {
-		if methods.Put.HasRequestBody() {
-			request, err := declarationFromRequestBody(source, methods.Put.RequestBody, resourcePath.Append("put", "request"), schemas)
-			if err != nil {
-				return nil, err
+			responses := operation.Mapping("responses")
+			for _, status := range responses.Keys() {
+				declarations = append(declarations, resourceDeclaration(source, responses.Text(status), methodPath.Append("responses", status), catalog))
 			}
-
-			declarations = append(declarations, request)
 		}
-
-		responses, err := declarationsFromResponses(source, methods.Put.Responses, resourcePath.Append("put", "responses"), schemas)
-		if err != nil {
-			return nil, err
-		}
-
-		declarations = append(declarations, responses...)
 	}
 
-	if methods.Delete.IsNonZero() {
-		responses, err := declarationsFromResponses(source, methods.Delete.Responses, resourcePath.Append("delete", "responses"), schemas)
-		if err != nil {
-			return nil, err
-		}
-
-		declarations = append(declarations, responses...)
-	}
-
-	return declarations, nil
+	return declarations
 }
 
-func declarationFromRequestBody(source, schemaName string, resourcePath dsl.ResourcePath, schemas dsl.SchemasMap) (resourceDeclaration, error) {
-	return declarationFromSchema(source, schemaName, resourcePath, schemas)
-}
+func resourceDeclaration(source string, schemaName string, resourcePath contract.ResourcePath, catalog contract.SchemasMap) ResourceDeclaration {
+	properties := schemamapper.ToPropertyModels(catalog, catalog[schemaName])
 
-func declarationsFromResponses(source string, responses dsl.Responses, resourcePath dsl.ResourcePath, schemas dsl.SchemasMap) ([]resourceDeclaration, error) {
-	var declarations []resourceDeclaration
-	for _, statusCode := range slices.Sorted(maps.Keys(responses)) {
-		declaration, err := declarationFromSchema(source, responses[statusCode], resourcePath.Append(strconv.Itoa(statusCode)), schemas)
-		if err != nil {
-			return nil, err
-		}
-
-		declarations = append(declarations, declaration)
+	return ResourceDeclaration{
+		Source:     source,
+		Path:       resourcePath,
+		SchemaName: schemaName,
+		Resource:   resourcepathmapper.ToResourceModel(resourcePath, properties),
 	}
-
-	return declarations, nil
-}
-
-func declarationFromSchema(source, schemaName string, resourcePath dsl.ResourcePath, schemas dsl.SchemasMap) (resourceDeclaration, error) {
-	properties := schemamapper.ToPropertyModels(schemas, schemas[schemaName])
-
-	for _, path := range slices.Sorted(maps.Keys(properties)) {
-		if !dsl.IsSupportedType(properties[path].Type) {
-			return resourceDeclaration{}, fmt.Errorf("unknown schema type %q at %s", properties[path].Type, path)
-		}
-	}
-
-	return resourceDeclaration{
-		source:       source,
-		resourcePath: resourcePath,
-		resource:     resourcepathmapper.ToResourceModel(resourcePath, properties),
-	}, nil
 }

@@ -1,12 +1,12 @@
 package fragmentmapper_test
 
 import (
-	"encoding/json"
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,15 +29,14 @@ func endpointProvidesJSON(endpoint string) string {
 }`
 }
 
-// singleEndpointResource maps one valid single-endpoint file to its resource.
 func singleEndpointResource(t *testing.T, raw string) model.UploadedResource {
 	t.Helper()
 
-	var dslContract dsl.Contract
-	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
+	var document any
+	require.NoError(t, yaml.Unmarshal([]byte(raw), &document))
 
-	resources, err := fragmentmapper.ToResourceModels([]dsl.Fragment{{Source: "things.yaml", Contract: &dslContract}})
-	require.NoError(t, err)
+	declarations := fragmentmapper.ToDeclarations([]contract.Fragment{{Source: "things.yaml", Document: document}})
+	resources := fragmentmapper.ToResourceModels(declarations)
 	require.Len(t, resources, 1)
 
 	return resources[0]

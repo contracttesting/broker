@@ -71,6 +71,16 @@ func TestStatusCode_RejeitaForaDaFaixaEmOrdemEstavel(t *testing.T) {
 	assert.Equal(t, "abc", violations[2].Details["key"])
 }
 
+func TestStatusCode_RejeitaSinalMesmoDentroDaFaixa(t *testing.T) {
+	subject := descriptor.Map(descriptor.StatusCode, descriptor.String())
+
+	violations := descriptor.Validate(subject, map[string]any{"+200": "Pet", "-1": "Erro"}, "api.yaml")
+
+	require.Len(t, violations, 2)
+	assert.Equal(t, "+200", violations[0].Details["key"])
+	assert.Equal(t, "-1", violations[1].Details["key"])
+}
+
 func TestSchemaType_AceitaOsSeisTipos(t *testing.T) {
 	for _, allowed := range []string{"object", "array", "string", "integer", "float", "boolean"} {
 		assert.Empty(t, descriptor.Validate(descriptor.SchemaType, allowed, "api.yaml"), allowed)
@@ -93,4 +103,15 @@ func TestFlag_ExigeBooleano(t *testing.T) {
 
 	require.Len(t, violations, 1)
 	assert.Equal(t, map[string]string{"expected": "boolean", "got": "string"}, violations[0].Details)
+}
+
+func TestEndpoint_BarraDuplaNoFimContinuaMalformada(t *testing.T) {
+	subject := descriptor.Map(descriptor.Endpoint, descriptor.Object(descriptor.Fields{}))
+
+	violations := descriptor.Validate(subject, map[string]any{"/users//": nil}, "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "endpoint.syntax", violations[0].Code)
+	assert.Equal(t, "/users//", violations[0].Path)
+	assert.Equal(t, map[string]string{"key": "/users//", "error": "malformed path"}, violations[0].Details)
 }

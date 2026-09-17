@@ -1,7 +1,7 @@
 package schemamapper
 
 import (
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/model"
 )
 
@@ -9,7 +9,7 @@ import (
 const MaxDepth = 10
 
 // ToPropertyModels resolves a schema into its property models keyed by $-rooted path.
-func ToPropertyModels(schemas dsl.SchemasMap, root dsl.Schema) map[string]model.Property {
+func ToPropertyModels(schemas contract.SchemasMap, root contract.Schema) map[string]model.Property {
 	properties := map[string]model.Property{}
 
 	propertyModelsFromSchema(schemas, properties, propertyPath("$"), root, 0)
@@ -18,10 +18,10 @@ func ToPropertyModels(schemas dsl.SchemasMap, root dsl.Schema) map[string]model.
 }
 
 func propertyModelsFromSchema(
-	schemas dsl.SchemasMap,
+	schemas contract.SchemasMap,
 	properties map[string]model.Property,
 	path propertyPath,
-	schema dsl.Schema,
+	schema contract.Schema,
 	depth int,
 ) {
 	if depth >= MaxDepth {

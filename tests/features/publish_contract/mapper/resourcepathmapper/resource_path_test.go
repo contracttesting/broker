@@ -3,14 +3,14 @@ package resourcepathmapper_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/resourcepathmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestToResourceModel_ConsumerRestRequest_Parses(t *testing.T) {
-	path := dsl.NewResourcePath("consumes;pets-service;rest;/pets;post;request")
+	path := contract.NewResourcePath("consumes;pets-service;rest;/pets;post;request")
 
 	resource := resourcepathmapper.ToResourceModel(path, nil)
 
@@ -23,7 +23,7 @@ func TestToResourceModel_ConsumerRestRequest_Parses(t *testing.T) {
 }
 
 func TestToResourceModel_ProviderRestRequest_Parses(t *testing.T) {
-	path := dsl.NewResourcePath("provides;rest;/pets;post;request")
+	path := contract.NewResourcePath("provides;rest;/pets;post;request")
 
 	resource := resourcepathmapper.ToResourceModel(path, nil)
 
@@ -35,7 +35,7 @@ func TestToResourceModel_ProviderRestRequest_Parses(t *testing.T) {
 }
 
 func TestToResourceModel_ProviderRestResponse_Parses(t *testing.T) {
-	path := dsl.NewResourcePath("provides;rest;/pets;get;responses;200")
+	path := contract.NewResourcePath("provides;rest;/pets;get;responses;200")
 
 	resource := resourcepathmapper.ToResourceModel(path, nil)
 
@@ -47,7 +47,7 @@ func TestToResourceModel_ProviderRestResponse_Parses(t *testing.T) {
 }
 
 func TestToResourceModel_UnrecognizedPath_Panics(t *testing.T) {
-	path := dsl.NewResourcePath("garbage;not;a;real;path")
+	path := contract.NewResourcePath("garbage;not;a;real;path")
 
 	assert.Panics(t, func() { resourcepathmapper.ToResourceModel(path, nil) })
 }

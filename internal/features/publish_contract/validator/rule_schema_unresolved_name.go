@@ -1,23 +1,28 @@
 package validator
 
-import "fmt"
+import (
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
+)
 
-type schemaUnresolvedNameRule struct{}
+func unresolvedSchemaNames(declarations fragmentmapper.Declarations) []violation.Violation {
+	var violations []violation.Violation
 
-func (schemaUnresolvedNameRule) Code() string { return "schema.unresolved_name" }
+	for _, declaration := range declarations.Resources {
+		if _, declared := declarations.Catalog[declaration.SchemaName]; declared {
+			continue
+		}
 
-func (schemaUnresolvedNameRule) Validate(value any, contextualValidator *ContextualValidator) {
-	name, ok := value.(string)
-	if !ok {
-		return
+		violations = append(violations, violation.Violation{
+			Code:   "schema.unresolved_name",
+			Path:   declaration.Path.String(),
+			Source: declaration.Source,
+			Details: map[string]string{
+				"schema":   declaration.SchemaName,
+				"resource": declaration.Resource.Describe(),
+			},
+		})
 	}
 
-	if _, declared := contextualValidator.contractIndex.Schema(name); !declared {
-		contextualValidator.addViolation(fmt.Sprintf(
-			"unresolved schema name: %s referenced at %s (%s)",
-			name,
-			contextualValidator.where,
-			contextualValidator.source,
-		))
-	}
+	return violations
 }

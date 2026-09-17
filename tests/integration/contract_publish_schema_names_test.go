@@ -104,7 +104,9 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedResponseSchema_Multiple
 		contractFragment{"schemas.yaml", namesResolvedSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["unresolved schema name: Pets referenced at provides GET /pets 200 (pets.yaml)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.unresolved_name","path":"provides;rest;/pets;get;responses;200","source":"pets.yaml","details":{"schema":"Pets","resource":"provides GET /pets 200"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -117,7 +119,9 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedResponseSchema_SingleFi
 		contractFragment{"api.json", namesSingleFileJSON},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["unresolved schema name: Inexistente referenced at provides GET /pets 200 (api.json)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.unresolved_name","path":"provides;rest;/pets;get;responses;200","source":"api.json","details":{"schema":"Inexistente","resource":"provides GET /pets 200"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -130,7 +134,9 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedRequestSchema() {
 		contractFragment{"pets.yaml", namesRequestYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["unresolved schema name: Pet referenced at provides POST /pets request (pets.yaml)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.unresolved_name","path":"provides;rest;/pets;post;request","source":"pets.yaml","details":{"schema":"Pet","resource":"provides POST /pets request"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -143,7 +149,9 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedConsumedResponseSchema(
 		contractFragment{"a.yaml", namesConsumerYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["unresolved schema name: Pets referenced at consumes payments GET /invoices 200 (a.yaml)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.unresolved_name","path":"consumes;payments;rest;/invoices;get;responses;200","source":"a.yaml","details":{"schema":"Pets","resource":"consumes payments GET /invoices 200"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -156,7 +164,9 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedConsumedRequestSchema()
 		contractFragment{"a.yaml", namesConsumerRequestYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["unresolved schema name: Pet referenced at consumes payments POST /invoices request (a.yaml)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.unresolved_name","path":"consumes;payments;rest;/invoices;post;request","source":"a.yaml","details":{"schema":"Pet","resource":"consumes payments POST /invoices request"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -170,7 +180,10 @@ func (s *IntegrationSuite) TestPublishContract_UnresolvedRefInUnreachedSchema() 
 		contractFragment{"billing.yaml", namesDanglingSchemaYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["unresolved schema name: Payment referenced at Invoice.payment (billing.yaml)","unresolved schema name: Pets referenced at provides GET /pets 200 (pets.yaml)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.unresolved_ref","path":"schemas;Invoice;properties;payment","source":"billing.yaml","details":{"schema":"Payment","property":"Invoice.payment"}},`+
+		`{"code":"schema.unresolved_name","path":"provides;rest;/pets;get;responses;200","source":"pets.yaml","details":{"schema":"Pets","resource":"provides GET /pets 200"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
@@ -184,7 +197,10 @@ func (s *IntegrationSuite) TestPublishContract_CyclicSchema_RejectedBrokerStaysU
 		contractFragment{"schemas.yaml", namesCyclicSchemasYAML},
 	))
 	s.Equal(http.StatusBadRequest, status)
-	s.JSONEq(`{"message":"contract validation failed","violations":["schema Owner is too deep with more than 10 levels (schemas.yaml)","schema Pet is too deep with more than 10 levels (schemas.yaml)"]}`, body)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"schema.too_deep","path":"schemas;Owner","source":"schemas.yaml","details":{"schema":"Owner","maxDepth":"10"}},`+
+		`{"code":"schema.too_deep","path":"schemas;Pet","source":"schemas.yaml","details":{"schema":"Pet","maxDepth":"10"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 

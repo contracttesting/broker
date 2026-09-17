@@ -193,3 +193,50 @@ func TestContract_JsonDecodificadoSegueOMesmoCaminho(t *testing.T) {
 	assert.Equal(t, "provides;rest;/pets;get;responses;600", violations[0].Path)
 	assert.Equal(t, "api.json", violations[0].Source)
 }
+
+func TestContract_EndpointComParametroReprovaEmProvidesEConsumes(t *testing.T) {
+	source := `provides:
+  rest:
+    "/users/{userId}":
+      get:
+        responses:
+          200: User
+consumes:
+  users_api:
+    rest:
+      "/users/{userId}":
+        get:
+          responses:
+            200: User
+`
+
+	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+
+	require.Len(t, violations, 2)
+
+	assert.Equal(t, "endpoint.syntax", violations[0].Code)
+	assert.Equal(t, "consumes;users_api;rest;/users/{userId}", violations[0].Path)
+	assert.Equal(t, "/users/{userId}", violations[0].Details["key"])
+
+	assert.Equal(t, "endpoint.syntax", violations[1].Code)
+	assert.Equal(t, "provides;rest;/users/{userId}", violations[1].Path)
+	assert.Equal(t, "/users/{userId}", violations[1].Details["key"])
+}
+
+func TestContract_NomeDeServicoInvalidoSuprimeADescida(t *testing.T) {
+	source := `consumes:
+  "Bad;Svc":
+    rest:
+      "/users/{id}":
+        patch:
+          responses:
+            600: Missing
+`
+
+	violations := descriptor.Validate(descriptor.Contract, contractDocument(t, source), "api.yaml")
+
+	require.Len(t, violations, 1)
+	assert.Equal(t, "service.name_syntax", violations[0].Code)
+	assert.Equal(t, "consumes;Bad;Svc", violations[0].Path)
+	assert.Equal(t, map[string]string{"key": "Bad;Svc", "error": "must be snake_case"}, violations[0].Details)
+}

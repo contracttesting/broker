@@ -3,14 +3,14 @@ package schemamapper_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestToPropertyModels_Root_IsDollar(t *testing.T) {
-	properties := schemamapper.ToPropertyModels(nil, dsl.Schema{Type: "string"})
+	properties := schemamapper.ToPropertyModels(nil, contract.Schema{Type: "string"})
 
 	assert.Equal(t, map[string]model.Property{
 		"$": {Path: "$", Type: "string", Optional: false},
@@ -18,9 +18,9 @@ func TestToPropertyModels_Root_IsDollar(t *testing.T) {
 }
 
 func TestToPropertyModels_Property_AppendsDottedName(t *testing.T) {
-	properties := schemamapper.ToPropertyModels(nil, dsl.Schema{
+	properties := schemamapper.ToPropertyModels(nil, contract.Schema{
 		Type: "object",
-		Properties: map[string]dsl.Schema{
+		Properties: map[string]contract.Schema{
 			"x": {Type: "integer"},
 		},
 	})
@@ -32,10 +32,10 @@ func TestToPropertyModels_Property_AppendsDottedName(t *testing.T) {
 }
 
 func TestToPropertyModels_ArrayItem_SuffixesBrackets(t *testing.T) {
-	properties := schemamapper.ToPropertyModels(nil, dsl.Schema{
+	properties := schemamapper.ToPropertyModels(nil, contract.Schema{
 		Type: "object",
-		Properties: map[string]dsl.Schema{
-			"x": {Type: "array", Items: &dsl.Schema{Type: "string"}},
+		Properties: map[string]contract.Schema{
+			"x": {Type: "array", Items: &contract.Schema{Type: "string"}},
 		},
 	})
 

@@ -1,26 +1,33 @@
 package validator
 
 import (
-	"fmt"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
 
-type schemaDuplicateRule struct {
-	seen map[string]string
-}
+func duplicateSchemas(declarations fragmentmapper.Declarations) []violation.Violation {
+	var violations []violation.Violation
 
-func (schemaDuplicateRule) Code() string { return "schema.duplicate" }
+	declaredIn := map[string]string{}
 
-func (r *schemaDuplicateRule) Validate(value any, contextualValidator *ContextualValidator) {
-	name, ok := value.(string)
-	if !ok {
-		return
+	for _, declaration := range declarations.Schemas {
+		first, taken := declaredIn[declaration.Name]
+		if !taken {
+			declaredIn[declaration.Name] = declaration.Source
+
+			continue
+		}
+
+		violations = append(violations, violation.Violation{
+			Code:   "schema.duplicate",
+			Path:   schemaPath(declaration.Name),
+			Source: declaration.Source,
+			Details: map[string]string{
+				"schema":     declaration.Name,
+				"declaredIn": first,
+			},
+		})
 	}
 
-	if declaredIn, taken := r.seen[name]; taken {
-		contextualValidator.addViolation(fmt.Sprintf("duplicate schema: %s declared in %s and %s", name, declaredIn, contextualValidator.source))
-
-		return
-	}
-
-	r.seen[name] = contextualValidator.source
+	return violations
 }

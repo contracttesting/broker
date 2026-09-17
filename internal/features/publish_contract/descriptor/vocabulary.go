@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/validations"
 )
 
@@ -26,7 +26,7 @@ var (
 )
 
 func endpointSyntax(key string) error {
-	return validations.Endpoint(dsl.NormalizeEndpoint(key))
+	return validations.Endpoint(contract.NormalizeEndpoint(key))
 }
 
 const (
@@ -35,7 +35,7 @@ const (
 )
 
 func statusCodeInRange(key string) error {
-	status, err := strconv.Atoi(key)
+	status, err := strconv.ParseUint(key, 10, 0)
 	if err != nil || status < minStatusCode || status > maxStatusCode {
 		return fmt.Errorf("must be between %d and %d", minStatusCode, maxStatusCode)
 	}
