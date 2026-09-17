@@ -1,15 +1,15 @@
-package dsl_test
+package contract_test
 
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func schemaDocument(t *testing.T, source string) dsl.Document {
+func schemaDocument(t *testing.T, source string) contract.Document {
 	t.Helper()
 
 	var document map[string]any
@@ -19,11 +19,11 @@ func schemaDocument(t *testing.T, source string) dsl.Document {
 }
 
 func TestSchemaFromDocument_Primitivo(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: string
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: string
 description: nome do pet
 `))
 
-	assert.Equal(t, dsl.Schema{Type: "string", Description: "nome do pet"}, schema)
+	assert.Equal(t, contract.Schema{Type: "string", Description: "nome do pet"}, schema)
 	assert.True(t, schema.IsPrimitive())
 	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsArray())
@@ -33,7 +33,7 @@ description: nome do pet
 func TestSchemaFromDocument_CadaTipoPrimitivo(t *testing.T) {
 	for _, primitive := range []string{"string", "integer", "float", "boolean"} {
 		t.Run(primitive, func(t *testing.T) {
-			schema := dsl.SchemaFromDocument(dsl.Document{"type": primitive})
+			schema := contract.SchemaFromDocument(contract.Document{"type": primitive})
 
 			assert.True(t, schema.IsPrimitive())
 		})
@@ -41,9 +41,9 @@ func TestSchemaFromDocument_CadaTipoPrimitivo(t *testing.T) {
 }
 
 func TestSchemaFromDocument_TipoDesconhecidoNaoEhNada(t *testing.T) {
-	schema := dsl.SchemaFromDocument(dsl.Document{"type": "auid"})
+	schema := contract.SchemaFromDocument(contract.Document{"type": "auid"})
 
-	assert.Equal(t, dsl.Schema{Type: "auid"}, schema)
+	assert.Equal(t, contract.Schema{Type: "auid"}, schema)
 	assert.False(t, schema.IsPrimitive())
 	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsArray())
@@ -51,14 +51,14 @@ func TestSchemaFromDocument_TipoDesconhecidoNaoEhNada(t *testing.T) {
 }
 
 func TestSchemaFromDocument_TypeQueNaoEhStringEhIgnorado(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: 42
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: 42
 `))
 
-	assert.Equal(t, dsl.Schema{}, schema)
+	assert.Equal(t, contract.Schema{}, schema)
 }
 
 func TestSchemaFromDocument_ObjetoComProperties(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: object
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
 properties:
   id:
     type: string
@@ -67,9 +67,9 @@ properties:
     optional: true
 `))
 
-	assert.Equal(t, dsl.Schema{
+	assert.Equal(t, contract.Schema{
 		Type: "object",
-		Properties: map[string]dsl.Schema{
+		Properties: map[string]contract.Schema{
 			"id":   {Type: "string"},
 			"name": {Type: "string", Optional: true},
 		},
@@ -81,7 +81,7 @@ properties:
 }
 
 func TestSchemaFromDocument_ObjetoSemTypeMasComPropertiesEhObjeto(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `properties: {}
+	schema := contract.SchemaFromDocument(schemaDocument(t, `properties: {}
 `))
 
 	assert.NotNil(t, schema.Properties)
@@ -90,16 +90,16 @@ func TestSchemaFromDocument_ObjetoSemTypeMasComPropertiesEhObjeto(t *testing.T) 
 }
 
 func TestSchemaFromDocument_PropriedadeQueNaoEhMapaViraSchemaZero(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: object
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
 properties:
   id: string
 `))
 
-	assert.Equal(t, map[string]dsl.Schema{"id": {}}, schema.Properties)
+	assert.Equal(t, map[string]contract.Schema{"id": {}}, schema.Properties)
 }
 
 func TestSchemaFromDocument_PropertiesQueNaoEhMapaEhIgnorado(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `properties: id
+	schema := contract.SchemaFromDocument(schemaDocument(t, `properties: id
 `))
 
 	assert.Nil(t, schema.Properties)
@@ -107,12 +107,12 @@ func TestSchemaFromDocument_PropertiesQueNaoEhMapaEhIgnorado(t *testing.T) {
 }
 
 func TestSchemaFromDocument_ArrayComItems(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: array
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: array
 items:
   type: integer
 `))
 
-	assert.Equal(t, dsl.Schema{Type: "array", Items: &dsl.Schema{Type: "integer"}}, schema)
+	assert.Equal(t, contract.Schema{Type: "array", Items: &contract.Schema{Type: "integer"}}, schema)
 	assert.True(t, schema.IsArray())
 	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsPrimitive())
@@ -120,17 +120,17 @@ items:
 }
 
 func TestSchemaFromDocument_ArrayComItemsVazio(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: array
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: array
 items: {}
 `))
 
 	require.NotNil(t, schema.Items)
-	assert.Equal(t, dsl.Schema{}, *schema.Items)
+	assert.Equal(t, contract.Schema{}, *schema.Items)
 	assert.True(t, schema.IsArray())
 }
 
 func TestSchemaFromDocument_ArraySemItems(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: array
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: array
 `))
 
 	assert.Nil(t, schema.Items)
@@ -138,29 +138,29 @@ func TestSchemaFromDocument_ArraySemItems(t *testing.T) {
 }
 
 func TestSchemaFromDocument_ItemsQueNaoEhMapaEhIgnorado(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: array
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: array
 items: string
 `))
 
-	assert.Equal(t, dsl.Schema{Type: "array"}, schema)
+	assert.Equal(t, contract.Schema{Type: "array"}, schema)
 }
 
 func TestSchemaFromDocument_ItemsSemTypeEhArray(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `items:
+	schema := contract.SchemaFromDocument(schemaDocument(t, `items:
   type: string
 `))
 
-	assert.Equal(t, dsl.Schema{Items: &dsl.Schema{Type: "string"}}, schema)
+	assert.Equal(t, contract.Schema{Items: &contract.Schema{Type: "string"}}, schema)
 	assert.True(t, schema.IsArray())
 	assert.False(t, schema.IsObject())
 }
 
 func TestSchemaFromDocument_Ref(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `ref: Pet
+	schema := contract.SchemaFromDocument(schemaDocument(t, `ref: Pet
 optional: true
 `))
 
-	assert.Equal(t, dsl.Schema{Ref: "Pet", Optional: true}, schema)
+	assert.Equal(t, contract.Schema{Ref: "Pet", Optional: true}, schema)
 	assert.True(t, schema.IsRef())
 	assert.False(t, schema.IsObject())
 	assert.False(t, schema.IsArray())
@@ -174,7 +174,7 @@ func TestSchemaFromDocument_RefComTypeOuEstruturaNaoEhRef(t *testing.T) {
 		"items":      "ref: Pet\nitems: {}\n",
 	} {
 		t.Run(name, func(t *testing.T) {
-			schema := dsl.SchemaFromDocument(schemaDocument(t, source))
+			schema := contract.SchemaFromDocument(schemaDocument(t, source))
 
 			assert.Equal(t, "Pet", schema.Ref)
 			assert.False(t, schema.IsRef())
@@ -183,14 +183,14 @@ func TestSchemaFromDocument_RefComTypeOuEstruturaNaoEhRef(t *testing.T) {
 }
 
 func TestSchemaFromDocument_Optional(t *testing.T) {
-	assert.True(t, dsl.SchemaFromDocument(dsl.Document{"type": "string", "optional": true}).Optional)
-	assert.False(t, dsl.SchemaFromDocument(dsl.Document{"type": "string", "optional": false}).Optional)
-	assert.False(t, dsl.SchemaFromDocument(dsl.Document{"type": "string", "optional": "true"}).Optional)
-	assert.False(t, dsl.SchemaFromDocument(dsl.Document{"type": "string"}).Optional)
+	assert.True(t, contract.SchemaFromDocument(contract.Document{"type": "string", "optional": true}).Optional)
+	assert.False(t, contract.SchemaFromDocument(contract.Document{"type": "string", "optional": false}).Optional)
+	assert.False(t, contract.SchemaFromDocument(contract.Document{"type": "string", "optional": "true"}).Optional)
+	assert.False(t, contract.SchemaFromDocument(contract.Document{"type": "string"}).Optional)
 }
 
 func TestSchemaFromDocument_RecursaoAninhada(t *testing.T) {
-	schema := dsl.SchemaFromDocument(schemaDocument(t, `type: object
+	schema := contract.SchemaFromDocument(schemaDocument(t, `type: object
 properties:
   users:
     type: array
@@ -204,17 +204,17 @@ properties:
             optional: true
 `))
 
-	assert.Equal(t, dsl.Schema{
+	assert.Equal(t, contract.Schema{
 		Type: "object",
-		Properties: map[string]dsl.Schema{
+		Properties: map[string]contract.Schema{
 			"users": {
 				Type: "array",
-				Items: &dsl.Schema{
+				Items: &contract.Schema{
 					Type: "object",
-					Properties: map[string]dsl.Schema{
+					Properties: map[string]contract.Schema{
 						"tags": {
 							Type:  "array",
-							Items: &dsl.Schema{Ref: "Tag", Optional: true},
+							Items: &contract.Schema{Ref: "Tag", Optional: true},
 						},
 					},
 				},
@@ -224,10 +224,10 @@ properties:
 }
 
 func TestSchemaFromDocument_DocumentoNilOuVazioDaSchemaZero(t *testing.T) {
-	assert.Equal(t, dsl.Schema{}, dsl.SchemaFromDocument(nil))
-	assert.Equal(t, dsl.Schema{}, dsl.SchemaFromDocument(dsl.Document{}))
+	assert.Equal(t, contract.Schema{}, contract.SchemaFromDocument(nil))
+	assert.Equal(t, contract.Schema{}, contract.SchemaFromDocument(contract.Document{}))
 
-	zero := dsl.SchemaFromDocument(nil)
+	zero := contract.SchemaFromDocument(nil)
 	assert.False(t, zero.IsObject())
 	assert.False(t, zero.IsArray())
 	assert.False(t, zero.IsPrimitive())

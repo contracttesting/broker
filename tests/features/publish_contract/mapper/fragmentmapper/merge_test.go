@@ -3,7 +3,7 @@ package fragmentmapper_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/goccy/go-yaml"
@@ -240,15 +240,15 @@ type mergedFile struct {
 	raw    string
 }
 
-func mergeFragments(t *testing.T, files ...mergedFile) []dsl.Fragment {
+func mergeFragments(t *testing.T, files ...mergedFile) []contract.Fragment {
 	t.Helper()
 
-	fragments := make([]dsl.Fragment, 0, len(files))
+	fragments := make([]contract.Fragment, 0, len(files))
 	for _, file := range files {
 		var document any
 		require.NoError(t, yaml.Unmarshal([]byte(file.raw), &document))
 
-		fragments = append(fragments, dsl.Fragment{Source: file.source, Document: document})
+		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
 	return fragments
@@ -263,12 +263,12 @@ func mergeResources(t *testing.T, files ...mergedFile) []model.UploadedResource 
 func mergeContract(t *testing.T, files ...mergedFile) *model.UploadedContract {
 	t.Helper()
 
-	contract := model.NewUploadedContract(0, "front_app", "1", "")
+	uploaded := model.NewUploadedContract(0, "front_app", "1", "")
 	for _, resource := range mergeResources(t, files...) {
-		require.NoError(t, contract.AddResource(&resource))
+		require.NoError(t, uploaded.AddResource(&resource))
 	}
 
-	return contract
+	return uploaded
 }
 
 func mergedResource(t *testing.T, resources []model.UploadedResource, interaction model.Interaction) model.UploadedResource {

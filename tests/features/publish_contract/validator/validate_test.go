@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
 	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
@@ -166,12 +166,12 @@ type validatedFile struct {
 func validateFiles(t *testing.T, files ...validatedFile) []violation.Violation {
 	t.Helper()
 
-	fragments := make([]dsl.Fragment, 0, len(files))
+	fragments := make([]contract.Fragment, 0, len(files))
 	for _, file := range files {
 		var document any
 		require.NoError(t, yaml.Unmarshal([]byte(file.raw), &document))
 
-		fragments = append(fragments, dsl.Fragment{Source: file.source, Document: document})
+		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
 	return validator.Validate(fragmentmapper.ToDeclarations(fragments))

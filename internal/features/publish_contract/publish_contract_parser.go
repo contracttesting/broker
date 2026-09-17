@@ -11,19 +11,19 @@ import (
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 )
 
-func decodeFragment(fragment ContractFragment) (dsl.Fragment, error) {
+func decodeFragment(fragment ContractFragment) (contract.Fragment, error) {
 	extension := strings.ToLower(filepath.Ext(fragment.Source))
 	if extension != ".yaml" && extension != ".yml" && extension != ".json" {
-		return dsl.Fragment{}, fmt.Errorf(
+		return contract.Fragment{}, fmt.Errorf(
 			"unsupported contract file: %s (expected .yaml, .yml or .json)",
 			fragment.Source,
 		)
 	}
 
-	decoded := dsl.Fragment{Source: fragment.Source}
+	decoded := contract.Fragment{Source: fragment.Source}
 
 	content := bytes.TrimSpace([]byte(fragment.Content))
 	if len(content) == 0 {
@@ -32,11 +32,11 @@ func decodeFragment(fragment ContractFragment) (dsl.Fragment, error) {
 
 	file, err := parser.ParseBytes(content, 0)
 	if err != nil {
-		return dsl.Fragment{}, malformedContractFile(fragment.Source, err)
+		return contract.Fragment{}, malformedContractFile(fragment.Source, err)
 	}
 
 	if len(file.Docs) > 1 {
-		return dsl.Fragment{}, malformedContractFile(fragment.Source, errors.New("multiple documents are not supported"))
+		return contract.Fragment{}, malformedContractFile(fragment.Source, errors.New("multiple documents are not supported"))
 	}
 
 	if len(file.Docs) == 0 || file.Docs[0].Body == nil {
@@ -46,11 +46,11 @@ func decodeFragment(fragment ContractFragment) (dsl.Fragment, error) {
 	body := file.Docs[0].Body
 
 	if usesAnchors(body) {
-		return dsl.Fragment{}, malformedContractFile(fragment.Source, errors.New("anchors and aliases are not supported"))
+		return contract.Fragment{}, malformedContractFile(fragment.Source, errors.New("anchors and aliases are not supported"))
 	}
 
 	if err := yaml.NodeToValue(body, &decoded.Document); err != nil {
-		return dsl.Fragment{}, malformedContractFile(fragment.Source, err)
+		return contract.Fragment{}, malformedContractFile(fragment.Source, err)
 	}
 
 	return decoded, nil

@@ -1,7 +1,7 @@
 package fragmentmapper
 
 import (
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/resourcepathmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
 	"github.com/contracttesting/broker/internal/model"
@@ -10,12 +10,12 @@ import (
 type Declarations struct {
 	Resources []ResourceDeclaration
 	Schemas   []SchemaDeclaration
-	Catalog   dsl.SchemasMap
+	Catalog   contract.SchemasMap
 }
 
 type ResourceDeclaration struct {
 	Source     string
-	Path       dsl.ResourcePath
+	Path       contract.ResourcePath
 	SchemaName string
 	Resource   model.UploadedResource
 }
@@ -23,20 +23,20 @@ type ResourceDeclaration struct {
 type SchemaDeclaration struct {
 	Source string
 	Name   string
-	Schema dsl.Schema
+	Schema contract.Schema
 }
 
 var methodsInOrder = []string{"get", "post", "put", "delete"}
 
-func ToDeclarations(fragments []dsl.Fragment) Declarations {
-	sorted := dsl.SortedBySource(fragments)
-	declarations := Declarations{Catalog: dsl.SchemasMap{}}
+func ToDeclarations(fragments []contract.Fragment) Declarations {
+	sorted := contract.SortedBySource(fragments)
+	declarations := Declarations{Catalog: contract.SchemasMap{}}
 
 	for _, fragment := range sorted {
 		schemas := fragment.Root().Mapping("schemas")
 
 		for _, name := range schemas.Keys() {
-			schema := dsl.SchemaFromDocument(schemas.Mapping(name))
+			schema := contract.SchemaFromDocument(schemas.Mapping(name))
 			declarations.Schemas = append(declarations.Schemas, SchemaDeclaration{Source: fragment.Source, Name: name, Schema: schema})
 
 			if _, declared := declarations.Catalog[name]; !declared {
@@ -63,9 +63,9 @@ func ToResourceModels(declarations Declarations) []model.UploadedResource {
 	return resources
 }
 
-func resourceDeclarationsFromFragment(fragment dsl.Fragment, catalog dsl.SchemasMap) []ResourceDeclaration {
+func resourceDeclarationsFromFragment(fragment contract.Fragment, catalog contract.SchemasMap) []ResourceDeclaration {
 	document := fragment.Root()
-	root := dsl.NewResourcePath("")
+	root := contract.NewResourcePath("")
 
 	var declarations []ResourceDeclaration
 
@@ -87,11 +87,11 @@ func resourceDeclarationsFromFragment(fragment dsl.Fragment, catalog dsl.Schemas
 	)...)
 }
 
-func resourceDeclarationsFromRest(source string, rest dsl.Document, resourcePath dsl.ResourcePath, catalog dsl.SchemasMap) []ResourceDeclaration {
+func resourceDeclarationsFromRest(source string, rest contract.Document, resourcePath contract.ResourcePath, catalog contract.SchemasMap) []ResourceDeclaration {
 	var declarations []ResourceDeclaration
 
 	for _, endpoint := range rest.Keys() {
-		endpointPath := resourcePath.Append("rest", dsl.NormalizeEndpoint(endpoint))
+		endpointPath := resourcePath.Append("rest", contract.NormalizeEndpoint(endpoint))
 		methods := rest.Mapping(endpoint)
 
 		for _, method := range methodsInOrder {
@@ -112,7 +112,7 @@ func resourceDeclarationsFromRest(source string, rest dsl.Document, resourcePath
 	return declarations
 }
 
-func resourceDeclaration(source string, schemaName string, resourcePath dsl.ResourcePath, catalog dsl.SchemasMap) ResourceDeclaration {
+func resourceDeclaration(source string, schemaName string, resourcePath contract.ResourcePath, catalog contract.SchemasMap) ResourceDeclaration {
 	properties := schemamapper.ToPropertyModels(catalog, catalog[schemaName])
 
 	return ResourceDeclaration{

@@ -3,7 +3,7 @@ package fragmentmapper_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/goccy/go-yaml"
@@ -143,12 +143,12 @@ type declaredFile struct {
 func declarationsOf(t *testing.T, files ...declaredFile) fragmentmapper.Declarations {
 	t.Helper()
 
-	fragments := make([]dsl.Fragment, 0, len(files))
+	fragments := make([]contract.Fragment, 0, len(files))
 	for _, file := range files {
 		var document any
 		require.NoError(t, yaml.Unmarshal([]byte(file.raw), &document))
 
-		fragments = append(fragments, dsl.Fragment{Source: file.source, Document: document})
+		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
 	return fragmentmapper.ToDeclarations(fragments)
@@ -200,9 +200,9 @@ func TestToDeclarations_OrdenaSchemasPorOrigemENome(t *testing.T) {
 	)
 
 	assert.Equal(t, []fragmentmapper.SchemaDeclaration{
-		{Source: "a.yaml", Name: "Pet", Schema: dsl.Schema{Type: "object", Properties: map[string]dsl.Schema{"id": {Type: "string"}}}},
-		{Source: "a.yaml", Name: "Problem", Schema: dsl.Schema{Type: "object", Properties: map[string]dsl.Schema{"title": {Type: "string"}}}},
-		{Source: "b.yaml", Name: "Pet", Schema: dsl.Schema{Type: "object", Properties: map[string]dsl.Schema{"name": {Type: "string"}}}},
+		{Source: "a.yaml", Name: "Pet", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"id": {Type: "string"}}}},
+		{Source: "a.yaml", Name: "Problem", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"title": {Type: "string"}}}},
+		{Source: "b.yaml", Name: "Pet", Schema: contract.Schema{Type: "object", Properties: map[string]contract.Schema{"name": {Type: "string"}}}},
 	}, declarations.Schemas)
 }
 
@@ -212,9 +212,9 @@ func TestToDeclarations_CatalogoFicaComAPrimeiraDeclaracaoDeCadaNome(t *testing.
 		declaredFile{"a.yaml", petByIdYAML},
 	)
 
-	assert.Equal(t, dsl.SchemasMap{
-		"Pet":     {Type: "object", Properties: map[string]dsl.Schema{"id": {Type: "string"}}},
-		"Problem": {Type: "object", Properties: map[string]dsl.Schema{"title": {Type: "string"}}},
+	assert.Equal(t, contract.SchemasMap{
+		"Pet":     {Type: "object", Properties: map[string]contract.Schema{"id": {Type: "string"}}},
+		"Problem": {Type: "object", Properties: map[string]contract.Schema{"title": {Type: "string"}}},
 	}, declarations.Catalog)
 
 	require.Len(t, declarations.Resources, 2)
@@ -268,7 +268,7 @@ func TestToDeclarations_NomeNaoResolvidoGeraPropriedadeDoSchemaZero(t *testing.T
 }
 
 func TestToDeclarations_FragmentoSemDocumentoNaoDeclaraNada(t *testing.T) {
-	declarations := fragmentmapper.ToDeclarations([]dsl.Fragment{{Source: "empty.yaml"}})
+	declarations := fragmentmapper.ToDeclarations([]contract.Fragment{{Source: "empty.yaml"}})
 
 	assert.Empty(t, declarations.Resources)
 	assert.Empty(t, declarations.Schemas)

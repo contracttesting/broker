@@ -1,4 +1,4 @@
-package dsl
+package contract
 
 type SchemasMap map[string]Schema
 

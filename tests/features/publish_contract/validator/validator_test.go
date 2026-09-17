@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
 	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
@@ -121,16 +121,16 @@ schemas:
         type: integer
 `
 
-func validatorFragment(t *testing.T, source, raw string) dsl.Fragment {
+func validatorFragment(t *testing.T, source, raw string) contract.Fragment {
 	t.Helper()
 
 	var document any
 	require.NoError(t, yaml.Unmarshal([]byte(raw), &document))
 
-	return dsl.Fragment{Source: source, Document: document}
+	return contract.Fragment{Source: source, Document: document}
 }
 
-func validateFragments(fragments ...dsl.Fragment) []violation.Violation {
+func validateFragments(fragments ...contract.Fragment) []violation.Violation {
 	return validator.Validate(fragmentmapper.ToDeclarations(fragments))
 }
 
@@ -197,7 +197,7 @@ func TestValidator_EveryRule_FiresAtItsLocationSortedBySourceThenPath(t *testing
 }
 
 func TestValidator_FragmentOrder_DoesNotChangeTheReport(t *testing.T) {
-	fragments := []dsl.Fragment{
+	fragments := []contract.Fragment{
 		validatorFragment(t, "a.yaml", petsProviderYAML),
 		validatorFragment(t, "b.yaml", petsProviderYAML),
 		validatorFragment(t, "c.yaml", petSchemaYAML),
@@ -206,7 +206,7 @@ func TestValidator_FragmentOrder_DoesNotChangeTheReport(t *testing.T) {
 		validatorFragment(t, "f.yaml", integerIDConsumerYAML),
 	}
 
-	reversed := make([]dsl.Fragment, 0, len(fragments))
+	reversed := make([]contract.Fragment, 0, len(fragments))
 	for index := len(fragments) - 1; index >= 0; index-- {
 		reversed = append(reversed, fragments[index])
 	}

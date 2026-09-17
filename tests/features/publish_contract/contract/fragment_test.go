@@ -1,21 +1,21 @@
-package dsl_test
+package contract_test
 
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFragment_RootDevolveODocumentoQuandoEhMapa(t *testing.T) {
-	fragment := dsl.Fragment{Source: "api.yaml", Document: map[string]any{"provides": map[string]any{"rest": map[string]any{}}}}
+	fragment := contract.Fragment{Source: "api.yaml", Document: map[string]any{"provides": map[string]any{"rest": map[string]any{}}}}
 
-	assert.Equal(t, dsl.Document{"provides": map[string]any{"rest": map[string]any{}}}, fragment.Root())
+	assert.Equal(t, contract.Document{"provides": map[string]any{"rest": map[string]any{}}}, fragment.Root())
 	assert.NotNil(t, fragment.Root().Mapping("provides").Mapping("rest"))
 }
 
 func TestFragment_RootDeDocumentoNilEhNil(t *testing.T) {
-	fragment := dsl.Fragment{Source: "empty.yaml"}
+	fragment := contract.Fragment{Source: "empty.yaml"}
 
 	assert.Nil(t, fragment.Root())
 	assert.Nil(t, fragment.Root().Mapping("provides"))
@@ -28,7 +28,7 @@ func TestFragment_RootDeDocumentoQueNaoEhMapaEhNil(t *testing.T) {
 		"numero": 42,
 	} {
 		t.Run(name, func(t *testing.T) {
-			fragment := dsl.Fragment{Source: "odd.yaml", Document: document}
+			fragment := contract.Fragment{Source: "odd.yaml", Document: document}
 
 			assert.Nil(t, fragment.Root())
 		})
@@ -36,34 +36,34 @@ func TestFragment_RootDeDocumentoQueNaoEhMapaEhNil(t *testing.T) {
 }
 
 func TestSortedBySource_OrdenaPelaOrigem(t *testing.T) {
-	fragments := []dsl.Fragment{
+	fragments := []contract.Fragment{
 		{Source: "c.yaml", Document: "c"},
 		{Source: "a.yaml", Document: "a"},
 		{Source: "b.yaml", Document: "b"},
 	}
 
-	assert.Equal(t, []dsl.Fragment{
+	assert.Equal(t, []contract.Fragment{
 		{Source: "a.yaml", Document: "a"},
 		{Source: "b.yaml", Document: "b"},
 		{Source: "c.yaml", Document: "c"},
-	}, dsl.SortedBySource(fragments))
+	}, contract.SortedBySource(fragments))
 }
 
 func TestSortedBySource_NaoAlteraAEntrada(t *testing.T) {
-	fragments := []dsl.Fragment{{Source: "b.yaml"}, {Source: "a.yaml"}}
+	fragments := []contract.Fragment{{Source: "b.yaml"}, {Source: "a.yaml"}}
 
-	dsl.SortedBySource(fragments)
+	contract.SortedBySource(fragments)
 
-	assert.Equal(t, []dsl.Fragment{{Source: "b.yaml"}, {Source: "a.yaml"}}, fragments)
+	assert.Equal(t, []contract.Fragment{{Source: "b.yaml"}, {Source: "a.yaml"}}, fragments)
 }
 
 func TestSortedBySource_QualquerOrdemDeEntradaDaOMesmoResultado(t *testing.T) {
-	forward := dsl.SortedBySource([]dsl.Fragment{{Source: "a.yaml"}, {Source: "b.yaml"}, {Source: "c.yaml"}})
-	backward := dsl.SortedBySource([]dsl.Fragment{{Source: "c.yaml"}, {Source: "b.yaml"}, {Source: "a.yaml"}})
+	forward := contract.SortedBySource([]contract.Fragment{{Source: "a.yaml"}, {Source: "b.yaml"}, {Source: "c.yaml"}})
+	backward := contract.SortedBySource([]contract.Fragment{{Source: "c.yaml"}, {Source: "b.yaml"}, {Source: "a.yaml"}})
 
 	assert.Equal(t, forward, backward)
 }
 
 func TestSortedBySource_EntradaVaziaDaListaVazia(t *testing.T) {
-	assert.Empty(t, dsl.SortedBySource(nil))
+	assert.Empty(t, contract.SortedBySource(nil))
 }

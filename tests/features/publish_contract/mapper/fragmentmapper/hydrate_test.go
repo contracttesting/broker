@@ -3,7 +3,7 @@ package fragmentmapper_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/goccy/go-yaml"
@@ -36,13 +36,13 @@ const happyContractJSON = `{
   }
 }`
 
-func singleFragment(t *testing.T, raw string) []dsl.Fragment {
+func singleFragment(t *testing.T, raw string) []contract.Fragment {
 	t.Helper()
 
 	var document any
 	require.NoError(t, yaml.Unmarshal([]byte(raw), &document))
 
-	return []dsl.Fragment{{Source: "api.json", Document: document}}
+	return []contract.Fragment{{Source: "api.json", Document: document}}
 }
 
 func toResourceModels(t *testing.T, raw string) []model.UploadedResource {

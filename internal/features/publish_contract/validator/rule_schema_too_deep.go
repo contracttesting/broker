@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
@@ -33,7 +33,7 @@ func schemasTooDeep(declarations fragmentmapper.Declarations) []violation.Violat
 	return violations
 }
 
-func exceedsDepth(schema dsl.Schema, catalog dsl.SchemasMap, depth DepthCounter) bool {
+func exceedsDepth(schema contract.Schema, catalog contract.SchemasMap, depth DepthCounter) bool {
 	if depth.Exceeded() {
 		return true
 	}

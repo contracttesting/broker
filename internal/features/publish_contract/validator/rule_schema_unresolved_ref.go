@@ -4,7 +4,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
@@ -26,7 +26,7 @@ func unresolvedSchemaRefs(declarations fragmentmapper.Declarations) []violation.
 	return violations
 }
 
-func unresolvedRefsIn(schema dsl.Schema, catalog dsl.SchemasMap, source string, path string, property string) []violation.Violation {
+func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, source string, path string, property string) []violation.Violation {
 	switch {
 	case schema.IsRef():
 		if _, declared := catalog[schema.Ref]; declared {

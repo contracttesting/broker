@@ -3,7 +3,7 @@ package fragmentmapper_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/goccy/go-yaml"
@@ -35,7 +35,7 @@ func singleEndpointResource(t *testing.T, raw string) model.UploadedResource {
 	var document any
 	require.NoError(t, yaml.Unmarshal([]byte(raw), &document))
 
-	declarations := fragmentmapper.ToDeclarations([]dsl.Fragment{{Source: "things.yaml", Document: document}})
+	declarations := fragmentmapper.ToDeclarations([]contract.Fragment{{Source: "things.yaml", Document: document}})
 	resources := fragmentmapper.ToResourceModels(declarations)
 	require.Len(t, resources, 1)
 
