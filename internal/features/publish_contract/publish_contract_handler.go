@@ -43,8 +43,6 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 	}
 
 	fragments := make([]contract.Fragment, 0, len(requestBody.Contracts))
-	var shapeViolations []violation.Violation
-
 	for _, uploaded := range requestBody.Contracts {
 		if strings.TrimSpace(uploaded.Source) == "" {
 			return ctr.respondInvalidInput(ctx)
@@ -56,11 +54,15 @@ func (ctr *PublishContractHandler) Handle(ctx fiber.Ctx) error {
 		}
 
 		fragments = append(fragments, fragment)
+	}
+
+	var shapeViolations []violation.Violation
+	for _, fragment := range contract.SortedBySource(fragments) {
 		shapeViolations = append(shapeViolations, descriptor.Validate(descriptor.Contract, fragment.Document, fragment.Source)...)
 	}
 
 	if len(shapeViolations) > 0 {
-		return ctr.respondValidationFailed(ctx, violation.SortedByLocation(shapeViolations))
+		return ctr.respondValidationFailed(ctx, shapeViolations)
 	}
 
 	participant, exists := ctr.participantRepository.FindByName(ctx.Context(), serviceName)

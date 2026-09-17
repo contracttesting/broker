@@ -1,8 +1,6 @@
 package validator
 
 import (
-	"strings"
-
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
@@ -18,6 +16,6 @@ var rules = []rule{
 	schemasTooDeep,
 }
 
-func schemaPath(name string, segments ...string) string {
-	return strings.Join(append([]string{"schemas", name}, segments...), ";")
+func schemaPath(name string) string {
+	return "schemas;" + name
 }

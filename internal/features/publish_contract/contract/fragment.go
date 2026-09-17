@@ -11,14 +11,9 @@ type Fragment struct {
 }
 
 func (f Fragment) Root() Document {
-	switch root := f.Document.(type) {
-	case map[string]any:
-		return root
-	case Document:
-		return root
-	default:
-		return nil
-	}
+	root, _ := f.Document.(map[string]any)
+
+	return root
 }
 
 func SortedBySource(fragments []Fragment) []Fragment {

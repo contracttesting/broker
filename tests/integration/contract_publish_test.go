@@ -730,6 +730,12 @@ schemas:
         type: string
 `
 
+const scalarMethodYAML = `provides:
+  rest:
+    /pets:
+      get: text
+`
+
 const anchoredSchemasYAML = `schemas:
   Pet: &pet
     type: object
@@ -788,6 +794,26 @@ schemas:
         type: strng
 `
 
+const parentAndNestedEndpointsOutOfRangeYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          999: Pet
+    /pets/*:
+      get:
+        responses:
+          999: Pet
+`
+
+const parentEndpointOutOfRangeYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          999: Pet
+`
+
 func (s *IntegrationSuite) TestPublishContract_UnknownMethod_Rejected() {
 	status, _ := s.post("/api/participants", petsParticipantBody)
 	s.Require().Equal(http.StatusOK, status)
@@ -813,6 +839,21 @@ func (s *IntegrationSuite) TestPublishContract_MessageBlock_Rejected() {
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
 		`{"code":"key.unknown","path":"provides;message","source":"api.yaml","details":{"key":"message"}}`+
+		`]}`, body)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_ScalarMethod_Rejected() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1",
+		contractFragment{"api.yaml", scalarMethodYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"value.invalid_kind","path":"provides;rest;/pets;get","source":"api.yaml","details":{"expected":"mapping","got":"string"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
@@ -864,6 +905,24 @@ func (s *IntegrationSuite) TestPublishContract_JSONAndYAML_YieldTheSameViolation
 		`]}`
 	s.JSONEq(violations, jsonBody)
 	s.JSONEq(strings.ReplaceAll(violations, "api.json", "api.yaml"), yamlBody)
+
+	s.Equal(0, s.countRows("contracts"))
+}
+
+func (s *IntegrationSuite) TestPublishContract_ShapeViolations_KeepDocumentOrderPerSource() {
+	status, _ := s.post("/api/participants", petsParticipantBody)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/contracts", s.publishBody("pets_service", "1",
+		contractFragment{"b.yaml", parentEndpointOutOfRangeYAML},
+		contractFragment{"a.yaml", parentAndNestedEndpointsOutOfRangeYAML},
+	))
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"contract validation failed","violations":[`+
+		`{"code":"status.out_of_range","path":"provides;rest;/pets;get;responses;999","source":"a.yaml","details":{"key":"999","error":"must be between 100 and 599"}},`+
+		`{"code":"status.out_of_range","path":"provides;rest;/pets/*;get;responses;999","source":"a.yaml","details":{"key":"999","error":"must be between 100 and 599"}},`+
+		`{"code":"status.out_of_range","path":"provides;rest;/pets;get;responses;999","source":"b.yaml","details":{"key":"999","error":"must be between 100 and 599"}}`+
+		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 }
