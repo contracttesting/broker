@@ -13,7 +13,6 @@ FROM alpine:3.21
 WORKDIR /app
 
 COPY --from=build /out/broker /app/broker
-COPY migrations /app/migrations
 
 EXPOSE 8080
 

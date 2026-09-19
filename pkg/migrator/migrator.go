@@ -3,9 +3,8 @@ package migrator
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -36,40 +35,41 @@ const insertMigrationSQL = `INSERT INTO %s (migration) VALUES ($1);`
 
 type Migrator struct {
 	pool            *pgxpool.Pool
-	migrationsDir   string
+	migrations      fs.FS
 	migrationsTable string
 }
 
 func New(
 	pool *pgxpool.Pool,
-	migrationsDir, migrationsTable string,
+	migrations fs.FS,
+	migrationsTable string,
 ) *Migrator {
 	return &Migrator{
 		pool:            pool,
-		migrationsDir:   migrationsDir,
+		migrations:      migrations,
 		migrationsTable: migrationsTable,
 	}
 }
 
-func (m *Migrator) Migrate() error {
-	if err := m.ensureMigrationsTable(); err != nil {
+func (this *Migrator) Migrate() error {
+	if err := this.ensureMigrationsTable(); err != nil {
 		return fmt.Errorf("error ensuring migrations table: %w", err)
 	}
 
-	migrationFiles, err := m.getMigrationFiles()
+	migrationFiles, err := this.getMigrationFiles()
 	if err != nil {
 		return fmt.Errorf("error reading migrations directory: %w", err)
 	}
 
 	ctx := context.Background()
-	tx, err := m.pool.Begin(ctx)
+	tx, err := this.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("error starting migrations transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	for _, migrationFile := range migrationFiles {
-		applied, err := m.isMigrationApplied(ctx, tx, migrationFile)
+		applied, err := this.isMigrationApplied(ctx, tx, migrationFile)
 		if err != nil {
 			return fmt.Errorf(
 				"error checking if migration %s is applied: %w",
@@ -82,7 +82,7 @@ func (m *Migrator) Migrate() error {
 			continue
 		}
 
-		if err := m.applyMigration(ctx, tx, migrationFile); err != nil {
+		if err := this.applyMigration(ctx, tx, migrationFile); err != nil {
 			return err
 		}
 
@@ -96,26 +96,26 @@ func (m *Migrator) Migrate() error {
 	return nil
 }
 
-func (m *Migrator) ensureMigrationsTable() error {
+func (this *Migrator) ensureMigrationsTable() error {
 	var sql string
 
 	// only a qualified name identifies a schema to create; an unqualified one resolves
 	// through search_path and must not be mistaken for a schema of its own
-	if schema, _, qualified := strings.Cut(m.migrationsTable, "."); qualified {
+	if schema, _, qualified := strings.Cut(this.migrationsTable, "."); qualified {
 		sql = fmt.Sprintf(ensureMigrationsSchemaSQL, schema)
 	}
 
-	sql += fmt.Sprintf(ensureMigrationsTableSQL, m.migrationsTable)
+	sql += fmt.Sprintf(ensureMigrationsTableSQL, this.migrationsTable)
 
-	if _, err := m.pool.Exec(context.Background(), sql); err != nil {
+	if _, err := this.pool.Exec(context.Background(), sql); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (m *Migrator) getMigrationFiles() ([]string, error) {
-	entries, err := os.ReadDir(m.migrationsDir)
+func (this *Migrator) getMigrationFiles() ([]string, error) {
+	entries, err := fs.ReadDir(this.migrations, ".")
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (m *Migrator) getMigrationFiles() ([]string, error) {
 			continue
 		}
 		assertValidMigrationFilename(entry.Name())
-		migrationFiles = append(migrationFiles, filepath.Join(m.migrationsDir, entry.Name()))
+		migrationFiles = append(migrationFiles, entry.Name())
 	}
 
 	return migrationFiles, nil
@@ -148,8 +148,8 @@ func assertValidMigrationFilename(name string) {
 	}
 }
 
-func (m *Migrator) isMigrationApplied(ctx context.Context, tx pgx.Tx, migrationFile string) (bool, error) {
-	sql := fmt.Sprintf(selectMigrationSQL, m.migrationsTable)
+func (this *Migrator) isMigrationApplied(ctx context.Context, tx pgx.Tx, migrationFile string) (bool, error) {
+	sql := fmt.Sprintf(selectMigrationSQL, this.migrationsTable)
 
 	var count int
 	if err := tx.QueryRow(ctx, sql, migrationFile).Scan(&count); err != nil {
@@ -159,8 +159,8 @@ func (m *Migrator) isMigrationApplied(ctx context.Context, tx pgx.Tx, migrationF
 	return count > 0, nil
 }
 
-func (m *Migrator) applyMigration(ctx context.Context, tx pgx.Tx, migrationFile string) error {
-	contents, err := os.ReadFile(migrationFile)
+func (this *Migrator) applyMigration(ctx context.Context, tx pgx.Tx, migrationFile string) error {
+	contents, err := fs.ReadFile(this.migrations, migrationFile)
 	if err != nil {
 		return fmt.Errorf("error reading migration file %s: %w", migrationFile, err)
 	}
@@ -169,7 +169,7 @@ func (m *Migrator) applyMigration(ctx context.Context, tx pgx.Tx, migrationFile 
 		return fmt.Errorf("error executing migration %s: %w", migrationFile, err)
 	}
 
-	sql := fmt.Sprintf(insertMigrationSQL, m.migrationsTable)
+	sql := fmt.Sprintf(insertMigrationSQL, this.migrationsTable)
 	if _, err := tx.Exec(ctx, sql, migrationFile); err != nil {
 		return fmt.Errorf("error recording migration %s: %w", migrationFile, err)
 	}
