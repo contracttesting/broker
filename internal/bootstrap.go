@@ -5,6 +5,7 @@ import (
 	"github.com/contracttesting/broker/internal/features/can_i_deploy"
 	"github.com/contracttesting/broker/internal/features/create_environment"
 	"github.com/contracttesting/broker/internal/features/create_participant"
+	"github.com/contracttesting/broker/internal/features/health"
 	"github.com/contracttesting/broker/internal/features/publish_contract"
 	"github.com/contracttesting/broker/internal/features/record_deployment"
 	"github.com/contracttesting/broker/internal/features/rename_participant"
@@ -19,6 +20,7 @@ func Run() *components.Components {
 	can_i_deploy.Register(components)
 	record_deployment.Register(components)
 	rename_participant.Register(components)
+	health.Register(components)
 
 	return components
 }
