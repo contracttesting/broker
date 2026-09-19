@@ -1249,3 +1249,17 @@ func (s *IntegrationSuite) TestCanIDeploy_RemovedConsumerPropertyIsNotChecked() 
 	s.Empty(front.Endpoints)
 	s.NotContains(body, "$.legacy")
 }
+
+func (s *IntegrationSuite) TestCanIDeploy_UnknownEnvironmentReturns404() {
+	status, _ := s.post("/api/participants", `{"participant":"api"}`)
+	s.Require().Equal(http.StatusOK, status)
+
+	status, _ = s.post("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
+	s.Require().Equal(http.StatusOK, status)
+
+	status, body := s.post("/api/can-i-deploy", `{"participant":"api","version":"v1","environment":"production"}`)
+	s.Equal(http.StatusNotFound, status)
+	s.JSONEq(`{"message":"environment not found"}`, body)
+
+	s.Equal(0, s.countRows("compatibility_checks"))
+}

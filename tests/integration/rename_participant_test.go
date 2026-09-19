@@ -101,7 +101,7 @@ func (s *IntegrationSuite) TestRenameParticipant_OntoExistingNameIsRejectedNever
 	ordersID := s.renameParticipantID("orders_service")
 
 	status, body := s.post("/api/participants/rename", `{"oldName":"pets_service","newName":"orders_service"}`)
-	s.Equal(http.StatusBadRequest, status)
+	s.Equal(http.StatusConflict, status)
 	s.JSONEq(`{"message":"participant already exists"}`, body)
 
 	s.Equal(2, s.countRows("participants"))

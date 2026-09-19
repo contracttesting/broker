@@ -4,8 +4,11 @@ import (
 	"github.com/contracttesting/broker/internal/features/can_i_deploy/compatibility_checker"
 )
 
+const ContractChecked = "contract checked successfully"
+const CanIDeployInvalidInput = "can-i-deploy invalid input"
 const ContractNotFound = "contract not found"
 const ParticipantNotFound = "participant not found"
+const EnvironmentNotFound = "environment not found"
 
 type CanIDeployRequestBody struct {
 	Participant string `json:"participant"`
