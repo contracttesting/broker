@@ -1,12 +1,12 @@
 package fragmentmapper_test
 
 import (
-	"encoding/json"
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
 	"github.com/contracttesting/broker/internal/model"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,22 +36,19 @@ const happyContractJSON = `{
   }
 }`
 
-func singleFragment(t *testing.T, raw string) []dsl.Fragment {
+func singleFragment(t *testing.T, raw string) []contract.Fragment {
 	t.Helper()
 
-	var dslContract dsl.Contract
-	require.NoError(t, json.Unmarshal([]byte(raw), &dslContract))
+	var document any
+	require.NoError(t, yaml.Unmarshal([]byte(raw), &document))
 
-	return []dsl.Fragment{{Source: "api.json", Contract: &dslContract}}
+	return []contract.Fragment{{Source: "api.json", Document: document}}
 }
 
 func toResourceModels(t *testing.T, raw string) []model.UploadedResource {
 	t.Helper()
 
-	resources, err := fragmentmapper.ToResourceModels(singleFragment(t, raw))
-	require.NoError(t, err)
-
-	return resources
+	return fragmentmapper.ToResourceModels(fragmentmapper.ToDeclarations(singleFragment(t, raw)))
 }
 
 func TestToResourceModels_Happy_MaterializesResources(t *testing.T) {
@@ -307,32 +304,4 @@ func TestToResourceModels_WideShallowSchema_MaterializesEveryBranch(t *testing.T
 	require.Contains(t, resource.Properties, "$.users[].list[].list[]")
 	assert.Equal(t, "array", resource.Properties["$.users[].list[].list"].Type)
 	assert.Equal(t, "string", resource.Properties["$.users[].list[].userId"].Type)
-}
-
-const unknownTypeContractJSON = `{
-  "consumes": {
-    "pets_service": {
-      "rest": {
-        "/pets": {
-          "get": {
-            "responses": { "200": "Pet" }
-          }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": {
-        "id": { "type": "auid" }
-      }
-    }
-  }
-}`
-
-func TestToResourceModels_UnknownSchemaType_ReturnsError(t *testing.T) {
-	_, err := fragmentmapper.ToResourceModels(singleFragment(t, unknownTypeContractJSON))
-
-	require.EqualError(t, err, `unknown schema type "auid" at $.id`)
 }

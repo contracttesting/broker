@@ -30,7 +30,7 @@ func TestSchema_RecursaoDesceEmProfundidade(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "schema.invalid_type", violations[0].Code)
+	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "properties;tags;items;type", violations[0].Path)
 	assert.Equal(t, "number", violations[0].Details["value"])
 }
@@ -59,7 +59,7 @@ func TestSchema_ArraySemItemsNoNivelFundo(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Schema(), schemaDocument(t, source), "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "schema.array_without_items", violations[0].Code)
+	assert.Equal(t, "schema.array_without_items", violations[0].ErrorCode)
 	assert.Equal(t, "properties;tags", violations[0].Path)
 	assert.Nil(t, violations[0].Details)
 }
@@ -68,7 +68,7 @@ func TestSchema_VazioEhTipoInvalido(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Schema(), map[string]any{}, "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "schema.invalid_type", violations[0].Code)
+	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
 	assert.Equal(t, map[string]string{
 		"value":   "",
@@ -80,7 +80,7 @@ func TestSchema_NuloEhTipoInvalido(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Schema(), nil, "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "schema.invalid_type", violations[0].Code)
+	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Details["value"])
 }
 
@@ -94,6 +94,6 @@ func TestSchema_TipoForaDoConjuntoContaComoForma(t *testing.T) {
 	violations := descriptor.Validate(descriptor.Schema(), map[string]any{"type": "number"}, "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "schema.invalid_type", violations[0].Code)
+	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "type", violations[0].Path)
 }

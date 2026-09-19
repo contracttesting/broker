@@ -1,31 +1,70 @@
 package validator
 
 import (
-	"fmt"
+	"maps"
+	"slices"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
 
-type schemaUnresolvedRefRule struct{}
+// Each schema is inspected in its own definition only, so a broken ref is reported once, where it is written.
+func unresolvedSchemaRefs(declarations fragmentmapper.Declarations) []violation.Violation {
+	var violations []violation.Violation
 
-func (schemaUnresolvedRefRule) Code() string { return "schema.unresolved_ref" }
-
-func (schemaUnresolvedRefRule) Validate(value any, contextualValidator *ContextualValidator) {
-	schema, ok := value.(dsl.Schema)
-	if !ok {
-		return
+	for _, declaration := range declarations.Schemas {
+		violations = append(violations, unresolvedRefsIn(
+			declaration.Schema,
+			declarations.Catalog,
+			declaration.Source,
+			schemaPath(declaration.Name),
+			declaration.Name,
+		)...)
 	}
 
-	if contextualValidator.depth.Exceeded() || !schema.IsRef() {
-		return
+	return violations
+}
+
+func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, source string, path string, property string) []violation.Violation {
+	switch {
+	case schema.IsRef():
+		if _, declared := catalog[schema.Ref]; declared {
+			return nil
+		}
+
+		return []violation.Violation{{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      path,
+			Source:    source,
+			Details: map[string]string{
+				"schema":   schema.Ref,
+				"property": property,
+			},
+		}}
+
+	case schema.IsArray():
+		if schema.Items == nil {
+			return nil
+		}
+
+		return unresolvedRefsIn(*schema.Items, catalog, source, path+";items", property+"[]")
+
+	case schema.IsObject():
+		var violations []violation.Violation
+
+		for _, name := range slices.Sorted(maps.Keys(schema.Properties)) {
+			violations = append(violations, unresolvedRefsIn(
+				schema.Properties[name],
+				catalog,
+				source,
+				path+";properties;"+name,
+				property+"."+name,
+			)...)
+		}
+
+		return violations
 	}
 
-	if _, declared := contextualValidator.contractIndex.Schema(schema.Ref); !declared {
-		contextualValidator.addViolation(fmt.Sprintf(
-			"unresolved schema name: %s referenced at %s (%s)",
-			schema.Ref,
-			contextualValidator.where,
-			contextualValidator.source,
-		))
-	}
+	return nil
 }

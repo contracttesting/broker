@@ -1,5 +1,9 @@
 package publish_contract
 
+import (
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
+)
+
 const (
 	ContractPublishSuccessful   string = "contract publish successful"
 	ContractInvalidInput        string = "contract invalid input"
@@ -25,6 +29,6 @@ type PublishContractResponseBody struct {
 }
 
 type PublishContractValidationResponseBody struct {
-	Message    string   `json:"message"`
-	Violations []string `json:"violations"`
+	Message    string                `json:"message"`
+	Violations []violation.Violation `json:"violations"`
 }

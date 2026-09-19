@@ -9,11 +9,11 @@ import (
 
 type Fields map[string]Node
 
-type Written map[string]any
+type PresentFields map[string]any
 
-func (w Written) HasAny(names ...string) bool {
+func (this PresentFields) HasAny(names ...string) bool {
 	for _, name := range names {
-		if w[name] != nil {
+		if this[name] != nil {
 			return true
 		}
 	}
@@ -21,8 +21,7 @@ func (w Written) HasAny(names ...string) bool {
 	return false
 }
 
-// A rule fills Code and Details; the walker fills Path on its own copy.
-type Rule func(written Written) *violation.Violation
+type Rule func(present PresentFields) *violation.Violation
 
 type ObjectNode struct {
 	fields Fields
@@ -33,33 +32,34 @@ func Object(fields Fields) ObjectNode {
 	return ObjectNode{fields: fields}
 }
 
-func (o ObjectNode) Rules(rules ...Rule) ObjectNode {
-	o.rules = rules
+func (this ObjectNode) Rules(rules ...Rule) ObjectNode {
+	this.rules = rules
 
-	return o
+	return this
 }
 
-func (o ObjectNode) validate(value any, path string) []violation.Violation {
+func (this ObjectNode) validate(value any, path string) []violation.Violation {
 	mapping, ok := value.(map[string]any)
+
 	if !ok && value != nil {
 		return []violation.Violation{invalidKind(value, path, "mapping")}
 	}
 
-	violations := o.validateFields(mapping, path)
+	violations := this.validateFields(mapping, path)
 
-	return append(violations, o.applyRules(writtenFields(mapping), path)...)
+	return append(violations, this.applyRules(presentFields(mapping), path)...)
 }
 
-func (o ObjectNode) validateFields(mapping map[string]any, path string) []violation.Violation {
+func (this ObjectNode) validateFields(mapping map[string]any, path string) []violation.Violation {
 	var violations []violation.Violation
 
 	for _, key := range slices.Sorted(maps.Keys(mapping)) {
-		field, known := o.fields[key]
+		field, known := this.fields[key]
 		if !known {
 			violations = append(violations, violation.Violation{
-				Code:    "key.unknown",
-				Path:    joinPath(path, key),
-				Details: map[string]string{"key": key},
+				ErrorCode: "key.unknown",
+				Path:      joinPath(path, key),
+				Details:   map[string]string{"key": key},
 			})
 
 			continue
@@ -71,11 +71,11 @@ func (o ObjectNode) validateFields(mapping map[string]any, path string) []violat
 	return violations
 }
 
-func (o ObjectNode) applyRules(written Written, path string) []violation.Violation {
+func (this ObjectNode) applyRules(present PresentFields, path string) []violation.Violation {
 	var violations []violation.Violation
 
-	for _, rule := range o.rules {
-		broken := rule(written)
+	for _, rule := range this.rules {
+		broken := rule(present)
 		if broken == nil {
 			continue
 		}
@@ -88,14 +88,14 @@ func (o ObjectNode) applyRules(written Written, path string) []violation.Violati
 	return violations
 }
 
-func writtenFields(mapping map[string]any) Written {
-	written := Written{}
+func presentFields(mapping map[string]any) PresentFields {
+	present := PresentFields{}
 
 	for key, value := range mapping {
 		if value != nil {
-			written[key] = value
+			present[key] = value
 		}
 	}
 
-	return written
+	return present
 }

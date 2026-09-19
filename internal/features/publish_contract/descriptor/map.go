@@ -8,23 +8,23 @@ import (
 )
 
 type Key struct {
-	Code  string
-	Check func(key string) error
+	ErrorCode string
+	Check     func(key string) error
 }
 
-func (k Key) reject(key string, path string) *violation.Violation {
-	if k.Check == nil {
+func (this Key) reject(key string, path string) *violation.Violation {
+	if this.Check == nil {
 		return nil
 	}
 
-	err := k.Check(key)
+	err := this.Check(key)
 	if err == nil {
 		return nil
 	}
 
 	return &violation.Violation{
-		Code: k.Code,
-		Path: path,
+		ErrorCode: this.ErrorCode,
+		Path:      path,
 		Details: map[string]string{
 			"key":   key,
 			"error": err.Error(),
@@ -41,26 +41,26 @@ type mapNode struct {
 	value Node
 }
 
-func (m mapNode) validate(value any, path string) []violation.Violation {
+func (this mapNode) validate(value any, path string) []violation.Violation {
 	if value == nil {
 		return nil
 	}
 
-	mapping, ok := value.(map[string]any)
-	if !ok {
+	mapping, exists := value.(map[string]any)
+	if !exists {
 		return []violation.Violation{invalidKind(value, path, "mapping")}
 	}
 
 	var violations []violation.Violation
 
 	for _, key := range slices.Sorted(maps.Keys(mapping)) {
-		if rejected := m.key.reject(key, joinPath(path, key)); rejected != nil {
+		if rejected := this.key.reject(key, joinPath(path, key)); rejected != nil {
 			violations = append(violations, *rejected)
 
 			continue
 		}
 
-		violations = append(violations, m.value.validate(mapping[key], joinPath(path, key))...)
+		violations = append(violations, this.value.validate(mapping[key], joinPath(path, key))...)
 	}
 
 	return violations

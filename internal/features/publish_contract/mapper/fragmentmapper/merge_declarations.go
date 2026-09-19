@@ -1,26 +1,16 @@
 package fragmentmapper
 
 import (
-	"fmt"
-
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
 	"github.com/contracttesting/broker/internal/model"
 )
 
-// resourceDeclaration is the resource one fragment leaf declares, with its path key and source file.
-type resourceDeclaration struct {
-	source       string
-	resourcePath dsl.ResourcePath
-	resource     model.UploadedResource
-}
-
-// mergeDeclarationsByResourcePath folds the declarations of each resource path into one, in first-appearance order.
-func mergeDeclarationsByResourcePath(declarations []resourceDeclaration) ([]resourceDeclaration, error) {
-	merged := make([]resourceDeclaration, 0, len(declarations))
+// A provider declared twice is a violation the validator reports before this runs, so the first one wins here.
+func mergeByResourcePath(declarations []ResourceDeclaration) []ResourceDeclaration {
+	merged := make([]ResourceDeclaration, 0, len(declarations))
 	indexByPath := make(map[string]int, len(declarations))
 
 	for _, declaration := range declarations {
-		key := declaration.resourcePath.String()
+		key := declaration.Path.String()
 
 		index, seen := indexByPath[key]
 		if !seen {
@@ -30,24 +20,16 @@ func mergeDeclarationsByResourcePath(declarations []resourceDeclaration) ([]reso
 			continue
 		}
 
-		first := merged[index]
-
-		if declaration.resource.IsProvider() {
-			return nil, fmt.Errorf(
-				"resource already added: %s from %s and %s",
-				declaration.resource.Describe(),
-				first.source,
-				declaration.source,
-			)
+		if declaration.Resource.IsProvider() {
+			continue
 		}
 
-		merged[index].resource = unionResourceModels(first.resource, declaration.resource)
+		merged[index].Resource = unionResourceModels(merged[index].Resource, declaration.Resource)
 	}
 
-	return merged, nil
+	return merged
 }
 
-// unionResourceModels joins two declarations of the same resource by its interaction.
 func unionResourceModels(a, b model.UploadedResource) model.UploadedResource {
 	union := a
 
@@ -61,7 +43,7 @@ func unionResourceModels(a, b model.UploadedResource) model.UploadedResource {
 	return union
 }
 
-// unionRequestProperties merges what two senders send: a path is required only if both require it.
+// What two senders send: a path is required only if both require it.
 func unionRequestProperties(a, b map[string]model.Property) map[string]model.Property {
 	union := make(map[string]model.Property, len(a)+len(b))
 
@@ -83,7 +65,7 @@ func unionRequestProperties(a, b map[string]model.Property) map[string]model.Pro
 	return union
 }
 
-// unionResponseProperties merges what two readers need: a path is optional only if every reader that mentions it allows it.
+// What two readers need: a path is optional only if every reader that mentions it allows it.
 func unionResponseProperties(a, b map[string]model.Property) map[string]model.Property {
 	union := make(map[string]model.Property, len(a)+len(b))
 

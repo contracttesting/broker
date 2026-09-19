@@ -1,530 +1,672 @@
 package validator_test
 
 import (
-	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
-	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
+	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
+	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
 )
 
-const validEndpointsJSON = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": { "responses": { "200": "Pet" } },
-        "post": { "request": "Pet", "responses": { "201": "Pet" } }
-      }
-    }
-  },
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "Invoice" } }
-        }
-      }
-    }
-  }
-}`
+const validEndpointsYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+      post:
+        request: Pet
+        responses:
+          201: Pet
+consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: Invoice
+`
 
-const validSchemasJSON = `{
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": { "id": { "type": "string" } }
-    },
-    "Invoice": {
-      "type": "object",
-      "properties": { "total": { "type": "integer" } }
-    }
-  }
-}`
+const validSchemasYAML = `schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+  Invoice:
+    type: object
+    properties:
+      total:
+        type: integer
+`
 
-const unresolvedNamesJSON = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": { "responses": { "200": "Missing" } },
-        "post": { "request": "AlsoMissing" }
-      }
-    }
-  },
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "put": { "request": "Gone", "responses": { "200": "Vanished" } }
-        }
-      }
-    }
-  }
-}`
+const unresolvedNamesYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Missing
+      post:
+        request: AlsoMissing
+consumes:
+  payments:
+    rest:
+      /invoices:
+        put:
+          request: Gone
+          responses:
+            200: Vanished
+`
 
-const unreachedRefJSON = `{
-  "schemas": {
-    "Invoice": {
-      "type": "object",
-      "properties": {
-        "payment": { "ref": "Payment" },
-        "lines": {
-          "type": "array",
-          "items": { "ref": "Line" }
-        }
-      }
-    }
-  }
-}`
+const unreachedRefYAML = `schemas:
+  Invoice:
+    type: object
+    properties:
+      payment:
+        ref: Payment
+      lines:
+        type: array
+        items:
+          ref: Line
+`
 
-const cyclicSchemasJSON = `{
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": { "owner": { "ref": "Owner" } }
-    },
-    "Owner": {
-      "type": "object",
-      "properties": { "pet": { "ref": "Pet" } }
-    }
-  }
-}`
+const refBehindRefYAML = `schemas:
+  Pets:
+    type: array
+    items:
+      ref: Pet
+  Pet:
+    type: object
+    properties:
+      owner:
+        ref: Ghost
+`
 
-const deeplyNestedJSON = `{
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": { "l1": {
-        "type": "object",
-        "properties": { "l2": {
-          "type": "object",
-          "properties": { "l3": {
-            "type": "object",
-            "properties": { "l4": {
-              "type": "object",
-              "properties": { "l5": {
-                "type": "object",
-                "properties": { "l6": {
-                  "type": "object",
-                  "properties": { "l7": {
-                    "type": "object",
-                    "properties": { "l8": {
-                      "type": "object",
-                      "properties": { "l9": {
-                        "type": "object",
-                        "properties": { "l10": {
-                          "type": "object",
-                          "properties": { "l11": { "type": "string" } }
-                        } }
-                      } }
-                    } }
-                  } }
-                } }
-              } }
-            } }
-          } }
-        } }
-      } }
-    }
-  }
-}`
+const cyclicSchemasYAML = `schemas:
+  Pet:
+    type: object
+    properties:
+      owner:
+        ref: Owner
+  Owner:
+    type: object
+    properties:
+      pet:
+        ref: Pet
+`
 
-const invalidEndpointJSON = `{
-  "provides": {
-    "rest": {
-      "/users/{userId}": {
-        "get": { "responses": { "200": "Missing" } }
-      }
-    }
-  }
-}`
+const petsResponseYAML = `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+`
 
-const arrayWithoutItemsJSON = `{
-  "schemas": {
-    "Pets": { "type": "array" },
-    "Owner": {
-      "type": "object",
-      "properties": { "pets": { "type": "array" } }
-    }
-  }
-}`
+const petsRequestYAML = `provides:
+  rest:
+    /pets:
+      post:
+        request: Pet
+        responses:
+          201: Pet
+`
 
-const invalidSchemaTypesJSON = `{
-  "schemas": {
-    "Owner": { "type": "objct" },
-    "Pet": {
-      "type": "object",
-      "properties": {
-        "id": { "type": "strng" },
-        "tags": { "type": "array", "items": {} }
-      }
-    }
-  }
-}`
+const invoicesConsumerYAML = `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: Invoice
+`
 
-const invalidStatusCodesJSON = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": { "responses": { "99": "Pet", "200": "Pet", "600": "Pet" } }
-      }
-    }
-  },
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "post": { "responses": { "-1": "Invoice" } }
-        }
-      }
-    }
-  }
-}`
+const invoiceStringConsumerYAML = `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceString
+schemas:
+  InvoiceString:
+    type: object
+    properties:
+      id:
+        type: string
+`
 
-const petsResponseFragment = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": { "responses": { "200": "Pet" } }
-      }
-    }
-  }
-}`
-
-const petsRequestFragment = `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "post": { "request": "Pet", "responses": { "201": "Pet" } }
-      }
-    }
-  }
-}`
-
-const invoicesConsumerFragment = `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "Invoice" } }
-        }
-      }
-    }
-  }
-}`
+const invoiceIntegerConsumerYAML = `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceInteger
+schemas:
+  InvoiceInteger:
+    type: object
+    properties:
+      id:
+        type: integer
+`
 
 type validatedFile struct {
 	source string
 	raw    string
 }
 
-func validateFiles(t *testing.T, files ...validatedFile) []string {
+func validateFiles(t *testing.T, files ...validatedFile) []violation.Violation {
 	t.Helper()
 
-	fragments := make([]dsl.Fragment, 0, len(files))
+	fragments := make([]contract.Fragment, 0, len(files))
 	for _, file := range files {
-		contract := &dsl.Contract{}
-		require.NoError(t, json.Unmarshal([]byte(file.raw), contract))
+		var document any
+		require.NoError(t, yaml.Unmarshal([]byte(file.raw), &document))
 
-		fragments = append(fragments, dsl.Fragment{Source: file.source, Contract: contract})
+		fragments = append(fragments, contract.Fragment{Source: file.source, Document: document})
 	}
 
-	return validator.NewContextualValidator().Validate(fragments)
+	return validator.Validate(fragmentmapper.ToDeclarations(fragments))
+}
+
+func nestedPetYAML(levels int) string {
+	var source strings.Builder
+
+	source.WriteString("schemas:\n  Pet:\n")
+	indent := "    "
+
+	for level := 1; level <= levels; level++ {
+		source.WriteString(indent + "type: object\n")
+		source.WriteString(indent + "properties:\n")
+		indent += "  "
+		fmt.Fprintf(&source, "%sl%d:\n", indent, level)
+		indent += "  "
+	}
+
+	source.WriteString(indent + "type: string\n")
+
+	return source.String()
 }
 
 func TestValidate_ValidContractAcrossFragments_ReportsNothing(t *testing.T) {
-	messages := validateFiles(t,
-		validatedFile{"endpoints.json", validEndpointsJSON},
-		validatedFile{"schemas.json", validSchemasJSON},
+	violations := validateFiles(t,
+		validatedFile{"endpoints.yaml", validEndpointsYAML},
+		validatedFile{"schemas.yaml", validSchemasYAML},
 	)
 
-	assert.Empty(t, messages)
+	assert.Empty(t, violations)
 }
 
-func TestValidate_UnresolvedSchemaNames_QuoteTheResourceTheyName(t *testing.T) {
-	messages := validateFiles(t, validatedFile{"api.json", unresolvedNamesJSON})
+func TestValidate_UnresolvedSchemaNames_NameTheResourceThatCitesThem(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"api.yaml", unresolvedNamesYAML})
 
-	assert.Equal(t, []string{
-		"unresolved schema name: Missing referenced at provides GET /pets 200 (api.json)",
-		"unresolved schema name: AlsoMissing referenced at provides POST /pets request (api.json)",
-		"unresolved schema name: Gone referenced at consumes payments PUT /invoices request (api.json)",
-		"unresolved schema name: Vanished referenced at consumes payments PUT /invoices 200 (api.json)",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;put;request",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Gone", "resource": "consumes payments PUT /invoices request"},
+		},
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;put;responses;200",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Vanished", "resource": "consumes payments PUT /invoices 200"},
+		},
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
+		},
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;post;request",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "AlsoMissing", "resource": "provides POST /pets request"},
+		},
+	}, violations)
 }
 
-func TestValidate_UnresolvedRefInNeverReferencedSchema_ReportsEachPath(t *testing.T) {
-	messages := validateFiles(t, validatedFile{"billing.json", unreachedRefJSON})
+func TestValidate_UnresolvedRefInNeverReferencedSchema_ReportsEachRefSite(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"billing.yaml", unreachedRefYAML})
 
-	assert.Equal(t, []string{
-		"unresolved schema name: Line referenced at Invoice.lines[] (billing.json)",
-		"unresolved schema name: Payment referenced at Invoice.payment (billing.json)",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Invoice;properties;lines;items",
+			Source:    "billing.yaml",
+			Details:   map[string]string{"schema": "Line", "property": "Invoice.lines[]"},
+		},
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Invoice;properties;payment",
+			Source:    "billing.yaml",
+			Details:   map[string]string{"schema": "Payment", "property": "Invoice.payment"},
+		},
+	}, violations)
+}
+
+func TestValidate_UnresolvedRefBehindAResolvedRef_ReportedOnceWhereWritten(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", refBehindRefYAML})
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Pet;properties;owner",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Ghost", "property": "Pet.owner"},
+		},
+	}, violations)
 }
 
 func TestValidate_CyclicSchemas_ReportOneTooDeepPerRoot(t *testing.T) {
-	messages := validateFiles(t, validatedFile{"schemas.json", cyclicSchemasJSON})
+	violations := validateFiles(t, validatedFile{"schemas.yaml", cyclicSchemasYAML})
 
-	assert.Equal(t, []string{
-		"schema Owner is too deep with more than 10 levels (schemas.json)",
-		"schema Pet is too deep with more than 10 levels (schemas.json)",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Owner",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Owner", "maxDepth": "10"},
+		},
+		{
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
+		},
+	}, violations)
+}
+
+func TestValidate_NestingAtMaxDepth_ReportsNothing(t *testing.T) {
+	violations := validateFiles(t, validatedFile{"schemas.yaml", nestedPetYAML(9)})
+
+	assert.Empty(t, violations)
 }
 
 func TestValidate_NestingPastMaxDepth_ReportsTooDeep(t *testing.T) {
-	messages := validateFiles(t, validatedFile{"schemas.json", deeplyNestedJSON})
+	violations := validateFiles(t, validatedFile{"schemas.yaml", nestedPetYAML(10)})
 
-	assert.Equal(t, []string{
-		"schema Pet is too deep with more than 10 levels (schemas.json)",
-	}, messages)
-}
-
-func TestValidate_InvalidEndpoint_ReportedOnceAndMethodsNotVisited(t *testing.T) {
-	messages := validateFiles(t, validatedFile{"api.json", invalidEndpointJSON})
-
-	assert.Equal(t, []string{
-		`invalid endpoint "/users/{userId}": dynamic path segments must use * (api.json)`,
-	}, messages)
-}
-
-func TestValidate_ArrayWithoutItems_Rejected(t *testing.T) {
-	messages := validateFiles(t, validatedFile{"schemas.json", arrayWithoutItemsJSON})
-
-	assert.Equal(t, []string{
-		"array schema without items at Owner.pets (schemas.json)",
-		"array schema without items at Pets (schemas.json)",
-	}, messages)
-}
-
-func TestValidate_InvalidSchemaTypes_Rejected(t *testing.T) {
-	messages := validateFiles(t, validatedFile{"schemas.json", invalidSchemaTypesJSON})
-
-	assert.Equal(t, []string{
-		`invalid schema type "objct" at Owner (schemas.json)`,
-		`invalid schema type "strng" at Pet.id (schemas.json)`,
-		`invalid schema type "" at Pet.tags[] (schemas.json)`,
-	}, messages)
-}
-
-func TestValidate_StatusCodesOutOfRange_Rejected(t *testing.T) {
-	messages := validateFiles(t,
-		validatedFile{"api.json", invalidStatusCodesJSON},
-		validatedFile{"schemas.json", validSchemasJSON},
-	)
-
-	assert.Equal(t, []string{
-		"invalid status code 99 at provides GET /pets (api.json)",
-		"invalid status code 600 at provides GET /pets (api.json)",
-		"invalid status code -1 at consumes payments POST /invoices (api.json)",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
+		},
+	}, violations)
 }
 
 func TestValidate_DuplicateSchema_NamesBothSources(t *testing.T) {
-	messages := validateFiles(t,
-		validatedFile{"schemas.json", validSchemasJSON},
-		validatedFile{"billing.json", validSchemasJSON},
+	violations := validateFiles(t,
+		validatedFile{"schemas.yaml", validSchemasYAML},
+		validatedFile{"billing.yaml", validSchemasYAML},
 	)
 
-	assert.Equal(t, []string{
-		"duplicate schema: Invoice declared in billing.json and schemas.json",
-		"duplicate schema: Pet declared in billing.json and schemas.json",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.duplicate",
+			Path:      "schemas;Invoice",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Invoice", "declaredIn": "billing.yaml"},
+		},
+		{
+			ErrorCode: "schema.duplicate",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"},
+		},
+	}, violations)
 }
 
 func TestValidate_DuplicateProvidedResources_NameTheResourceAndBothSources(t *testing.T) {
-	messages := validateFiles(t,
-		validatedFile{"a.json", petsResponseFragment},
-		validatedFile{"b.json", petsResponseFragment},
-		validatedFile{"c.json", petsRequestFragment},
-		validatedFile{"d.json", petsRequestFragment},
-		validatedFile{"schemas.json", validSchemasJSON},
+	violations := validateFiles(t,
+		validatedFile{"a.yaml", petsResponseYAML},
+		validatedFile{"b.yaml", petsResponseYAML},
+		validatedFile{"c.yaml", petsRequestYAML},
+		validatedFile{"d.yaml", petsRequestYAML},
+		validatedFile{"schemas.yaml", validSchemasYAML},
 	)
 
-	assert.Equal(t, []string{
-		"duplicate resource: provides GET /pets 200 declared in a.json and b.json",
-		"duplicate resource: provides POST /pets request declared in c.json and d.json",
-		"duplicate resource: provides POST /pets 201 declared in c.json and d.json",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details:   map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
+		},
+		{
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;post;request",
+			Source:    "d.yaml",
+			Details:   map[string]string{"resource": "provides POST /pets request", "declaredIn": "c.yaml"},
+		},
+		{
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;post;responses;201",
+			Source:    "d.yaml",
+			Details:   map[string]string{"resource": "provides POST /pets 201", "declaredIn": "c.yaml"},
+		},
+	}, violations)
 }
 
-// a consumed resource declared twice is merged by union at build time, so validation
-// has nothing to say about it
 func TestValidate_DuplicateConsumedResource_ReportsNothing(t *testing.T) {
-	messages := validateFiles(t,
-		validatedFile{"e.json", invoicesConsumerFragment},
-		validatedFile{"f.json", invoicesConsumerFragment},
-		validatedFile{"schemas.json", validSchemasJSON},
+	violations := validateFiles(t,
+		validatedFile{"e.yaml", invoicesConsumerYAML},
+		validatedFile{"f.yaml", invoicesConsumerYAML},
+		validatedFile{"schemas.yaml", validSchemasYAML},
 	)
 
-	assert.Empty(t, messages)
+	assert.Empty(t, violations)
 }
 
 func TestValidate_BothProvidedSpellingsInOneFile_ReportsDuplicateResource(t *testing.T) {
-	bothSpellings := `{
-  "provides": {
-    "rest": {
-      "/pets": {
-        "get": { "responses": { "200": "Pet" } }
-      },
-      "/pets/": {
-        "get": { "responses": { "200": "Pet" } }
-      }
-    }
-  },
-  "schemas": {
-    "Pet": {
-      "type": "object",
-      "properties": { "id": { "type": "string" } }
-    }
-  }
-}`
+	bothSpellings := `provides:
+  rest:
+    /pets:
+      get:
+        responses:
+          200: Pet
+    /pets/:
+      get:
+        responses:
+          200: Pet
+schemas:
+  Pet:
+    type: object
+    properties:
+      id:
+        type: string
+`
 
-	messages := validateFiles(t, validatedFile{"pets.json", bothSpellings})
+	violations := validateFiles(t, validatedFile{"pets.yaml", bothSpellings})
 
-	assert.Equal(t, []string{
-		"duplicate resource: provides GET /pets 200 declared twice in pets.json",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "pets.yaml",
+			Details:   map[string]string{"resource": "provides GET /pets 200", "declaredIn": "pets.yaml"},
+		},
+	}, violations)
 }
 
 func TestValidate_BothConsumedSpellingsInOneFile_ReportsNothing(t *testing.T) {
-	bothSpellings := `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "Invoice" } }
-        },
-        "/invoices/": {
-          "get": { "responses": { "200": "Invoice" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "Invoice": {
-      "type": "object",
-      "properties": { "total": { "type": "integer" } }
-    }
-  }
-}`
+	bothSpellings := `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: Invoice
+      /invoices/:
+        get:
+          responses:
+            200: Invoice
+schemas:
+  Invoice:
+    type: object
+    properties:
+      total:
+        type: integer
+`
 
-	messages := validateFiles(t, validatedFile{"invoices.json", bothSpellings})
+	violations := validateFiles(t, validatedFile{"invoices.yaml", bothSpellings})
 
-	assert.Empty(t, messages)
+	assert.Empty(t, violations)
 }
 
 func TestValidate_ConsumedResourceWithConflictingTypes_NamesBothDeclarations(t *testing.T) {
-	stringID := `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "InvoiceString" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "InvoiceString": {
-      "type": "object",
-      "properties": { "id": { "type": "string" } }
-    }
-  }
-}`
-
-	integerID := `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "InvoiceInteger" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "InvoiceInteger": {
-      "type": "object",
-      "properties": { "id": { "type": "integer" } }
-    }
-  }
-}`
-
-	messages := validateFiles(t,
-		validatedFile{"b.json", integerID},
-		validatedFile{"a.json", stringID},
+	violations := validateFiles(t,
+		validatedFile{"b.yaml", invoiceIntegerConsumerYAML},
+		validatedFile{"a.yaml", invoiceStringConsumerYAML},
 	)
 
-	assert.Equal(t, []string{
-		"conflicting property type for $.id at consumes payments GET /invoices 200: string (a.json) and integer (b.json)",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.id",
+				"type":         "integer",
+				"declaredIn":   "a.yaml",
+				"declaredType": "string",
+			},
+		},
+	}, violations)
 }
 
 func TestValidate_ConsumedResourceWithConflictingTypesInOneFile_NamesTheFileTwice(t *testing.T) {
-	bothSpellings := `{
-  "consumes": {
-    "payments": {
-      "rest": {
-        "/invoices": {
-          "get": { "responses": { "200": "InvoiceString" } }
-        },
-        "/invoices/": {
-          "get": { "responses": { "200": "InvoiceInteger" } }
-        }
-      }
-    }
-  },
-  "schemas": {
-    "InvoiceString": {
-      "type": "object",
-      "properties": { "id": { "type": "string" } }
-    },
-    "InvoiceInteger": {
-      "type": "object",
-      "properties": { "id": { "type": "integer" } }
-    }
-  }
-}`
+	bothSpellings := `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: InvoiceString
+      /invoices/:
+        get:
+          responses:
+            200: InvoiceInteger
+schemas:
+  InvoiceString:
+    type: object
+    properties:
+      id:
+        type: string
+  InvoiceInteger:
+    type: object
+    properties:
+      id:
+        type: integer
+`
 
-	messages := validateFiles(t, validatedFile{"invoices.json", bothSpellings})
+	violations := validateFiles(t, validatedFile{"invoices.yaml", bothSpellings})
 
-	assert.Equal(t, []string{
-		"conflicting property type for $.id at consumes payments GET /invoices 200: string (invoices.json) and integer (invoices.json)",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "invoices.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.id",
+				"type":         "integer",
+				"declaredIn":   "invoices.yaml",
+				"declaredType": "string",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_SeveralConflictingProperties_ReportEachInPropertyPathOrder(t *testing.T) {
+	invoice := `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: Invoice
+schemas:
+  Invoice:
+    type: object
+    properties:
+      total:
+        type: integer
+      id:
+        type: string
+`
+
+	charge := `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: Charge
+schemas:
+  Charge:
+    type: object
+    properties:
+      total:
+        type: float
+      id:
+        type: integer
+`
+
+	violations := validateFiles(t,
+		validatedFile{"a.yaml", invoice},
+		validatedFile{"b.yaml", charge},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.id",
+				"type":         "integer",
+				"declaredIn":   "a.yaml",
+				"declaredType": "string",
+			},
+		},
+		{
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
+			Details: map[string]string{
+				"resource":     "consumes payments GET /invoices 200",
+				"property":     "$.total",
+				"type":         "float",
+				"declaredIn":   "a.yaml",
+				"declaredType": "integer",
+			},
+		},
+	}, violations)
+}
+
+func TestValidate_ConflictAgainstUnresolvedSchema_ReportsOnlyTheUnresolvedName(t *testing.T) {
+	ghost := `consumes:
+  payments:
+    rest:
+      /invoices:
+        get:
+          responses:
+            200: Ghost
+`
+
+	violations := validateFiles(t,
+		validatedFile{"a.yaml", invoiceStringConsumerYAML},
+		validatedFile{"b.yaml", ghost},
+	)
+
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
+			Details:   map[string]string{"schema": "Ghost", "resource": "consumes payments GET /invoices 200"},
+		},
+	}, violations)
 }
 
 func TestValidate_TrailingSlashInAnotherFile_CollidesAsDuplicateResource(t *testing.T) {
-	slashed := `{
-  "provides": {
-    "rest": {
-      "/pets/": {
-        "get": { "responses": { "200": "Pet" } }
-      }
-    }
-  }
-}`
+	slashed := `provides:
+  rest:
+    /pets/:
+      get:
+        responses:
+          200: Pet
+`
 
-	messages := validateFiles(t,
-		validatedFile{"a.json", petsResponseFragment},
-		validatedFile{"b.json", slashed},
-		validatedFile{"schemas.json", validSchemasJSON},
+	violations := validateFiles(t,
+		validatedFile{"a.yaml", petsResponseYAML},
+		validatedFile{"b.yaml", slashed},
+		validatedFile{"schemas.yaml", validSchemasYAML},
 	)
 
-	assert.Equal(t, []string{
-		"duplicate resource: provides GET /pets 200 declared in a.json and b.json",
-	}, messages)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details:   map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
+		},
+	}, violations)
 }
 
 func TestValidate_SameInputTwice_ReportsTheSameOrder(t *testing.T) {
 	files := []validatedFile{
-		{"api.json", unresolvedNamesJSON},
-		{"billing.json", unreachedRefJSON},
-		{"schemas.json", cyclicSchemasJSON},
+		{"api.yaml", unresolvedNamesYAML},
+		{"billing.yaml", unreachedRefYAML},
+		{"schemas.yaml", cyclicSchemasYAML},
 	}
 
 	first := validateFiles(t, files...)
 	second := validateFiles(t, files...)
 
-	require.Len(t, first, 8)
+	assert.Equal(t, []violation.Violation{
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;put;request",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Gone", "resource": "consumes payments PUT /invoices request"},
+		},
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;put;responses;200",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Vanished", "resource": "consumes payments PUT /invoices 200"},
+		},
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
+		},
+		{
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;post;request",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "AlsoMissing", "resource": "provides POST /pets request"},
+		},
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Invoice;properties;lines;items",
+			Source:    "billing.yaml",
+			Details:   map[string]string{"schema": "Line", "property": "Invoice.lines[]"},
+		},
+		{
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Invoice;properties;payment",
+			Source:    "billing.yaml",
+			Details:   map[string]string{"schema": "Payment", "property": "Invoice.payment"},
+		},
+		{
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Owner",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Owner", "maxDepth": "10"},
+		},
+		{
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
+		},
+	}, first)
 	assert.Equal(t, first, second)
 }

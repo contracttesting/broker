@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/model"
 )
 
@@ -23,7 +23,7 @@ var (
 	)
 )
 
-func ToResourceModel(path dsl.ResourcePath, properties map[string]model.Property) model.UploadedResource {
+func ToResourceModel(path contract.ResourcePath, properties map[string]model.Property) model.UploadedResource {
 	if args, ok := path.ExtractNamedArgs(consumerRestRequestRegex); ok {
 		return *model.NewRestRequestConsumer(
 			args["provider"],

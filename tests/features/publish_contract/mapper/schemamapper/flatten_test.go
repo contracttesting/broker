@@ -3,29 +3,29 @@ package schemamapper_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/dsl"
+	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
 	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
 	"github.com/contracttesting/broker/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func addressSchemas(targetOptional bool) dsl.SchemasMap {
-	return dsl.SchemasMap{
+func addressSchemas(targetOptional bool) contract.SchemasMap {
+	return contract.SchemasMap{
 		"Address": {
 			Type:     "object",
 			Optional: targetOptional,
-			Properties: map[string]dsl.Schema{
+			Properties: map[string]contract.Schema{
 				"street": {Type: "string"},
 			},
 		},
 	}
 }
 
-func userWithAddress(siteOptional bool) dsl.Schema {
-	return dsl.Schema{
+func userWithAddress(siteOptional bool) contract.Schema {
+	return contract.Schema{
 		Type: "object",
-		Properties: map[string]dsl.Schema{
+		Properties: map[string]contract.Schema{
 			"address": {Ref: "Address", Optional: siteOptional},
 		},
 	}

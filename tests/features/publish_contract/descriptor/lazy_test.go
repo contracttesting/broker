@@ -32,7 +32,7 @@ func TestLazy_ResolveAGramaticaNaValidacao(t *testing.T) {
 	violations := descriptor.Validate(tree(), document, "tree.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "value.invalid_kind", violations[0].Code)
+	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "children;left;children;leaf;name", violations[0].Path)
 	assert.Equal(t, map[string]string{"expected": "string", "got": "integer"}, violations[0].Details)
 }

@@ -130,8 +130,6 @@ schemas:
         type: integer
 `
 
-// mergedProperties reads back what the publish stored for the single resource of the
-// contract, one line per path: "$.id string required".
 func (s *IntegrationSuite) mergedProperties() []string {
 	rows, err := s.Pool.Query(context.Background(),
 		`SELECT properties.path, property_versions.type, property_versions.optional
@@ -233,15 +231,13 @@ func (s *IntegrationSuite) TestPublishContract_ConsumerModulesDisagreeOnProperty
 	))
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"contract validation failed","violations":[`+
-		`"conflicting property type for $.id at consumes payments GET /invoices 200: string (a.yaml) and integer (b.yaml)"`+
+		`{"code":"resource.type_conflict","path":"consumes;payments;rest;/invoices;get;responses;200","source":"b.yaml","details":{"resource":"consumes payments GET /invoices 200","property":"$.id","type":"integer","declaredIn":"a.yaml","declaredType":"string"}}`+
 		`]}`, body)
 
 	s.Equal(0, s.countRows("contracts"))
 	s.Equal(0, s.countRows("resources"))
 }
 
-// the union is commutative, so the fragments can arrive in any order and still build
-// the very same contract — the checksum proves it by aliasing the stored snapshot
 func (s *IntegrationSuite) TestPublishContract_MergedFragmentsInAnyOrder_AliasTheSameSnapshot() {
 	status, _ := s.post("/api/participants", frontParticipantBody)
 	s.Require().Equal(http.StatusOK, status)

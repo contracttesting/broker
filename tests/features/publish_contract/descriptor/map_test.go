@@ -30,7 +30,7 @@ func atLeastThreeLetters(key string) error {
 
 func TestMap_TodasAsChavesSeguemOMesmoNo(t *testing.T) {
 	subject := descriptor.Map(descriptor.Key{}, descriptor.Object(descriptor.Fields{
-		"type": descriptor.Enum{Code: "schema.invalid_type", Allowed: []string{"object", "array"}},
+		"type": descriptor.Enum{ErrorCode: "schema.invalid_type", Allowed: []string{"object", "array"}},
 	}))
 
 	violations := descriptor.Validate(subject, mapDocument(t, "Pet:\n  type: object\nOwner:\n  type: number\n"), "api.yaml")
@@ -48,24 +48,24 @@ func TestMap_ChaveSemRegraAceitaQualquerTexto(t *testing.T) {
 }
 
 func TestMap_ChaveReprovadaSaiComCodigoChaveEErro(t *testing.T) {
-	subject := descriptor.Map(descriptor.Key{Code: "key.short", Check: atLeastThreeLetters}, descriptor.String())
+	subject := descriptor.Map(descriptor.Key{ErrorCode: "key.short", Check: atLeastThreeLetters}, descriptor.String())
 
 	violations := descriptor.Validate(subject, mapDocument(t, "ab: x\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "key.short", violations[0].Code)
+	assert.Equal(t, "key.short", violations[0].ErrorCode)
 	assert.Equal(t, "ab", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
 	assert.Equal(t, map[string]string{"key": "ab", "error": "too short"}, violations[0].Details)
 }
 
 func TestMap_ChaveReprovadaNaoDesceNoValor(t *testing.T) {
-	subject := descriptor.Map(descriptor.Key{Code: "key.short", Check: atLeastThreeLetters}, descriptor.Object(descriptor.Fields{}))
+	subject := descriptor.Map(descriptor.Key{ErrorCode: "key.short", Check: atLeastThreeLetters}, descriptor.Object(descriptor.Fields{}))
 
 	violations := descriptor.Validate(subject, mapDocument(t, "ab:\n  patch: nope\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "key.short", violations[0].Code)
+	assert.Equal(t, "key.short", violations[0].ErrorCode)
 }
 
 func TestMap_ChavesSaemEmOrdemEstavel(t *testing.T) {
@@ -79,7 +79,7 @@ func TestMap_ChavesSaemEmOrdemEstavel(t *testing.T) {
 }
 
 func TestMap_NuloContaComoVazio(t *testing.T) {
-	subject := descriptor.Map(descriptor.Key{Code: "key.short", Check: atLeastThreeLetters}, descriptor.String())
+	subject := descriptor.Map(descriptor.Key{ErrorCode: "key.short", Check: atLeastThreeLetters}, descriptor.String())
 
 	violations := descriptor.Validate(subject, nil, "api.yaml")
 
@@ -92,7 +92,7 @@ func TestMap_RejeitaSequenciaComoKind(t *testing.T) {
 	violations := descriptor.Validate(subject, []any{"a", "b"}, "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "value.invalid_kind", violations[0].Code)
+	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, "", violations[0].Path)
 	assert.Equal(t, map[string]string{"expected": "mapping", "got": "sequence"}, violations[0].Details)
 }

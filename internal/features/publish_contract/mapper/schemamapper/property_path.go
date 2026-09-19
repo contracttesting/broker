@@ -2,14 +2,14 @@ package schemamapper
 
 type propertyPath string
 
-func (p propertyPath) String() string {
-	return string(p)
+func (this propertyPath) String() string {
+	return string(this)
 }
 
-func (p propertyPath) Append(chunk string) propertyPath {
-	return propertyPath(string(p) + "." + chunk)
+func (this propertyPath) Append(chunk string) propertyPath {
+	return propertyPath(string(this) + "." + chunk)
 }
 
-func (p propertyPath) AppendArray() propertyPath {
-	return propertyPath(string(p) + "[]")
+func (this propertyPath) AppendArray() propertyPath {
+	return propertyPath(string(this) + "[]")
 }

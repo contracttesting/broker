@@ -37,11 +37,11 @@ func (boolNode) validate(value any, path string) []violation.Violation {
 }
 
 type Enum struct {
-	Code    string
-	Allowed []string
+	ErrorCode string
+	Allowed   []string
 }
 
-func (e Enum) validate(value any, path string) []violation.Violation {
+func (this Enum) validate(value any, path string) []violation.Violation {
 	if value == nil {
 		return nil
 	}
@@ -51,16 +51,16 @@ func (e Enum) validate(value any, path string) []violation.Violation {
 	}
 
 	text := fmt.Sprint(value)
-	if slices.Contains(e.Allowed, text) {
+	if slices.Contains(this.Allowed, text) {
 		return nil
 	}
 
 	return []violation.Violation{{
-		Code: e.Code,
-		Path: path,
+		ErrorCode: this.ErrorCode,
+		Path:      path,
 		Details: map[string]string{
 			"value":   text,
-			"allowed": strings.Join(e.Allowed, ", "),
+			"allowed": strings.Join(this.Allowed, ", "),
 		},
 	}}
 }
