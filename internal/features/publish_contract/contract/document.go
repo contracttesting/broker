@@ -7,24 +7,24 @@ import (
 
 type Document map[string]any
 
-func (d Document) Mapping(key string) Document {
-	mapping, _ := d[key].(map[string]any)
+func (this Document) Mapping(key string) Document {
+	mapping, _ := this[key].(map[string]any)
 
 	return mapping
 }
 
-func (d Document) Text(key string) string {
-	text, _ := d[key].(string)
+func (this Document) Text(key string) string {
+	text, _ := this[key].(string)
 
 	return text
 }
 
-func (d Document) Flag(key string) bool {
-	flag, _ := d[key].(bool)
+func (this Document) Flag(key string) bool {
+	flag, _ := this[key].(bool)
 
 	return flag
 }
 
-func (d Document) Keys() []string {
-	return slices.Sorted(maps.Keys(d))
+func (this Document) Keys() []string {
+	return slices.Sorted(maps.Keys(this))
 }

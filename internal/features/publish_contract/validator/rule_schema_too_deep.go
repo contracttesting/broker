@@ -20,9 +20,9 @@ func schemasTooDeep(declarations fragmentmapper.Declarations) []violation.Violat
 		}
 
 		violations = append(violations, violation.Violation{
-			Code:   "schema.too_deep",
-			Path:   schemaPath(declaration.Name),
-			Source: declaration.Source,
+			ErrorCode: "schema.too_deep",
+			Path:      schemaPath(declaration.Name),
+			Source:    declaration.Source,
 			Details: map[string]string{
 				"schema":   declaration.Name,
 				"maxDepth": strconv.Itoa(schemamapper.MaxDepth),

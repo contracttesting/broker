@@ -14,6 +14,6 @@ type lazyNode struct {
 	grammar func() Node
 }
 
-func (l lazyNode) validate(value any, path string) []violation.Violation {
-	return l.grammar().validate(value, path)
+func (this lazyNode) validate(value any, path string) []violation.Violation {
+	return this.grammar().validate(value, path)
 }

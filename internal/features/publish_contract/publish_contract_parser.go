@@ -64,15 +64,15 @@ type anchorFinder struct {
 	found bool
 }
 
-func (f *anchorFinder) Visit(node ast.Node) ast.Visitor {
+func (this *anchorFinder) Visit(node ast.Node) ast.Visitor {
 	switch node.(type) {
 	case *ast.AnchorNode, *ast.AliasNode:
-		f.found = true
+		this.found = true
 
 		return nil
 	}
 
-	return f
+	return this
 }
 
 func usesAnchors(body ast.Node) bool {

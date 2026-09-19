@@ -7,10 +7,10 @@ type DepthCounter struct {
 	levels int
 }
 
-func (dc DepthCounter) Deeper() DepthCounter {
-	return DepthCounter{levels: dc.levels + 1}
+func (this DepthCounter) Deeper() DepthCounter {
+	return DepthCounter{levels: this.levels + 1}
 }
 
-func (dc DepthCounter) Exceeded() bool {
-	return dc.levels >= schemamapper.MaxDepth
+func (this DepthCounter) Exceeded() bool {
+	return this.levels >= schemamapper.MaxDepth
 }

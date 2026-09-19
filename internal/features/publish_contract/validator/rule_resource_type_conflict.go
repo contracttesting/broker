@@ -52,9 +52,9 @@ func conflictingPropertyTypes(declarations fragmentmapper.Declarations) []violat
 			}
 
 			violations = append(violations, violation.Violation{
-				Code:   "resource.type_conflict",
-				Path:   path,
-				Source: declaration.Source,
+				ErrorCode: "resource.type_conflict",
+				Path:      path,
+				Source:    declaration.Source,
 				Details: map[string]string{
 					"resource":     declaration.Resource.Describe(),
 					"property":     propertyPath,

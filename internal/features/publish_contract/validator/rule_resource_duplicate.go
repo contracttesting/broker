@@ -26,9 +26,9 @@ func duplicateResources(declarations fragmentmapper.Declarations) []violation.Vi
 		}
 
 		violations = append(violations, violation.Violation{
-			Code:   "resource.duplicate",
-			Path:   path,
-			Source: declaration.Source,
+			ErrorCode: "resource.duplicate",
+			Path:      path,
+			Source:    declaration.Source,
 			Details: map[string]string{
 				"resource":   declaration.Resource.Describe(),
 				"declaredIn": first,

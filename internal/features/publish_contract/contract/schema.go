@@ -35,25 +35,25 @@ func SchemaFromDocument(document Document) Schema {
 	return schema
 }
 
-func (s *Schema) IsObject() bool {
-	if s.Type != "" {
-		return s.Type == "object"
+func (this *Schema) IsObject() bool {
+	if this.Type != "" {
+		return this.Type == "object"
 	}
 
-	return s.Properties != nil
+	return this.Properties != nil
 }
 
-func (s *Schema) IsArray() bool {
-	if s.Type != "" {
-		return s.Type == "array"
+func (this *Schema) IsArray() bool {
+	if this.Type != "" {
+		return this.Type == "array"
 	}
 
-	return s.Items != nil
+	return this.Items != nil
 }
 
-func (s *Schema) IsPrimitive() bool {
-	if s.Type != "" {
-		return isPrimitiveType(s.Type)
+func (this *Schema) IsPrimitive() bool {
+	if this.Type != "" {
+		return isPrimitiveType(this.Type)
 	}
 
 	return false
@@ -66,10 +66,10 @@ func isPrimitiveType(schemaType string) bool {
 		schemaType == "boolean"
 }
 
-func (s *Schema) IsRef() bool {
-	if s.Type != "" || s.Properties != nil || s.Items != nil {
+func (this *Schema) IsRef() bool {
+	if this.Type != "" || this.Properties != nil || this.Items != nil {
 		return false
 	}
 
-	return s.Ref != ""
+	return this.Ref != ""
 }

@@ -210,28 +210,28 @@ func TestValidate_UnresolvedSchemaNames_NameTheResourceThatCitesThem(t *testing.
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "consumes;payments;rest;/invoices;put;request",
-			Source:  "api.yaml",
-			Details: map[string]string{"schema": "Gone", "resource": "consumes payments PUT /invoices request"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;put;request",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Gone", "resource": "consumes payments PUT /invoices request"},
 		},
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "consumes;payments;rest;/invoices;put;responses;200",
-			Source:  "api.yaml",
-			Details: map[string]string{"schema": "Vanished", "resource": "consumes payments PUT /invoices 200"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;put;responses;200",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Vanished", "resource": "consumes payments PUT /invoices 200"},
 		},
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "provides;rest;/pets;get;responses;200",
-			Source:  "api.yaml",
-			Details: map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
 		},
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "provides;rest;/pets;post;request",
-			Source:  "api.yaml",
-			Details: map[string]string{"schema": "AlsoMissing", "resource": "provides POST /pets request"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;post;request",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "AlsoMissing", "resource": "provides POST /pets request"},
 		},
 	}, violations)
 }
@@ -241,16 +241,16 @@ func TestValidate_UnresolvedRefInNeverReferencedSchema_ReportsEachRefSite(t *tes
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "schema.unresolved_ref",
-			Path:    "schemas;Invoice;properties;lines;items",
-			Source:  "billing.yaml",
-			Details: map[string]string{"schema": "Line", "property": "Invoice.lines[]"},
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Invoice;properties;lines;items",
+			Source:    "billing.yaml",
+			Details:   map[string]string{"schema": "Line", "property": "Invoice.lines[]"},
 		},
 		{
-			Code:    "schema.unresolved_ref",
-			Path:    "schemas;Invoice;properties;payment",
-			Source:  "billing.yaml",
-			Details: map[string]string{"schema": "Payment", "property": "Invoice.payment"},
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Invoice;properties;payment",
+			Source:    "billing.yaml",
+			Details:   map[string]string{"schema": "Payment", "property": "Invoice.payment"},
 		},
 	}, violations)
 }
@@ -260,10 +260,10 @@ func TestValidate_UnresolvedRefBehindAResolvedRef_ReportedOnceWhereWritten(t *te
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "schema.unresolved_ref",
-			Path:    "schemas;Pet;properties;owner",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Ghost", "property": "Pet.owner"},
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Pet;properties;owner",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Ghost", "property": "Pet.owner"},
 		},
 	}, violations)
 }
@@ -273,16 +273,16 @@ func TestValidate_CyclicSchemas_ReportOneTooDeepPerRoot(t *testing.T) {
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "schema.too_deep",
-			Path:    "schemas;Owner",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Owner", "maxDepth": "10"},
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Owner",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Owner", "maxDepth": "10"},
 		},
 		{
-			Code:    "schema.too_deep",
-			Path:    "schemas;Pet",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Pet", "maxDepth": "10"},
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
 		},
 	}, violations)
 }
@@ -298,10 +298,10 @@ func TestValidate_NestingPastMaxDepth_ReportsTooDeep(t *testing.T) {
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "schema.too_deep",
-			Path:    "schemas;Pet",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Pet", "maxDepth": "10"},
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
 		},
 	}, violations)
 }
@@ -314,16 +314,16 @@ func TestValidate_DuplicateSchema_NamesBothSources(t *testing.T) {
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "schema.duplicate",
-			Path:    "schemas;Invoice",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Invoice", "declaredIn": "billing.yaml"},
+			ErrorCode: "schema.duplicate",
+			Path:      "schemas;Invoice",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Invoice", "declaredIn": "billing.yaml"},
 		},
 		{
-			Code:    "schema.duplicate",
-			Path:    "schemas;Pet",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"},
+			ErrorCode: "schema.duplicate",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"},
 		},
 	}, violations)
 }
@@ -339,22 +339,22 @@ func TestValidate_DuplicateProvidedResources_NameTheResourceAndBothSources(t *te
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "resource.duplicate",
-			Path:    "provides;rest;/pets;get;responses;200",
-			Source:  "b.yaml",
-			Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details:   map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
 		},
 		{
-			Code:    "resource.duplicate",
-			Path:    "provides;rest;/pets;post;request",
-			Source:  "d.yaml",
-			Details: map[string]string{"resource": "provides POST /pets request", "declaredIn": "c.yaml"},
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;post;request",
+			Source:    "d.yaml",
+			Details:   map[string]string{"resource": "provides POST /pets request", "declaredIn": "c.yaml"},
 		},
 		{
-			Code:    "resource.duplicate",
-			Path:    "provides;rest;/pets;post;responses;201",
-			Source:  "d.yaml",
-			Details: map[string]string{"resource": "provides POST /pets 201", "declaredIn": "c.yaml"},
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;post;responses;201",
+			Source:    "d.yaml",
+			Details:   map[string]string{"resource": "provides POST /pets 201", "declaredIn": "c.yaml"},
 		},
 	}, violations)
 }
@@ -392,10 +392,10 @@ schemas:
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "resource.duplicate",
-			Path:    "provides;rest;/pets;get;responses;200",
-			Source:  "pets.yaml",
-			Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "pets.yaml"},
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "pets.yaml",
+			Details:   map[string]string{"resource": "provides GET /pets 200", "declaredIn": "pets.yaml"},
 		},
 	}, violations)
 }
@@ -433,9 +433,9 @@ func TestValidate_ConsumedResourceWithConflictingTypes_NamesBothDeclarations(t *
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:   "resource.type_conflict",
-			Path:   "consumes;payments;rest;/invoices;get;responses;200",
-			Source: "b.yaml",
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
 			Details: map[string]string{
 				"resource":     "consumes payments GET /invoices 200",
 				"property":     "$.id",
@@ -476,9 +476,9 @@ schemas:
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:   "resource.type_conflict",
-			Path:   "consumes;payments;rest;/invoices;get;responses;200",
-			Source: "invoices.yaml",
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "invoices.yaml",
 			Details: map[string]string{
 				"resource":     "consumes payments GET /invoices 200",
 				"property":     "$.id",
@@ -532,9 +532,9 @@ schemas:
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:   "resource.type_conflict",
-			Path:   "consumes;payments;rest;/invoices;get;responses;200",
-			Source: "b.yaml",
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
 			Details: map[string]string{
 				"resource":     "consumes payments GET /invoices 200",
 				"property":     "$.id",
@@ -544,9 +544,9 @@ schemas:
 			},
 		},
 		{
-			Code:   "resource.type_conflict",
-			Path:   "consumes;payments;rest;/invoices;get;responses;200",
-			Source: "b.yaml",
+			ErrorCode: "resource.type_conflict",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
 			Details: map[string]string{
 				"resource":     "consumes payments GET /invoices 200",
 				"property":     "$.total",
@@ -575,10 +575,10 @@ func TestValidate_ConflictAgainstUnresolvedSchema_ReportsOnlyTheUnresolvedName(t
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "consumes;payments;rest;/invoices;get;responses;200",
-			Source:  "b.yaml",
-			Details: map[string]string{"schema": "Ghost", "resource": "consumes payments GET /invoices 200"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;get;responses;200",
+			Source:    "b.yaml",
+			Details:   map[string]string{"schema": "Ghost", "resource": "consumes payments GET /invoices 200"},
 		},
 	}, violations)
 }
@@ -600,10 +600,10 @@ func TestValidate_TrailingSlashInAnotherFile_CollidesAsDuplicateResource(t *test
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "resource.duplicate",
-			Path:    "provides;rest;/pets;get;responses;200",
-			Source:  "b.yaml",
-			Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
+			ErrorCode: "resource.duplicate",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "b.yaml",
+			Details:   map[string]string{"resource": "provides GET /pets 200", "declaredIn": "a.yaml"},
 		},
 	}, violations)
 }
@@ -620,52 +620,52 @@ func TestValidate_SameInputTwice_ReportsTheSameOrder(t *testing.T) {
 
 	assert.Equal(t, []violation.Violation{
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "consumes;payments;rest;/invoices;put;request",
-			Source:  "api.yaml",
-			Details: map[string]string{"schema": "Gone", "resource": "consumes payments PUT /invoices request"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;put;request",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Gone", "resource": "consumes payments PUT /invoices request"},
 		},
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "consumes;payments;rest;/invoices;put;responses;200",
-			Source:  "api.yaml",
-			Details: map[string]string{"schema": "Vanished", "resource": "consumes payments PUT /invoices 200"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "consumes;payments;rest;/invoices;put;responses;200",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Vanished", "resource": "consumes payments PUT /invoices 200"},
 		},
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "provides;rest;/pets;get;responses;200",
-			Source:  "api.yaml",
-			Details: map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;get;responses;200",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "Missing", "resource": "provides GET /pets 200"},
 		},
 		{
-			Code:    "schema.unresolved_name",
-			Path:    "provides;rest;/pets;post;request",
-			Source:  "api.yaml",
-			Details: map[string]string{"schema": "AlsoMissing", "resource": "provides POST /pets request"},
+			ErrorCode: "schema.unresolved_name",
+			Path:      "provides;rest;/pets;post;request",
+			Source:    "api.yaml",
+			Details:   map[string]string{"schema": "AlsoMissing", "resource": "provides POST /pets request"},
 		},
 		{
-			Code:    "schema.unresolved_ref",
-			Path:    "schemas;Invoice;properties;lines;items",
-			Source:  "billing.yaml",
-			Details: map[string]string{"schema": "Line", "property": "Invoice.lines[]"},
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Invoice;properties;lines;items",
+			Source:    "billing.yaml",
+			Details:   map[string]string{"schema": "Line", "property": "Invoice.lines[]"},
 		},
 		{
-			Code:    "schema.unresolved_ref",
-			Path:    "schemas;Invoice;properties;payment",
-			Source:  "billing.yaml",
-			Details: map[string]string{"schema": "Payment", "property": "Invoice.payment"},
+			ErrorCode: "schema.unresolved_ref",
+			Path:      "schemas;Invoice;properties;payment",
+			Source:    "billing.yaml",
+			Details:   map[string]string{"schema": "Payment", "property": "Invoice.payment"},
 		},
 		{
-			Code:    "schema.too_deep",
-			Path:    "schemas;Owner",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Owner", "maxDepth": "10"},
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Owner",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Owner", "maxDepth": "10"},
 		},
 		{
-			Code:    "schema.too_deep",
-			Path:    "schemas;Pet",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Pet", "maxDepth": "10"},
+			ErrorCode: "schema.too_deep",
+			Path:      "schemas;Pet",
+			Source:    "schemas.yaml",
+			Details:   map[string]string{"schema": "Pet", "maxDepth": "10"},
 		},
 	}, first)
 	assert.Equal(t, first, second)

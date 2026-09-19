@@ -14,13 +14,13 @@ var (
 	SchemaRef = String()
 
 	SchemaType = Enum{
-		Code:    "schema.invalid_type",
-		Allowed: []string{"object", "array", "string", "integer", "float", "boolean"},
+		ErrorCode: "schema.invalid_type",
+		Allowed:   []string{"object", "array", "string", "integer", "float", "boolean"},
 	}
 
-	Endpoint     = Key{Code: "endpoint.syntax", Check: endpointSyntax}
-	ServiceName  = Key{Code: "service.name_syntax", Check: validations.ParticipantName}
-	StatusCode   = Key{Code: "status.out_of_range", Check: statusCodeInRange}
+	Endpoint     = Key{ErrorCode: "endpoint.syntax", Check: endpointSyntax}
+	ServiceName  = Key{ErrorCode: "service.name_syntax", Check: validations.ParticipantName}
+	StatusCode   = Key{ErrorCode: "status.out_of_range", Check: statusCodeInRange}
 	SchemaName   = Key{}
 	PropertyName = Key{}
 )

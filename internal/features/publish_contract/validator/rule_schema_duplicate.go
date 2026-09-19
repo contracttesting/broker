@@ -19,9 +19,9 @@ func duplicateSchemas(declarations fragmentmapper.Declarations) []violation.Viol
 		}
 
 		violations = append(violations, violation.Violation{
-			Code:   "schema.duplicate",
-			Path:   schemaPath(declaration.Name),
-			Source: declaration.Source,
+			ErrorCode: "schema.duplicate",
+			Path:      schemaPath(declaration.Name),
+			Source:    declaration.Source,
 			Details: map[string]string{
 				"schema":     declaration.Name,
 				"declaredIn": first,

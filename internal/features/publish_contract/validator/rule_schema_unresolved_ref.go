@@ -34,9 +34,9 @@ func unresolvedRefsIn(schema contract.Schema, catalog contract.SchemasMap, sourc
 		}
 
 		return []violation.Violation{{
-			Code:   "schema.unresolved_ref",
-			Path:   path,
-			Source: source,
+			ErrorCode: "schema.unresolved_ref",
+			Path:      path,
+			Source:    source,
 			Details: map[string]string{
 				"schema":   schema.Ref,
 				"property": property,

@@ -17,13 +17,13 @@ func Schema() Node {
 	}).Rules(schemaHasShape, arrayRequiresItems)
 }
 
-func schemaHasShape(written Written) *violation.Violation {
-	if written.HasAny("type", "properties", "items", "ref") {
+func schemaHasShape(present PresentFields) *violation.Violation {
+	if present.HasAny("type", "properties", "items", "ref") {
 		return nil
 	}
 
 	return &violation.Violation{
-		Code: SchemaType.Code,
+		ErrorCode: SchemaType.ErrorCode,
 		Details: map[string]string{
 			"value":   "",
 			"allowed": strings.Join(SchemaType.Allowed, ", "),
@@ -31,10 +31,10 @@ func schemaHasShape(written Written) *violation.Violation {
 	}
 }
 
-func arrayRequiresItems(written Written) *violation.Violation {
-	if written["type"] != "array" || written["items"] != nil {
+func arrayRequiresItems(present PresentFields) *violation.Violation {
+	if present["type"] != "array" || present["items"] != nil {
 		return nil
 	}
 
-	return &violation.Violation{Code: "schema.array_without_items"}
+	return &violation.Violation{ErrorCode: "schema.array_without_items"}
 }

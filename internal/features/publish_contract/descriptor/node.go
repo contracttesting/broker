@@ -18,7 +18,6 @@ func Validate(grammar Node, document any, source string) []violation.Violation {
 	return violations
 }
 
-// `;` because a segment carries `.` and `/` (endpoints), so it is the only separator a consumer can split on.
 func joinPath(path string, key string) string {
 	if path == "" {
 		return key
@@ -50,8 +49,8 @@ func kindOf(value any) string {
 
 func invalidKind(value any, path string, expected string) violation.Violation {
 	return violation.Violation{
-		Code: "value.invalid_kind",
-		Path: path,
+		ErrorCode: "value.invalid_kind",
+		Path:      path,
 		Details: map[string]string{
 			"expected": expected,
 			"got":      kindOf(value),

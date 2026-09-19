@@ -10,8 +10,8 @@ type Fragment struct {
 	Document any
 }
 
-func (f Fragment) Root() Document {
-	root, _ := f.Document.(map[string]any)
+func (this Fragment) Root() Document {
+	root, _ := this.Document.(map[string]any)
 
 	return root
 }

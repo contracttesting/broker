@@ -14,9 +14,9 @@ func unresolvedSchemaNames(declarations fragmentmapper.Declarations) []violation
 		}
 
 		violations = append(violations, violation.Violation{
-			Code:   "schema.unresolved_name",
-			Path:   declaration.Path.String(),
-			Source: declaration.Source,
+			ErrorCode: "schema.unresolved_name",
+			Path:      declaration.Path.String(),
+			Source:    declaration.Source,
 			Details: map[string]string{
 				"schema":   declaration.SchemaName,
 				"resource": declaration.Resource.Describe(),

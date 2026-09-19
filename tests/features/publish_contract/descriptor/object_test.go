@@ -22,14 +22,14 @@ func objectDocument(t *testing.T, source string) any {
 
 func TestObject_RejeitaChaveDesconhecida(t *testing.T) {
 	subject := descriptor.Object(descriptor.Fields{
-		"type":     descriptor.Enum{Code: "schema.invalid_type", Allowed: []string{"object"}},
+		"type":     descriptor.Enum{ErrorCode: "schema.invalid_type", Allowed: []string{"object"}},
 		"optional": descriptor.Bool(),
 	})
 
 	violations := descriptor.Validate(subject, objectDocument(t, "type: object\npatch: nope\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "key.unknown", violations[0].Code)
+	assert.Equal(t, "key.unknown", violations[0].ErrorCode)
 	assert.Equal(t, "patch", violations[0].Path)
 	assert.Equal(t, "api.yaml", violations[0].Source)
 	assert.Equal(t, map[string]string{"key": "patch"}, violations[0].Details)
@@ -47,22 +47,22 @@ func TestObject_AcumulaChavesDesconhecidasEmOrdemEstavel(t *testing.T) {
 
 func TestObject_DespachaCampoParaSeuNo(t *testing.T) {
 	subject := descriptor.Object(descriptor.Fields{
-		"type":     descriptor.Enum{Code: "schema.invalid_type", Allowed: []string{"object", "array", "string"}},
+		"type":     descriptor.Enum{ErrorCode: "schema.invalid_type", Allowed: []string{"object", "array", "string"}},
 		"optional": descriptor.Bool(),
 	})
 
 	violations := descriptor.Validate(subject, objectDocument(t, "type: number\npatch: nope\n"), "api.yaml")
 
 	require.Len(t, violations, 2)
-	assert.Equal(t, "key.unknown", violations[0].Code)
-	assert.Equal(t, "schema.invalid_type", violations[1].Code)
+	assert.Equal(t, "key.unknown", violations[0].ErrorCode)
+	assert.Equal(t, "schema.invalid_type", violations[1].ErrorCode)
 }
 
 func TestObject_CaminhoDesceComPontoEVirgula(t *testing.T) {
 	subject := descriptor.Object(descriptor.Fields{
 		"schemas": descriptor.Object(descriptor.Fields{
 			"Pet": descriptor.Object(descriptor.Fields{
-				"type": descriptor.Enum{Code: "schema.invalid_type", Allowed: []string{"object"}},
+				"type": descriptor.Enum{ErrorCode: "schema.invalid_type", Allowed: []string{"object"}},
 			}),
 		}),
 	})
@@ -87,16 +87,16 @@ func TestObject_RejeitaEscalarComoKind(t *testing.T) {
 	violations := descriptor.Validate(subject, "nope", "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "value.invalid_kind", violations[0].Code)
+	assert.Equal(t, "value.invalid_kind", violations[0].ErrorCode)
 	assert.Equal(t, map[string]string{"expected": "mapping", "got": "string"}, violations[0].Details)
 }
 
 func TestObject_CampoComValorNuloNaoContaComoEscrito(t *testing.T) {
-	var seen descriptor.Written
+	var seen descriptor.PresentFields
 
 	subject := descriptor.Object(descriptor.Fields{"optional": descriptor.Bool()}).
-		Rules(func(written descriptor.Written) *violation.Violation {
-			seen = written
+		Rules(func(present descriptor.PresentFields) *violation.Violation {
+			seen = present
 
 			return nil
 		})
@@ -111,19 +111,19 @@ func TestObject_RegrasRodamDepoisDosCamposERecebemOsEscritos(t *testing.T) {
 	subject := descriptor.Object(descriptor.Fields{
 		"type":  descriptor.String(),
 		"items": descriptor.String(),
-	}).Rules(func(written descriptor.Written) *violation.Violation {
-		if written["type"] != "array" || written.HasAny("items") {
+	}).Rules(func(present descriptor.PresentFields) *violation.Violation {
+		if present["type"] != "array" || present.HasAny("items") {
 			return nil
 		}
 
-		return &violation.Violation{Code: "schema.array_without_items"}
+		return &violation.Violation{ErrorCode: "schema.array_without_items"}
 	})
 
 	violations := descriptor.Validate(subject, objectDocument(t, "type: array\nextra: x\n"), "api.yaml")
 
 	require.Len(t, violations, 2)
-	assert.Equal(t, "key.unknown", violations[0].Code)
-	assert.Equal(t, "schema.array_without_items", violations[1].Code)
+	assert.Equal(t, "key.unknown", violations[0].ErrorCode)
+	assert.Equal(t, "schema.array_without_items", violations[1].ErrorCode)
 	assert.Equal(t, "", violations[1].Path)
 	assert.Equal(t, "api.yaml", violations[1].Source)
 }
@@ -131,28 +131,28 @@ func TestObject_RegrasRodamDepoisDosCamposERecebemOsEscritos(t *testing.T) {
 func TestObject_RegraEmObjetoNuloRodaComEscritosVazios(t *testing.T) {
 	subject := descriptor.Object(descriptor.Fields{
 		"Pet": descriptor.Object(descriptor.Fields{"type": descriptor.String()}).
-			Rules(func(written descriptor.Written) *violation.Violation {
-				if written.HasAny("type") {
+			Rules(func(present descriptor.PresentFields) *violation.Violation {
+				if present.HasAny("type") {
 					return nil
 				}
 
-				return &violation.Violation{Code: "schema.invalid_type"}
+				return &violation.Violation{ErrorCode: "schema.invalid_type"}
 			}),
 	})
 
 	violations := descriptor.Validate(subject, objectDocument(t, "Pet:\n"), "api.yaml")
 
 	require.Len(t, violations, 1)
-	assert.Equal(t, "schema.invalid_type", violations[0].Code)
+	assert.Equal(t, "schema.invalid_type", violations[0].ErrorCode)
 	assert.Equal(t, "Pet", violations[0].Path)
 }
 
 func TestObject_RegraNaoTemSeuPonteiroMutado(t *testing.T) {
-	shared := &violation.Violation{Code: "schema.invalid_type"}
+	shared := &violation.Violation{ErrorCode: "schema.invalid_type"}
 
 	subject := descriptor.Object(descriptor.Fields{
 		"Pet": descriptor.Object(descriptor.Fields{}).
-			Rules(func(descriptor.Written) *violation.Violation { return shared }),
+			Rules(func(descriptor.PresentFields) *violation.Violation { return shared }),
 	})
 
 	violations := descriptor.Validate(subject, objectDocument(t, "Pet: {}\n"), "api.yaml")

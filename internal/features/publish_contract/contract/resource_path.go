@@ -11,36 +11,36 @@ func NewResourcePath(resourcePath string) ResourcePath {
 	return ResourcePath(resourcePath)
 }
 
-func (rp *ResourcePath) Append(parts ...string) ResourcePath {
+func (this *ResourcePath) Append(parts ...string) ResourcePath {
 	separator := ";"
 
-	if string(*rp) == "" {
+	if string(*this) == "" {
 		return ResourcePath(strings.Join(parts, separator))
 	}
 
 	chunks := strings.Join(parts, separator)
 
-	return ResourcePath(strings.Join([]string{string(*rp), chunks}, separator))
+	return ResourcePath(strings.Join([]string{string(*this), chunks}, separator))
 }
 
-func (rp *ResourcePath) String() string {
-	return string(*rp)
+func (this *ResourcePath) String() string {
+	return string(*this)
 }
 
-func (rp *ResourcePath) Split() []string {
-	return strings.Split(rp.String(), ";")
+func (this *ResourcePath) Split() []string {
+	return strings.Split(this.String(), ";")
 }
 
-func (rp *ResourcePath) IsConsumer() bool {
-	return rp.Split()[0] == "consumes"
+func (this *ResourcePath) IsConsumer() bool {
+	return this.Split()[0] == "consumes"
 }
 
-func (rp *ResourcePath) IsProvider() bool {
-	return rp.Split()[0] == "provides"
+func (this *ResourcePath) IsProvider() bool {
+	return this.Split()[0] == "provides"
 }
 
-func (rp *ResourcePath) ExtractNamedArgs(regex *regexp.Regexp) (map[string]string, bool) {
-	match := regex.FindStringSubmatch(rp.String())
+func (this *ResourcePath) ExtractNamedArgs(regex *regexp.Regexp) (map[string]string, bool) {
+	match := regex.FindStringSubmatch(this.String())
 	if match == nil {
 		return nil, false
 	}
