@@ -7,14 +7,12 @@ import (
 	"io"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/contracttesting/broker/internal"
 	"github.com/contracttesting/broker/internal/components"
-	"github.com/contracttesting/broker/pkg/rootpath"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/suite"
@@ -56,7 +54,6 @@ func (s *IntegrationSuite) SetupSuite() {
 	s.Require().NoError(err)
 
 	s.Require().NoError(os.Setenv("DATABASE_URL", connStr))
-	s.Require().NoError(os.Setenv("MIGRATIONS_DIR", filepath.Join(rootpath.Discover(), "migrations")))
 
 	s.Components = internal.Run()
 	s.Pool = s.Components.Pool

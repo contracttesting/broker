@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/contracttesting/broker/migrations"
 	"github.com/contracttesting/broker/pkg/migrator"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/recover"
@@ -63,17 +64,7 @@ func createHttpServer() *fiber.App {
 }
 
 func runMigrations(pool *pgxpool.Pool) {
-	migrationsDir := os.Getenv("MIGRATIONS_DIR")
-
-	if migrationsDir == "" {
-		migrationsDir = "migrations"
-	}
-
-	m := migrator.New(
-		pool,
-		migrationsDir,
-		"public.schema_migrations",
-	)
+	m := migrator.New(pool, migrations.FS, "public.schema_migrations")
 
 	if err := m.Migrate(); err != nil {
 		panic(fmt.Errorf("failed to run migrations: %w", err))

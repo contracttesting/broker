@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/contracttesting/broker/pkg/migrator"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -83,6 +84,18 @@ func (s *MigratorSuite) countMigrations() int {
 	return count
 }
 
+func (s *MigratorSuite) appliedMigrations() []string {
+	rows, err := s.pool.Query(context.Background(), "SELECT migration FROM public.schema_migrations ORDER BY id")
+	if err != nil {
+		s.T().Fatalf("Failed to query migrations: %v", err)
+	}
+	migrations, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		s.T().Fatalf("Failed to collect migrations: %v", err)
+	}
+	return migrations
+}
+
 func (s *MigratorSuite) schemaExists(name string) bool {
 	var exists bool
 	query := `SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = $1)`
@@ -105,7 +118,7 @@ func (s *MigratorSuite) TestAppliesAllPendingMigrations() {
 	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
 	s.writeMigration("20260102000000_create_bar.sql", "CREATE TABLE bar (id SERIAL PRIMARY KEY);")
 
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	if err := m.Migrate(); err != nil {
 		s.T().Fatalf("Migrate returned error: %v", err)
 	}
@@ -115,10 +128,23 @@ func (s *MigratorSuite) TestAppliesAllPendingMigrations() {
 	s.True(s.tableExists("bar"))
 }
 
+func (s *MigratorSuite) TestRecordsTheBareFileNameAsMigrationKey() {
+	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
+	s.writeMigration("20260102000000_create_bar.sql", "CREATE TABLE bar (id SERIAL PRIMARY KEY);")
+
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
+	s.NoError(m.Migrate())
+
+	s.Equal(
+		[]string{"20260101000000_create_foo.sql", "20260102000000_create_bar.sql"},
+		s.appliedMigrations(),
+	)
+}
+
 func (s *MigratorSuite) TestIsIdempotent() {
 	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
 
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	s.NoError(m.Migrate())
 	s.NoError(m.Migrate())
 
@@ -128,7 +154,7 @@ func (s *MigratorSuite) TestIsIdempotent() {
 func (s *MigratorSuite) TestPicksUpNewlyAddedMigrations() {
 	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
 
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	s.NoError(m.Migrate())
 	s.Equal(1, s.countMigrations())
 
@@ -140,7 +166,7 @@ func (s *MigratorSuite) TestPicksUpNewlyAddedMigrations() {
 }
 
 func (s *MigratorSuite) TestEnsuresMigrationsTable() {
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	s.NoError(m.Migrate())
 
 	s.True(s.tableExists("schema_migrations"))
@@ -150,7 +176,7 @@ func (s *MigratorSuite) TestEnsuresMigrationsTable() {
 func (s *MigratorSuite) TestUnqualifiedTableNameCreatesNoSchema() {
 	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
 
-	m := migrator.New(s.pool, s.dir, "schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "schema_migrations")
 	s.NoError(m.Migrate())
 
 	// the table resolves through search_path into public, and the table name is not
@@ -163,7 +189,7 @@ func (s *MigratorSuite) TestUnqualifiedTableNameCreatesNoSchema() {
 func (s *MigratorSuite) TestQualifiedTableNameCreatesItsSchema() {
 	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
 
-	m := migrator.New(s.pool, s.dir, "meta.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "meta.schema_migrations")
 	s.NoError(m.Migrate())
 
 	s.True(s.schemaExists("meta"))
@@ -183,7 +209,7 @@ func (s *MigratorSuite) TestSkipsNonSqlAndDirectories() {
 		s.T().Fatalf("Failed to create subdir: %v", err)
 	}
 
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	s.NoError(m.Migrate())
 
 	s.Equal(1, s.countMigrations())
@@ -192,7 +218,7 @@ func (s *MigratorSuite) TestSkipsNonSqlAndDirectories() {
 func (s *MigratorSuite) TestReturnsErrorOnInvalidSQL() {
 	s.writeMigration("20260101000000_broken.sql", "THIS IS NOT VALID SQL;")
 
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	err := m.Migrate()
 
 	s.Error(err)
@@ -203,7 +229,7 @@ func (s *MigratorSuite) TestRollsBackAllPendingWhenAnyMigrationFails() {
 	s.writeMigration("20260101000000_create_foo.sql", "CREATE TABLE foo (id SERIAL PRIMARY KEY);")
 	s.writeMigration("20260102000000_broken.sql", "THIS IS NOT VALID SQL;")
 
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	err := m.Migrate()
 
 	s.Error(err)
@@ -214,7 +240,7 @@ func (s *MigratorSuite) TestRollsBackAllPendingWhenAnyMigrationFails() {
 func (s *MigratorSuite) TestPanicsOnInvalidFilenameFormat() {
 	s.writeMigration("0001_legacy_format.sql", "CREATE TABLE legacy (id SERIAL PRIMARY KEY);")
 
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	s.PanicsWithValue(
 		`migrator: invalid migration filename "0001_legacy_format.sql": expected format YYYYMMDDHHMMSS_subject.sql (e.g. 20260520143022_add_users_table.sql)`,
 		func() { _ = m.Migrate() },
@@ -224,6 +250,6 @@ func (s *MigratorSuite) TestPanicsOnInvalidFilenameFormat() {
 func (s *MigratorSuite) TestPanicsOnInvalidTimestamp() {
 	s.writeMigration("20260230000000_bad_date.sql", "CREATE TABLE bad (id SERIAL PRIMARY KEY);")
 
-	m := migrator.New(s.pool, s.dir, "public.schema_migrations")
+	m := migrator.New(s.pool, os.DirFS(s.dir), "public.schema_migrations")
 	s.Panics(func() { _ = m.Migrate() })
 }

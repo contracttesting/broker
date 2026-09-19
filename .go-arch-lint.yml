@@ -19,6 +19,7 @@ components:
   model:                      { in: internal/model }
   validations:                { in: internal/validations }
   pkg:                        { in: pkg/** }
+  migrations:                 { in: migrations }
   tests:                      { in: tests/** }
 
 vendors:
@@ -66,7 +67,7 @@ deps:
     canUse: [fiber, guregu_null]
 
   components:
-    mayDependOn: [model, pkg]
+    mayDependOn: [model, pkg, migrations]
     canUse: [fiber, pgx]
   repository:
     mayDependOn: [model, validations]
