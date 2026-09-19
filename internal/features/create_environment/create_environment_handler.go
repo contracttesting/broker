@@ -14,35 +14,35 @@ func NewCreateEnvironmentHandler(repo *repository.EnvironmentRepository) *Create
 	return &CreateEnvironmentHandler{environmentRepository: repo}
 }
 
-func (ctr *CreateEnvironmentHandler) Handle(ctx fiber.Ctx) error {
+func (this *CreateEnvironmentHandler) Handle(ctx fiber.Ctx) error {
 	requestBody := &CreateEnvironmentRequestBody{}
 
 	if err := ctx.Bind().JSON(requestBody); err != nil {
-		return ctr.respondInvalidInput(ctx)
+		return this.respondInvalidInput(ctx)
 	}
 
-	if requestBody.Participant == "" {
-		return ctr.respondInvalidInput(ctx)
+	if requestBody.Environment == "" {
+		return this.respondInvalidInput(ctx)
 	}
 
-	if ctr.environmentRepository.ExistsByName(ctx.Context(), requestBody.Participant) {
-		return ctr.respondAlreadyExists(ctx)
+	if this.environmentRepository.ExistsByName(ctx.Context(), requestBody.Environment) {
+		return this.respondAlreadyExists(ctx)
 	}
 
-	ctr.environmentRepository.Create(ctx.Context(), model.NewEnvironment(requestBody.Participant))
+	this.environmentRepository.Create(ctx.Context(), model.NewEnvironment(requestBody.Environment))
 
 	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
 		Message: EnvironmentCreated,
 	})
 }
 
-func (ctr *CreateEnvironmentHandler) respondInvalidInput(ctx fiber.Ctx) error {
+func (this *CreateEnvironmentHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CreateEnvironmentResponseBody{
 		Message: EnvironmentInvalidInput,
 	})
 }
 
-func (ctr *CreateEnvironmentHandler) respondAlreadyExists(ctx fiber.Ctx) error {
+func (this *CreateEnvironmentHandler) respondAlreadyExists(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(CreateEnvironmentResponseBody{
 		Message: EnvironmentAlreadyExists,
 	})

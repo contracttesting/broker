@@ -129,7 +129,7 @@ func (s *IntegrationSuite) TestCanIDeploy_HappyPath() {
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
 	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", frontV1ConsumerContract}))
@@ -286,7 +286,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderCheckedAgainstDeployedConsumer
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", providerCheckedConsumerContract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
@@ -339,7 +339,7 @@ func (s *IntegrationSuite) TestCanIDeploy_RecordsOneRowPerDependency() {
 	status, _ := s.post("/api/participants", `{"participant":"app"}`)
 	s.Require().Equal(http.StatusOK, status)
 
-	status, _ = s.post("/api/environments", `{"participant":"production"}`)
+	status, _ = s.post("/api/environments", `{"environment":"production"}`)
 	s.Require().Equal(http.StatusOK, status)
 
 	status, _ = s.post("/api/contracts",
@@ -450,7 +450,7 @@ func (s *IntegrationSuite) TestCanIDeploy_TwoDeployableOneBreaking() {
 	for _, name := range []string{"users", "auth", "catalog", "app"} {
 		mustPost("/api/participants", `{"participant":"`+name+`"}`)
 	}
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("users", "v1", contractFragment{"api.json", usersV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"users","version":"v1","environment":"production"}`)
@@ -555,8 +555,8 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButNotDeployedInTargetEn
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
-	mustPost("/api/environments", `{"participant":"staging"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
+	mustPost("/api/environments", `{"environment":"staging"}`)
 
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", providerThingContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"staging"}`)
@@ -846,7 +846,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ConsumerAndProviderSameContract() {
 	for _, name := range []string{"users", "pets", "app"} {
 		mustPost("/api/participants", `{"participant":"`+name+`"}`)
 	}
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("users", "v1", contractFragment{"api.json", dualRoleUsersV1Contract}))
 	checkDeployableAndDeploy("users", "v1")
@@ -990,7 +990,7 @@ func (s *IntegrationSuite) TestCanIDeploy_MissingArrayReportsEveryNestedProperty
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", arrayProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
@@ -1042,7 +1042,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ProviderExistsButDeployedNowhere() {
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", providerThingContract}))
 	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", consumerThingContract}))
@@ -1083,7 +1083,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ChecksProviderAtItsDeployedVersion() {
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", apiV1ProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
@@ -1115,7 +1115,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ChecksConsumerAtItsDeployedVersion() {
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", frontV1ConsumerContract}))
 	mustPost("/api/deployments", `{"participant":"front","version":"v1","environment":"production"}`)
@@ -1176,7 +1176,7 @@ func (s *IntegrationSuite) TestCanIDeploy_RemovedProviderPropertyIsNotChecked() 
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", removedRequestProviderV1Contract}))
 	mustPost("/api/contracts", s.publishBody("api", "v2", contractFragment{"api.json", removedRequestProviderV2Contract}))
@@ -1228,7 +1228,7 @@ func (s *IntegrationSuite) TestCanIDeploy_RemovedConsumerPropertyIsNotChecked() 
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", removedResponseConsumerV1Contract}))
 	mustPost("/api/contracts", s.publishBody("front", "v2", contractFragment{"api.json", removedResponseConsumerV2Contract}))
