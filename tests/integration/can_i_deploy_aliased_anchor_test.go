@@ -39,7 +39,7 @@ func (s *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedProvider() {
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", anchorProviderV1Contract}))
 	// CI republishes the same content under the commit sha: an alias, no new snapshot
@@ -73,7 +73,7 @@ func (s *IntegrationSuite) TestCanIDeploy_AnchorsToAnAliasedDeployedConsumer() {
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("front", "v1", contractFragment{"api.json", anchorConsumerV1Contract}))
 	mustPost("/api/contracts", s.publishBody("front", "a1b2c3d", contractFragment{"api.json", anchorConsumerV1Contract}))

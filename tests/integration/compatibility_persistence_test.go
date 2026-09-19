@@ -113,7 +113,7 @@ func (s *IntegrationSuite) singleCheckResultForPersistence() persistedCheckResul
 
 func (s *IntegrationSuite) TestCompatibilityPersistence_BootstrapCheckRecordsNoCounterparts() {
 	s.mustPostForPersistence("/api/participants", `{"participant":"widgets"}`)
-	s.mustPostForPersistence("/api/environments", `{"participant":"production"}`)
+	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
 		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceStandaloneContract}))
 
@@ -147,7 +147,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_BootstrapCheckRecordsNoC
 
 func (s *IntegrationSuite) TestCompatibilityPersistence_NotFoundCounterpartKeepsItsName() {
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
-	s.mustPostForPersistence("/api/environments", `{"participant":"production"}`)
+	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
 		s.publishBody("front", "v1", contractFragment{"api.json", persistenceGhostConsumerContract}))
 
@@ -177,7 +177,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_NotFoundCounterpartKeeps
 func (s *IntegrationSuite) TestCompatibilityPersistence_NotDeployedCounterpartKeepsItsParticipant() {
 	s.mustPostForPersistence("/api/participants", `{"participant":"widgets"}`)
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
-	s.mustPostForPersistence("/api/environments", `{"participant":"production"}`)
+	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
 		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/contracts",
@@ -210,7 +210,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_NotDeployedCounterpartKe
 func (s *IntegrationSuite) TestCompatibilityPersistence_CompatiblePairIsStoredWithEmptyBreaks() {
 	s.mustPostForPersistence("/api/participants", `{"participant":"widgets"}`)
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
-	s.mustPostForPersistence("/api/environments", `{"participant":"production"}`)
+	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
 		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/deployments",
@@ -256,7 +256,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_CompatiblePairIsStoredWi
 func (s *IntegrationSuite) TestCompatibilityPersistence_IncompatiblePairStoresEveryBreakKey() {
 	s.mustPostForPersistence("/api/participants", `{"participant":"widgets"}`)
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
-	s.mustPostForPersistence("/api/environments", `{"participant":"production"}`)
+	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
 		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/deployments",
@@ -320,7 +320,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_IncompatiblePairStoresEv
 func (s *IntegrationSuite) TestCompatibilityPersistence_RepeatedCheckDoesNotGrowVerdicts() {
 	s.mustPostForPersistence("/api/participants", `{"participant":"widgets"}`)
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
-	s.mustPostForPersistence("/api/environments", `{"participant":"production"}`)
+	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
 		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/deployments",
@@ -349,7 +349,7 @@ func (s *IntegrationSuite) TestCompatibilityPersistence_RepeatedCheckDoesNotGrow
 func (s *IntegrationSuite) TestCompatibilityPersistence_RecordingTheSamePairTwiceKeepsOneVerdict() {
 	s.mustPostForPersistence("/api/participants", `{"participant":"widgets"}`)
 	s.mustPostForPersistence("/api/participants", `{"participant":"front"}`)
-	s.mustPostForPersistence("/api/environments", `{"participant":"production"}`)
+	s.mustPostForPersistence("/api/environments", `{"environment":"production"}`)
 	s.mustPostForPersistence("/api/contracts",
 		s.publishBody("widgets", "v1", contractFragment{"api.json", persistenceWidgetsProviderContract}))
 	s.mustPostForPersistence("/api/contracts",

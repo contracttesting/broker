@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-const productionEnvironmentBody = `{"participant":"production"}`
+const productionEnvironmentBody = `{"environment":"production"}`
 
 func (s *IntegrationSuite) TestHappyPath_CreateEnvironment() {
 	status, body := s.post("/api/environments", productionEnvironmentBody)
@@ -27,6 +27,14 @@ func (s *IntegrationSuite) TestIdempotent_DuplicateEnvironmentName() {
 
 func (s *IntegrationSuite) TestUnhappyPath_MissingEnvironmentName() {
 	status, body := s.post("/api/environments", `{}`)
+	s.Equal(http.StatusBadRequest, status)
+	s.JSONEq(`{"message":"environment invalid input"}`, body)
+
+	s.Equal(0, s.countRows("environments"))
+}
+
+func (s *IntegrationSuite) TestUnhappyPath_EnvironmentNameUnderParticipantKey() {
+	status, body := s.post("/api/environments", `{"participant":"production"}`)
 	s.Equal(http.StatusBadRequest, status)
 	s.JSONEq(`{"message":"environment invalid input"}`, body)
 

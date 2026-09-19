@@ -9,7 +9,7 @@ import (
 const (
 	renamePetsBody          = `{"participant":"pets_service"}`
 	renameOrdersBody        = `{"participant":"orders_service"}`
-	renameProductionEnvBody = `{"participant":"production"}`
+	renameProductionEnvBody = `{"environment":"production"}`
 	renameV1DeploymentBody  = `{"participant":"pets_service","version":"v1","environment":"production"}`
 )
 

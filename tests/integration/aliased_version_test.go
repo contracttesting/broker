@@ -73,7 +73,7 @@ func (s *IntegrationSuite) TestCanIDeploy_ResolvesAnAliasedVersion() {
 
 	mustPost("/api/participants", `{"participant":"api"}`)
 	mustPost("/api/participants", `{"participant":"front"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", aliasProviderContract}))
 	mustPost("/api/deployments", `{"participant":"api","version":"v1","environment":"production"}`)
@@ -95,7 +95,7 @@ func (s *IntegrationSuite) TestRecordDeployment_ResolvesAnAliasedVersion() {
 	}
 
 	mustPost("/api/participants", `{"participant":"api"}`)
-	mustPost("/api/environments", `{"participant":"production"}`)
+	mustPost("/api/environments", `{"environment":"production"}`)
 
 	mustPost("/api/contracts", s.publishBody("api", "v1", contractFragment{"api.json", aliasProviderContract}))
 	mustPost("/api/contracts", s.publishBody("api", "a1b2c3d", contractFragment{"api.json", aliasProviderContract}))

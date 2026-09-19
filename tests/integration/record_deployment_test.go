@@ -9,7 +9,7 @@ const (
 	apiParticipantBody         = `{"participant":"api"}`
 	apiV1DeploymentBody        = `{"participant":"api","version":"v1","environment":"production"}`
 	apiV2DeploymentBody        = `{"participant":"api","version":"v2","environment":"production"}`
-	productionEnvBodyForDeploy = `{"participant":"production"}`
+	productionEnvBodyForDeploy = `{"environment":"production"}`
 )
 
 const apiV1ContractBody = `

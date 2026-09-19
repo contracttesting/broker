@@ -138,7 +138,7 @@ func (s *IntegrationSuite) rewriteStoredVerdictForMemoization(breaks string) {
 func (s *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict() {
 	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"participant":"production"}`)
+	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
 		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
@@ -213,7 +213,7 @@ func (s *IntegrationSuite) TestMemoization_IdenticalChecksReplayTheStoredVerdict
 func (s *IntegrationSuite) TestMemoization_AliasedVersionHitsTheStoredVerdict() {
 	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"participant":"production"}`)
+	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
 		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
@@ -244,7 +244,7 @@ func (s *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentBrea
 	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
 	s.mustPostForMemoization("/api/participants", `{"participant":"billing"}`)
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"participant":"production"}`)
+	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
 		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
@@ -303,7 +303,7 @@ func (s *IntegrationSuite) TestMemoization_CachedVerdictKeepsLiveEnvironmentBrea
 func (s *IntegrationSuite) TestMemoization_HitOnACompatiblePairSkipsTheDiff() {
 	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"participant":"production"}`)
+	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
 		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",
@@ -346,7 +346,7 @@ func (s *IntegrationSuite) TestMemoization_HitOnACompatiblePairSkipsTheDiff() {
 func (s *IntegrationSuite) TestMemoization_HitOnAnIncompatiblePairSkipsTheDiff() {
 	s.mustPostForMemoization("/api/participants", `{"participant":"orders"}`)
 	s.mustPostForMemoization("/api/participants", `{"participant":"cart"}`)
-	s.mustPostForMemoization("/api/environments", `{"participant":"production"}`)
+	s.mustPostForMemoization("/api/environments", `{"environment":"production"}`)
 	s.mustPostForMemoization("/api/contracts",
 		s.publishBody("orders", "v1", contractFragment{"api.json", memoizationOrdersProviderContract}))
 	s.mustPostForMemoization("/api/deployments",

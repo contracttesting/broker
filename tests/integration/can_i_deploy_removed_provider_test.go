@@ -136,7 +136,7 @@ func (s *IntegrationSuite) mustPostForRemoval(path, body string) {
 // removalSetup publishes catalog v1 with /items and /stock, a consumer of both, and deploys
 // both to production. The caller publishes the catalog version that drops /items.
 func (s *IntegrationSuite) removalSetup(consumerContract string) {
-	s.mustPostForRemoval("/api/environments", `{"participant":"production"}`)
+	s.mustPostForRemoval("/api/environments", `{"environment":"production"}`)
 	s.mustPostForRemoval("/api/participants", `{"participant":"catalog"}`)
 	s.mustPostForRemoval("/api/contracts", s.publishBody("catalog", "v1", contractFragment{"api.json", removalCatalogV1Contract}))
 	s.mustPostForRemoval("/api/deployments", `{"participant":"catalog","version":"v1","environment":"production"}`)
