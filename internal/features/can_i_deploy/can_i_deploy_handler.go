@@ -34,39 +34,39 @@ func NewCanIDeployHandler(
 	}
 }
 
-func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
+func (this *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 	requestBody := &CanIDeployRequestBody{}
 	if err := ctx.Bind().JSON(requestBody); err != nil {
-		return h.respondInvalidInput(ctx)
+		return this.respondInvalidInput(ctx)
 	}
 
 	if requestBody.Participant == "" || requestBody.Version == "" || requestBody.Environment == "" {
-		return h.respondInvalidInput(ctx)
+		return this.respondInvalidInput(ctx)
 	}
 
-	participant, exists := h.participantRepository.FindByName(ctx.Context(), requestBody.Participant)
+	participant, exists := this.participantRepository.FindByName(ctx.Context(), requestBody.Participant)
 	if !exists {
-		return h.respondParticipantNotFound(ctx)
+		return this.respondParticipantNotFound(ctx)
 	}
 
-	contract, exists := h.contractRepository.GetContractByNameAndVersion(
+	contract, exists := this.contractRepository.GetContractByNameAndVersion(
 		ctx.Context(),
 		participant.Name,
 		requestBody.Version,
 	)
 
 	if !exists {
-		return h.respondContractNotFound(ctx)
+		return this.respondContractNotFound(ctx)
 	}
 
-	environment, exists := h.environmentRepository.FindByName(ctx.Context(), requestBody.Environment)
+	environment, exists := this.environmentRepository.FindByName(ctx.Context(), requestBody.Environment)
 	if !exists {
-		return h.respondInvalidInput(ctx)
+		return this.respondEnvironmentNotFound(ctx)
 	}
 
-	counterparts := h.contractRepository.LoadCounterparts(ctx.Context(), contract, environment.ID)
+	counterparts := this.contractRepository.LoadCounterparts(ctx.Context(), contract, environment.ID)
 
-	compatibilityReport := h.compatibilityChecker.Check(
+	compatibilityReport := this.compatibilityChecker.Check(
 		ctx.Context(),
 		contract,
 		environment,
@@ -78,10 +78,10 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 		deployable = deployable && result.Deployable
 	}
 
-	h.recordCheck(ctx.Context(), contract, environment, deployable, compatibilityReport)
+	this.recordCheck(ctx.Context(), contract, environment, deployable, compatibilityReport)
 
 	return ctx.Status(fiber.StatusOK).JSON(CanIDeployResponseBody{
-		Message:     "Contract checked successfully",
+		Message:     ContractChecked,
 		Participant: requestBody.Participant,
 		Version:     requestBody.Version,
 		Environment: requestBody.Environment,
@@ -90,7 +90,7 @@ func (h *CanIDeployHandler) Handle(ctx fiber.Ctx) error {
 	})
 }
 
-func (h *CanIDeployHandler) recordCheck(
+func (this *CanIDeployHandler) recordCheck(
 	ctx context.Context,
 	contract *model.PersistedContract,
 	environment *model.Environment,
@@ -165,23 +165,29 @@ func (h *CanIDeployHandler) recordCheck(
 		})
 	}
 
-	h.compatibilityRepository.RecordCheck(ctx, check, results, newVerdicts)
+	this.compatibilityRepository.RecordCheck(ctx, check, results, newVerdicts)
 }
 
-func (h *CanIDeployHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
+func (this *CanIDeployHandler) respondParticipantNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(CanIDeployErrorResponseBody{
 		Message: ParticipantNotFound,
 	})
 }
 
-func (h *CanIDeployHandler) respondInvalidInput(ctx fiber.Ctx) error {
+func (this *CanIDeployHandler) respondInvalidInput(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusBadRequest).JSON(CanIDeployErrorResponseBody{
-		Message: "Invalid input",
+		Message: CanIDeployInvalidInput,
 	})
 }
 
-func (h *CanIDeployHandler) respondContractNotFound(ctx fiber.Ctx) error {
+func (this *CanIDeployHandler) respondContractNotFound(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusNotFound).JSON(CanIDeployErrorResponseBody{
 		Message: ContractNotFound,
+	})
+}
+
+func (this *CanIDeployHandler) respondEnvironmentNotFound(ctx fiber.Ctx) error {
+	return ctx.Status(fiber.StatusNotFound).JSON(CanIDeployErrorResponseBody{
+		Message: EnvironmentNotFound,
 	})
 }
