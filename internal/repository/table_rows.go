@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
 )
 

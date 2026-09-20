@@ -1,6 +1,6 @@
 package compatibility_checker
 
-import "github.com/contracttesting/broker/internal/model"
+import "github.com/bidirekt/broker/internal/model"
 
 func checkResources(checked *model.PersistedResource, counterpart *model.PersistedResource) []ContractBreakingChange {
 	consumer, provider := checked, counterpart

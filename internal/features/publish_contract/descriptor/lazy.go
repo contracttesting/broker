@@ -1,7 +1,7 @@
 package descriptor
 
 import (
-	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
+	"github.com/bidirekt/broker/internal/features/publish_contract/violation"
 )
 
 // Go rejects a var that refers to itself in its own initializer, even through a closure;

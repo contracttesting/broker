@@ -3,8 +3,8 @@ package compatibility_checker_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/can_i_deploy/compatibility_checker"
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/features/can_i_deploy/compatibility_checker"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
 	"github.com/stretchr/testify/assert"
 )

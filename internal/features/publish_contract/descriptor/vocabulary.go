@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
-	"github.com/contracttesting/broker/internal/validations"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract"
+	"github.com/bidirekt/broker/internal/validations"
 )
 
 var (

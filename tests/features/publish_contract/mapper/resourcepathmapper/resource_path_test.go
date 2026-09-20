@@ -3,9 +3,9 @@ package resourcepathmapper_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
-	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/resourcepathmapper"
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract"
+	"github.com/bidirekt/broker/internal/features/publish_contract/mapper/resourcepathmapper"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 

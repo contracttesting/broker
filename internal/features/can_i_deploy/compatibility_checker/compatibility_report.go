@@ -1,7 +1,7 @@
 package compatibility_checker
 
 import (
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/guregu/null"
 )
 

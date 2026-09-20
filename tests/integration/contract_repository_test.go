@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/contracttesting/broker/internal/model"
-	"github.com/contracttesting/broker/internal/repository"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/repository"
 )
 
 const ordersParticipantBody = `{"participant":"orders_service"}`

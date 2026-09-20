@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"

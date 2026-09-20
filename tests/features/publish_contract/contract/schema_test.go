@@ -3,7 +3,7 @@ package contract_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

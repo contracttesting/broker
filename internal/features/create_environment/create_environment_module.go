@@ -1,8 +1,8 @@
 package create_environment
 
 import (
-	"github.com/contracttesting/broker/internal/components"
-	"github.com/contracttesting/broker/internal/repository"
+	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/repository"
 )
 
 func Register(components *components.Components) {

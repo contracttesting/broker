@@ -4,11 +4,11 @@ const assert = require('node:assert');
 process.env.CLA_ALLOWLIST = 'alefcastelo,dependabot[bot]';
 process.env.CLA_SIGNATURE_PHRASE = 'I have read the CLA Document and I hereby sign the CLA';
 process.env.CLA_RECHECK_KEYWORD = 'recheck';
-process.env.GITHUB_WORKFLOW_REF = 'contracttesting/broker/.github/workflows/cla.yml@refs/heads/main';
+process.env.GITHUB_WORKFLOW_REF = 'bidirekt/broker/.github/workflows/cla.yml@refs/heads/main';
 
 const cla = require('./cla.js');
 
-const repo = { owner: 'contracttesting', repo: 'broker' };
+const repo = { owner: 'bidirekt', repo: 'broker' };
 
 function notFound() {
   const error = new Error('Not Found');

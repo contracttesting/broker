@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract_differ"
-	"github.com/contracttesting/broker/internal/features/publish_contract/descriptor"
-	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
-	"github.com/contracttesting/broker/internal/features/publish_contract/validator"
-	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
-	"github.com/contracttesting/broker/internal/model"
-	"github.com/contracttesting/broker/internal/repository"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract_differ"
+	"github.com/bidirekt/broker/internal/features/publish_contract/descriptor"
+	"github.com/bidirekt/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/features/publish_contract/validator"
+	"github.com/bidirekt/broker/internal/features/publish_contract/violation"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
 

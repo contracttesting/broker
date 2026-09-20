@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/descriptor"
+	"github.com/bidirekt/broker/internal/features/publish_contract/descriptor"
 )
 
 func tree() descriptor.Node {

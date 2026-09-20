@@ -1,10 +1,10 @@
 package fragmentmapper
 
 import (
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
-	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/resourcepathmapper"
-	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/schemamapper"
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract"
+	"github.com/bidirekt/broker/internal/features/publish_contract/mapper/resourcepathmapper"
+	"github.com/bidirekt/broker/internal/features/publish_contract/mapper/schemamapper"
+	"github.com/bidirekt/broker/internal/model"
 )
 
 type Declarations struct {

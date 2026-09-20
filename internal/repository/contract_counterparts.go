@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/model"
 )
 
 // LoadCounterparts loads the deployed counterparts of the contract's resources in the environment, once per hash and side.
