@@ -3,7 +3,7 @@ package validations_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/validations"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/stretchr/testify/assert"
 )
 

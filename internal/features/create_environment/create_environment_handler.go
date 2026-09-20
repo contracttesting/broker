@@ -1,8 +1,8 @@
 package create_environment
 
 import (
-	"github.com/contracttesting/broker/internal/model"
-	"github.com/contracttesting/broker/internal/repository"
+	"github.com/bidirekt/broker/internal/model"
+	"github.com/bidirekt/broker/internal/repository"
 	"github.com/gofiber/fiber/v3"
 )
 

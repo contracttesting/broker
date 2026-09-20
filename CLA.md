@@ -1,6 +1,6 @@
 # Contributor License Agreement
 
-Thank you for contributing to the contracttesting broker. This agreement sets out
+Thank you for contributing to the bidirekt broker. This agreement sets out
 the terms under which your contributions are accepted. It is modelled on the
 Apache Software Foundation's Individual Contributor License Agreement.
 

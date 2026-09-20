@@ -4,9 +4,9 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
-	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
-	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract"
+	"github.com/bidirekt/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/features/publish_contract/violation"
 )
 
 // Each schema is inspected in its own definition only, so a broken ref is reported once, where it is written.

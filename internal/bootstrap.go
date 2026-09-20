@@ -1,14 +1,14 @@
 package internal
 
 import (
-	"github.com/contracttesting/broker/internal/components"
-	"github.com/contracttesting/broker/internal/features/can_i_deploy"
-	"github.com/contracttesting/broker/internal/features/create_environment"
-	"github.com/contracttesting/broker/internal/features/create_participant"
-	"github.com/contracttesting/broker/internal/features/health"
-	"github.com/contracttesting/broker/internal/features/publish_contract"
-	"github.com/contracttesting/broker/internal/features/record_deployment"
-	"github.com/contracttesting/broker/internal/features/rename_participant"
+	"github.com/bidirekt/broker/internal/components"
+	"github.com/bidirekt/broker/internal/features/can_i_deploy"
+	"github.com/bidirekt/broker/internal/features/create_environment"
+	"github.com/bidirekt/broker/internal/features/create_participant"
+	"github.com/bidirekt/broker/internal/features/health"
+	"github.com/bidirekt/broker/internal/features/publish_contract"
+	"github.com/bidirekt/broker/internal/features/record_deployment"
+	"github.com/bidirekt/broker/internal/features/rename_participant"
 )
 
 func Run() *components.Components {

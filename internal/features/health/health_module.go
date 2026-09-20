@@ -1,7 +1,7 @@
 package health
 
 import (
-	"github.com/contracttesting/broker/internal/components"
+	"github.com/bidirekt/broker/internal/components"
 )
 
 func Register(components *components.Components) {

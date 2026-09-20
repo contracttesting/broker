@@ -4,7 +4,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
+	"github.com/bidirekt/broker/internal/features/publish_contract/violation"
 )
 
 type Key struct {

@@ -3,7 +3,7 @@ package model_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 

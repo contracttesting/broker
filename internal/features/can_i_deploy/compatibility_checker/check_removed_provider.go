@@ -1,6 +1,6 @@
 package compatibility_checker
 
-import "github.com/contracttesting/broker/internal/model"
+import "github.com/bidirekt/broker/internal/model"
 
 // checkRemovedProvider runs outside the pair cache: the pair verdict may have been stored by
 // the consumer's own check, which never sees the removal, so it is always resolved live.

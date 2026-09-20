@@ -11,7 +11,7 @@ import (
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract"
 )
 
 func decodeFragment(fragment ContractFragment) (contract.Fragment, error) {

@@ -7,8 +7,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/contracttesting/broker/migrations"
-	"github.com/contracttesting/broker/pkg/migrator"
+	"github.com/bidirekt/broker/migrations"
+	"github.com/bidirekt/broker/pkg/migrator"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/jackc/pgx/v5/pgxpool"

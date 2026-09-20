@@ -3,8 +3,8 @@ package contract_differ_test
 import (
 	"testing"
 
-	"github.com/contracttesting/broker/internal/features/publish_contract/contract_differ"
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/features/publish_contract/contract_differ"
+	"github.com/bidirekt/broker/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -1,8 +1,8 @@
 package validator
 
 import (
-	"github.com/contracttesting/broker/internal/features/publish_contract/mapper/fragmentmapper"
-	"github.com/contracttesting/broker/internal/features/publish_contract/violation"
+	"github.com/bidirekt/broker/internal/features/publish_contract/mapper/fragmentmapper"
+	"github.com/bidirekt/broker/internal/features/publish_contract/violation"
 )
 
 type rule func(declarations fragmentmapper.Declarations) []violation.Violation

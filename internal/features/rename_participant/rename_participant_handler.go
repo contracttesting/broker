@@ -1,8 +1,8 @@
 package rename_participant
 
 import (
-	"github.com/contracttesting/broker/internal/repository"
-	"github.com/contracttesting/broker/internal/validations"
+	"github.com/bidirekt/broker/internal/repository"
+	"github.com/bidirekt/broker/internal/validations"
 	"github.com/gofiber/fiber/v3"
 )
 

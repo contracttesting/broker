@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contracttesting/broker/internal"
-	"github.com/contracttesting/broker/internal/components"
+	"github.com/bidirekt/broker/internal"
+	"github.com/bidirekt/broker/internal/components"
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/suite"

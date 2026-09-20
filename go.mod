@@ -1,4 +1,4 @@
-module github.com/contracttesting/broker
+module github.com/bidirekt/broker
 
 go 1.25.13
 

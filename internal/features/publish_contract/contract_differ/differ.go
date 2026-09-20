@@ -1,6 +1,6 @@
 package contract_differ
 
-import "github.com/contracttesting/broker/internal/model"
+import "github.com/bidirekt/broker/internal/model"
 
 // DiffContracts reports the resource and property changes from the persisted current to the uploaded next, keyed by resource hash.
 func DiffContracts(current *model.PersistedContract, next *model.UploadedContract) model.ContractDiff {

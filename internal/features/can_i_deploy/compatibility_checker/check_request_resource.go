@@ -1,6 +1,6 @@
 package compatibility_checker
 
-import "github.com/contracttesting/broker/internal/model"
+import "github.com/bidirekt/broker/internal/model"
 
 func checkRequestResource(
 	checked *model.PersistedResource,

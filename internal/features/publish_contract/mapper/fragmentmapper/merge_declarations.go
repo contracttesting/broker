@@ -1,7 +1,7 @@
 package fragmentmapper
 
 import (
-	"github.com/contracttesting/broker/internal/model"
+	"github.com/bidirekt/broker/internal/model"
 )
 
 // A provider declared twice is a violation the validator reports before this runs, so the first one wins here.
